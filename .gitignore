@@ -7,6 +7,7 @@
 out
 gen
 .env
+.claude
 
 # Docker
 .dockerignore
