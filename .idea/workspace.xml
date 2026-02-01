@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AIAssistantCustomInstructionsStorage">
+    <option name="instructions">
+      <map>
+        <entry key="AIAssistant.VCS.GenerateCommitMessage">
+          <value>
+            <AIAssistantStoredInstruction>
+              <option name="actionId" value="AIAssistant.VCS.GenerateCommitMessage" />
+              <option name="content" value="Avoid overly verbose descriptions or unnecessary details.&#10;日本語で出力してください。&#10;複数の変更には箇条書きを使用する&#10;$GIT_BRANCH_NAME からチケット番号を抽出" />
+            </AIAssistantStoredInstruction>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="9c4ecc60-6a30-44c4-a4b1-7d29b3ce376a" name="変更" comment="すべてのファイルに著作権情報を追加">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GithubDefaultAccount">
+    <option name="defaultAccountId" value="993f53ab-c502-419a-a759-f9a20d87fb9c" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="AISelfReview" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 2
+}]]></component>
+  <component name="ProjectId" id="393R2ATW621tpMQJPMHJmWxVGBx" />
+  <component name="ProjectViewState">
+    <option name="autoscrollFromSource" value="true" />
+    <option name="autoscrollToSource" value="true" />
+    <option name="compactDirectories" value="true" />
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="openDirectoriesWithSingleClick" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHELLCHECK.PATH": "/Users/sakaimasanori/Library/Application Support/JetBrains/PyCharm2025.3/plugins/Shell Script/shellcheck",
+    "ai.playground.ignore.import.keys.banner.in.settings": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "master",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "/Users/sakaimasanori/Dropbox/meteo",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "org.jetbrains.plugins.github.ui.GithubSettingsConfigurable",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecapSpentCounter">
+    <option name="endsOfQuotaMs" value="1770436882668" />
+    <option name="spentUsd" value="0.00265275" />
+  </component>
+  <component name="RecapUselessUpdatesCounter">
+    <option name="suspendCountdown" value="2" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-PY-253.30387.127" />
+        <option value="bundled-python-sdk-3944b0c99280-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.30387.127" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="デフォルトタスク">
+      <changelist id="9c4ecc60-6a30-44c4-a4b1-7d29b3ce376a" name="変更" comment="" />
+      <created>1700033276749</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1700033276749</updated>
+      <workItem from="1769922559052" duration="14792000" />
+    </task>
+    <task id="LOCAL-00001" summary="- RTSPストリームから流星をリアルタイム検出する `meteor_detector_rtsp.py` を追加  &#10;- MP4動画から流星を検出する `meteor_detector.py` を追加">
+      <option name="closed" value="true" />
+      <created>1769929896405</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1769929896405</updated>
+    </task>
+    <task id="LOCAL-00002" summary="- `.gitignore` ファイルを追加し、不必要なファイル/ディレクトリを除外  &#10;- `.claude/settings.local.json` を追加し、ローカル設定を構成">
+      <option name="closed" value="true" />
+      <created>1769929908317</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1769929908317</updated>
+    </task>
+    <task id="LOCAL-00003" summary="- `constellation_drawer.py` と `constellation_drawer_astrometry.py` を削除">
+      <option name="closed" value="true" />
+      <created>1769943433536</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1769943433540</updated>
+    </task>
+    <task id="LOCAL-00004" summary="- プロジェクトの概要と使用方法を記載した `README.md` を追加">
+      <option name="closed" value="true" />
+      <created>1769943502003</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1769943502003</updated>
+    </task>
+    <task id="LOCAL-00005" summary="- ダッシュボード画像 (`dashboard.png`) を追加  &#10;- `README.md` にダッシュボード画像の参照を追記">
+      <option name="closed" value="true" />
+      <created>1769943745031</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1769943745031</updated>
+    </task>
+    <task id="LOCAL-00006" summary="`README.md` にライセンス情報を明記">
+      <option name="closed" value="true" />
+      <created>1769943837117</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1769943837117</updated>
+    </task>
+    <task id="LOCAL-00007" summary="すべてのファイルに著作権情報を追加">
+      <option name="closed" value="true" />
+      <created>1769944128123</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1769944128123</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Add initial implementation for meteor detection  &#10;&#10;Introduced `meteor_detector_rtsp.py` and `meteor_detector.py` scripts to enable meteor detection from both RTSP streams and pre-recorded video files." />
+    <MESSAGE value="- RTSPストリームから流星をリアルタイム検出する `meteor_detector_rtsp.py` を追加  &#10;- MP4動画から流星を検出する `meteor_detector.py` を追加" />
+    <MESSAGE value="- `.gitignore` ファイルを追加し、不必要なファイル/ディレクトリを除外  &#10;- `.claude/settings.local.json` を追加し、ローカル設定を構成" />
+    <MESSAGE value="- `constellation_drawer.py` と `constellation_drawer_astrometry.py` を削除" />
+    <MESSAGE value="- プロジェクトの概要と使用方法を記載した `README.md` を追加" />
+    <MESSAGE value="- ダッシュボード画像 (`dashboard.png`) を追加  &#10;- `README.md` にダッシュボード画像の参照を追記" />
+    <MESSAGE value="`README.md` にライセンス情報を明記" />
+    <MESSAGE value="すべてのファイルに著作権情報を追加" />
+    <option name="LAST_COMMIT_MESSAGE" value="すべてのファイルに著作権情報を追加" />
+  </component>
+</project>
