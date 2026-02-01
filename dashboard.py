@@ -220,10 +220,63 @@ class DashboardHandler(BaseHTTPRequestHandler):
             background: #16213e;
             border-radius: 8px;
             font-size: 0.85em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }}
+        .detection-item:hover {{
+            background: #2a3f6f;
         }}
         .detection-item .time {{
             color: #00d4ff;
             font-weight: bold;
+        }}
+        .modal {{
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            align-items: center;
+            justify-content: center;
+        }}
+        .modal.active {{
+            display: flex;
+        }}
+        .modal-content {{
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }}
+        .modal-content img {{
+            max-width: 100%;
+            max-height: 90vh;
+            object-fit: contain;
+        }}
+        .modal-close {{
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }}
+        .modal-close:hover {{
+            color: #00d4ff;
+        }}
+        .modal-info {{
+            position: absolute;
+            bottom: -60px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: #aaa;
+            font-size: 0.9em;
         }}
         .footer {{
             text-align: center;
@@ -270,6 +323,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         &copy; 2026 株式会社　リバーランズ・コンサルティング
     </div>
 
+    <!-- 画像表示モーダル -->
+    <div class="modal" id="image-modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <img id="modal-image" src="" alt="検出画像">
+            <div class="modal-info" id="modal-info"></div>
+        </div>
+    </div>
+
     <script>
         const cameras = {json.dumps(CAMERAS)};
         const startTime = Date.now();
@@ -308,12 +370,43 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     .then(r => r.json())
                     .then(data => {{
                         document.getElementById('count' + i).textContent = data.detections;
-                        document.getElementById('status' + i).className = 'camera-status';
+                        // stream_aliveがfalseの場合はオフライン表示
+                        if (data.stream_alive === false) {{
+                            document.getElementById('status' + i).className = 'camera-status offline';
+                        }} else {{
+                            document.getElementById('status' + i).className = 'camera-status';
+                        }}
                     }})
                     .catch(() => {{
                         document.getElementById('status' + i).className = 'camera-status offline';
                     }});
             }}, 2000);
+        }});
+
+        // 画像モーダル表示
+        function showImage(imagePath, time, camera, confidence) {{
+            document.getElementById('modal-image').src = '/image/' + imagePath;
+            document.getElementById('modal-info').innerHTML =
+                `${{time}} | ${{camera}} | 信頼度: ${{confidence}}`;
+            document.getElementById('image-modal').classList.add('active');
+        }}
+
+        function closeModal() {{
+            document.getElementById('image-modal').classList.remove('active');
+        }}
+
+        // モーダルの背景クリックで閉じる
+        document.getElementById('image-modal').onclick = function(e) {{
+            if (e.target.id === 'image-modal') {{
+                closeModal();
+            }}
+        }};
+
+        // ESCキーでモーダルを閉じる
+        document.addEventListener('keydown', function(e) {{
+            if (e.key === 'Escape') {{
+                closeModal();
+            }}
         }});
 
         // 検出一覧を更新
@@ -324,7 +417,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     document.getElementById('total-detections').textContent = data.total;
                     if (data.recent.length > 0) {{
                         const html = data.recent.map(d => `
-                            <div class="detection-item">
+                            <div class="detection-item" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">
                                 <div class="time">${{d.time}}</div>
                                 <div>${{d.camera}}</div>
                                 <div>信頼度: ${{d.confidence}}</div>
@@ -357,11 +450,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 for line in f:
                                     try:
                                         d = json.loads(line)
+                                        timestamp_str = d.get('timestamp', '')
+                                        # composite画像のパスを取得
+                                        composite_file = d.get('composite_file', '')
+                                        if composite_file:
+                                            # 相対パスに変換
+                                            composite_path = f"{cam_dir.name}/{Path(composite_file).name}"
+                                        else:
+                                            composite_path = ''
+
                                         total += 1
                                         detections.append({
-                                            'time': d.get('timestamp', '')[:19].replace('T', ' '),
+                                            'time': timestamp_str[:19].replace('T', ' '),
                                             'camera': cam_dir.name,
                                             'confidence': f"{d.get('confidence', 0):.0%}",
+                                            'image': composite_path,
                                         })
                                     except:
                                         pass
@@ -375,6 +478,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 'recent': detections[:10],
             }
             self.wfile.write(json.dumps(result).encode())
+
+        elif self.path.startswith('/image/'):
+            # /image/camera_name/filename.jpg
+            try:
+                parts = self.path[7:].split('/', 1)
+                if len(parts) == 2:
+                    camera_name, filename = parts
+                    image_path = Path(DETECTIONS_DIR) / camera_name / filename
+
+                    if image_path.exists() and image_path.is_file():
+                        self.send_response(200)
+                        if filename.endswith('.jpg') or filename.endswith('.jpeg'):
+                            self.send_header('Content-type', 'image/jpeg')
+                        elif filename.endswith('.png'):
+                            self.send_header('Content-type', 'image/png')
+                        self.end_headers()
+
+                        with open(image_path, 'rb') as f:
+                            self.wfile.write(f.read())
+                        return
+            except:
+                pass
+
+            self.send_response(404)
+            self.end_headers()
 
         else:
             self.send_response(404)

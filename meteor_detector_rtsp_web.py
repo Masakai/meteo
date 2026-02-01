@@ -386,6 +386,8 @@ current_frame_lock = Lock()
 detection_count = 0
 start_time_global = None
 camera_name = ""
+last_frame_time = 0  # 最後にフレームを受信した時刻
+stream_timeout = 10.0  # ストリームがタイムアウトとみなす秒数
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -494,11 +496,16 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             elapsed = time.time() - start_time_global if start_time_global else 0
+            current_time = time.time()
+            time_since_last_frame = current_time - last_frame_time if last_frame_time > 0 else 0
+            is_stream_alive = time_since_last_frame < stream_timeout
             stats = {
                 "detections": detection_count,
                 "elapsed": round(elapsed, 1),
                 "camera": camera_name,
                 "settings": current_settings,
+                "stream_alive": is_stream_alive,
+                "time_since_last_frame": round(time_since_last_frame, 1),
             }
             self.wfile.write(json.dumps(stats).encode())
 
@@ -654,6 +661,10 @@ def process_rtsp_stream(
                 break
             if frame is None:
                 continue
+
+            # ストリーム生存確認用の時刻を更新
+            global last_frame_time
+            last_frame_time = time.time()
 
             ring_buffer.add(timestamp, frame)
 
