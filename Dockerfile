@@ -1,4 +1,8 @@
 # 流星検出用Dockerイメージ
+#
+# Copyright (c) 2026 Masanori Sakai
+# All rights reserved.
+
 FROM python:3.11-slim
 
 # OpenCV-headless用の依存ライブラリ

@@ -1,4 +1,8 @@
 # ダッシュボード用Dockerイメージ（軽量）
+#
+# Copyright (c) 2026 Masanori Sakai
+# All rights reserved.
+
 FROM python:3.11-slim
 
 WORKDIR /app

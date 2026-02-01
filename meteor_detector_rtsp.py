@@ -4,6 +4,9 @@ RTSPストリームからリアルタイムで流星を検出するプログラ�
 
 使い方:
     python meteor_detector_rtsp.py rtsp://192.168.1.100:554/stream
+
+Copyright (c) 2026 Masanori Sakai
+All rights reserved.
 """
 
 import argparse

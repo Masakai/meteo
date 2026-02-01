@@ -9,6 +9,9 @@ MP4動画から流星を検出するプログラム
 
 使い方:
     python meteor_detector.py input.mp4 --output output.mp4
+
+Copyright (c) 2026 Masanori Sakai
+All rights reserved.
 """
 
 import argparse

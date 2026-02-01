@@ -2,6 +2,9 @@
 """
 流星検出ダッシュボード
 全カメラのプレビューを1ページで表示
+
+Copyright (c) 2026 Masanori Sakai
+All rights reserved.
 """
 
 from http.server import HTTPServer, BaseHTTPRequestHandler

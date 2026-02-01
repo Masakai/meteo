@@ -5,6 +5,9 @@ streamersファイルからdocker-compose.ymlを自動生成
 使い方:
     python generate_compose.py
     python generate_compose.py --streamers /path/to/streamers --output docker-compose.yml
+
+Copyright (c) 2026 Masanori Sakai
+All rights reserved.
 """
 
 import argparse

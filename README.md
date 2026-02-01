@@ -253,6 +253,11 @@ camera1:
 - Webプレビュー: MJPEGストリーミング
 - Docker化: マルチコンテナ構成
 
+## ライセンス
+
+Copyright (c) 2026 Masanori Sakai
+All rights reserved.
+
 ## 更新履歴
 
 - 2024-02-01: RTSP検出、Webプレビュー、Dockerサポート追加

@@ -1,4 +1,8 @@
 # Docker環境用の依存ライブラリ
 # headlessバージョンを使用（GUIなし、軽量）
+#
+# Copyright (c) 2026 Masanori Sakai
+# All rights reserved.
+
 opencv-python-headless>=4.5.0
 numpy>=1.20.0

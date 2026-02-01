@@ -2,6 +2,9 @@
 #
 # 流星検出Docker管理スクリプト
 #
+# Copyright (c) 2026 Masanori Sakai
+# All rights reserved.
+#
 # 使い方:
 #   ./meteor-docker.sh start     # 起動
 #   ./meteor-docker.sh stop      # 停止
