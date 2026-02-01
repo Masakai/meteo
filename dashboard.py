@@ -266,7 +266,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
     </div>
 
     <div class="footer">
-        Meteor Detection System | Ctrl+C で終了
+        Meteor Detection System | Ctrl+C で終了<br>
+        &copy; 2026 株式会社　リバーランズ・コンサルティング
     </div>
 
     <script>
