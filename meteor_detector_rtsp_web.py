@@ -26,6 +26,7 @@ from datetime import datetime
 import time
 import signal
 import sys
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
 
@@ -385,6 +386,14 @@ current_frame_lock = Lock()
 detection_count = 0
 start_time_global = None
 camera_name = ""
+# 設定情報（ダッシュボード表示用）
+current_settings = {
+    "sensitivity": "medium",
+    "scale": 0.5,
+    "buffer": 15.0,
+    "extract_clips": True,
+    "exclude_bottom": 0.0625,
+}
 
 
 class MJPEGHandler(BaseHTTPRequestHandler):
@@ -482,12 +491,14 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         elif self.path == '/stats':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             elapsed = time.time() - start_time_global if start_time_global else 0
             stats = {
                 "detections": detection_count,
                 "elapsed": round(elapsed, 1),
                 "camera": camera_name,
+                "settings": current_settings,
             }
             self.wfile.write(json.dumps(stats).encode())
 
@@ -500,7 +511,7 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 
-def save_meteor_event(event, ring_buffer, output_dir, fps=30):
+def save_meteor_event(event, ring_buffer, output_dir, fps=30, extract_clips=True):
     """流星イベントを保存"""
     start = max(0, event.start_time - 2.0)
     end = event.end_time + 2.0
@@ -513,13 +524,16 @@ def save_meteor_event(event, ring_buffer, output_dir, fps=30):
     base_name = f"meteor_{ts}"
 
     height, width = frames[0][1].shape[:2]
-    clip_path = output_dir / f"{base_name}.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
 
-    for _, frame in frames:
-        writer.write(frame)
-    writer.release()
+    # クリップ動画の保存
+    if extract_clips:
+        clip_path = output_dir / f"{base_name}.mp4"
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
+
+        for _, frame in frames:
+            writer.write(frame)
+        writer.release()
 
     event_frames = ring_buffer.get_range(event.start_time, event.end_time)
     if event_frames:
@@ -540,7 +554,10 @@ def save_meteor_event(event, ring_buffer, output_dir, fps=30):
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
 
-    print(f"  保存: {clip_path.name}")
+    if extract_clips:
+        print(f"  保存: {clip_path.name}")
+    else:
+        print(f"  保存: {base_name}_composite.jpg")
 
 
 def process_rtsp_stream(
@@ -552,11 +569,21 @@ def process_rtsp_stream(
     sensitivity: str = "medium",
     web_port: int = 0,
     cam_name: str = "camera",
+    extract_clips: bool = True,
 ):
-    global current_frame, detection_count, start_time_global, camera_name
+    global current_frame, detection_count, start_time_global, camera_name, current_settings
 
     params = params or DetectionParams()
     camera_name = cam_name
+
+    # 設定情報を更新（ダッシュボード表示用）
+    current_settings.update({
+        "sensitivity": sensitivity,
+        "scale": process_scale,
+        "buffer": buffer_seconds,
+        "extract_clips": extract_clips,
+        "exclude_bottom": params.exclude_bottom_ratio,
+    })
 
     if sensitivity == "low":
         params.diff_threshold = 40
@@ -651,7 +678,7 @@ def process_rtsp_stream(
                     detection_count += 1
                     print(f"\n[{event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
                     print(f"  長さ: {event.length:.1f}px, 時間: {event.duration:.2f}秒")
-                    save_meteor_event(event, ring_buffer, output_path, fps=fps)
+                    save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
 
                 # プレビュー用フレーム生成
                 if web_port > 0:
@@ -687,7 +714,7 @@ def process_rtsp_stream(
         events = detector.finalize_all()
         for event in events:
             detection_count += 1
-            save_meteor_event(event, ring_buffer, output_path, fps=fps)
+            save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
 
         reader.stop()
         if httpd:
@@ -707,11 +734,19 @@ def main():
     parser.add_argument("--exclude-bottom", type=float, default=1/16)
     parser.add_argument("--web-port", type=int, default=0, help="Webプレビューポート (0=無効)")
     parser.add_argument("--camera-name", default="camera", help="カメラ名")
+    parser.add_argument("--extract-clips", action="store_true", default=True,
+                        help="流星検出時にMP4クリップを保存 (デフォルト: 有効)")
+    parser.add_argument("--no-clips", action="store_true",
+                        help="MP4クリップを保存しない（コンポジット画像のみ）")
 
     args = parser.parse_args()
 
     params = DetectionParams()
     params.exclude_bottom_ratio = args.exclude_bottom
+
+    # クリップ抽出の判定（--no-clips または環境変数 EXTRACT_CLIPS=false で無効化）
+    env_extract = os.environ.get("EXTRACT_CLIPS", "true").lower()
+    extract_clips = not args.no_clips and env_extract not in ("false", "0", "no")
 
     process_rtsp_stream(
         args.url,
@@ -722,6 +757,7 @@ def main():
         sensitivity=args.sensitivity,
         web_port=args.web_port,
         cam_name=args.camera_name,
+        extract_clips=extract_clips,
     )
 
 

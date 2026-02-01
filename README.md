@@ -114,8 +114,23 @@ python meteor_detector_rtsp_web.py \
   --scale 0.5 \
   --buffer 15 \
   --web-port 8080 \
-  --camera-name "camera1"
+  --camera-name "camera1" \
+  --extract-clips           # クリップ動画を保存（デフォルト）
 ```
+
+#### クリップ動画の保存
+
+検出した流星のクリップ動画（MP4）を保存するかどうかを制御できます：
+
+```bash
+# クリップ動画を保存（デフォルト）
+python meteor_detector_rtsp_web.py rtsp://... --extract-clips
+
+# クリップ動画を保存しない（コンポジット画像のみ）
+python meteor_detector_rtsp_web.py rtsp://... --no-clips
+```
+
+ストレージ容量を節約したい場合は `--no-clips` を使用してください。
 
 ### 3. Docker Composeで複数カメラを監視
 
@@ -140,6 +155,7 @@ python generate_compose.py
 python generate_compose.py --sensitivity fireball  # 火球検出モード
 python generate_compose.py --scale 0.25            # 処理解像度を1/4に
 python generate_compose.py --base-port 9080        # ポート番号を変更
+python generate_compose.py --extract-clips false   # クリップ動画を保存しない
 ```
 
 #### 起動と管理
@@ -219,11 +235,13 @@ input.meteors.json   # 検出結果のJSON
 
 ```
 detections/camera1/
-├── meteor_20240101_123456.mp4              # 流星イベントの動画クリップ
+├── meteor_20240101_123456.mp4              # 流星イベントの動画クリップ（--extract-clips時）
 ├── meteor_20240101_123456_composite.jpg    # 比較明合成（マーク付き）
 ├── meteor_20240101_123456_composite_original.jpg
 └── detections.jsonl                        # 検出ログ（JSONL形式）
 ```
+
+`--no-clips` を指定した場合、MP4クリップは生成されません（コンポジット画像とログのみ）。
 
 ## 検出アルゴリズム
 
@@ -272,6 +290,7 @@ camera1:
     - SCALE=0.5                 # 処理解像度スケール
     - BUFFER=15                 # バッファ秒数
     - EXCLUDE_BOTTOM=0.0625     # 下部除外範囲（1/16）
+    - EXTRACT_CLIPS=true        # クリップ動画を保存（true/false）
     - WEB_PORT=8080
   ports:
     - "8081:8080"               # ホスト:コンテナ
@@ -294,5 +313,6 @@ All rights reserved.
 
 ## 更新履歴
 
+- 2024-02-02: --extract-clips / --no-clips オプション追加
 - 2024-02-01: RTSP検出、Webプレビュー、Dockerサポート追加
 - 2024-01-31: MP4動画検出、火球モード、高速化オプション追加

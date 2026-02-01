@@ -52,6 +52,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int)
       - SCALE={settings['scale']}
       - BUFFER={settings['buffer']}
       - EXCLUDE_BOTTOM={settings['exclude_bottom']}
+      - EXTRACT_CLIPS={settings['extract_clips']}
       - WEB_PORT=8080
     ports:
       - "{web_port}:8080"
@@ -196,6 +197,9 @@ streamersファイルの形式:
                        help="バッファ秒数 (default: 15)")
     parser.add_argument("--exclude-bottom", default="0.0625",
                        help="下部除外範囲 (default: 0.0625)")
+    parser.add_argument("--extract-clips", default="true",
+                       choices=["true", "false"],
+                       help="クリップ動画を保存 (default: true)")
     parser.add_argument("--base-port", type=int, default=8080,
                        help="ベースポート番号 (default: 8080)")
 
@@ -206,6 +210,7 @@ streamersファイルの形式:
         'scale': args.scale,
         'buffer': args.buffer,
         'exclude_bottom': args.exclude_bottom,
+        'extract_clips': args.extract_clips,
     }
 
     # 生成

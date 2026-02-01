@@ -62,6 +62,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     </div>
                     <div class="camera-stats">
                         <span>検出: <b id="count{i}">-</b></span>
+                        <span class="camera-params" id="params{i}"></span>
                     </div>
                 </div>
                 '''
@@ -172,9 +173,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
             padding: 10px 15px;
             background: #16213e;
             font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
         }}
         .camera-stats b {{
             color: #00ff88;
+        }}
+        .camera-params {{
+            font-size: 0.8em;
+            color: #888;
+        }}
+        .camera-params .param {{
+            display: inline-block;
+            background: #2a3f6f;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 4px;
+        }}
+        .camera-params .param-clip {{
+            color: #00ff88;
+        }}
+        .camera-params .param-no-clip {{
+            color: #ff8844;
         }}
         .recent-detections {{
             max-width: 1800px;
@@ -262,6 +285,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
         // 各カメラの統計を取得
         let totalDetections = 0;
         cameras.forEach((cam, i) => {{
+            // 設定情報の取得（初回のみ）
+            fetch(cam.url + '/stats')
+                .then(r => r.json())
+                .then(data => {{
+                    if (data.settings) {{
+                        const s = data.settings;
+                        const clipClass = s.extract_clips ? 'param-clip' : 'param-no-clip';
+                        const clipText = s.extract_clips ? 'CLIP:ON' : 'CLIP:OFF';
+                        document.getElementById('params' + i).innerHTML =
+                            `<span class="param">${{s.sensitivity}}</span>` +
+                            `<span class="param">x${{s.scale}}</span>` +
+                            `<span class="param ${{clipClass}}">${{clipText}}</span>`;
+                    }}
+                }})
+                .catch(() => {{}});
+
+            // 検出数の定期更新
             setInterval(() => {{
                 fetch(cam.url + '/stats')
                     .then(r => r.json())
