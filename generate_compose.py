@@ -15,25 +15,8 @@ import re
 from pathlib import Path
 
 
-COMPOSE_HEADER = """# 流星検出 Docker Compose設定
-# 自動生成: python generate_compose.py
-#
-# 使い方:
-#   起動:     docker compose up -d
-#   停止:     docker compose down
-#   ログ確認: docker compose logs -f
-#   状態確認: docker compose ps
-#   再起動:   docker compose restart
-#
-# 検出結果は ./detections/ 以下に保存されます
-# 各カメラの結果は detections/<camera_name>/ に保存
-
-"""
-
-
 def parse_rtsp_url(url: str) -> dict:
     """RTSPのURLをパース"""
-    # rtsp://user:pass@host:port/path
     pattern = r'rtsp://(?:([^:]+):([^@]+)@)?([^:/]+)(?::(\d+))?(/.*)?'
     match = re.match(pattern, url.strip())
 
@@ -50,7 +33,7 @@ def parse_rtsp_url(url: str) -> dict:
     }
 
 
-def generate_service(index: int, rtsp_info: dict, settings: dict) -> str:
+def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int) -> str:
     """1つのカメラ用のサービス定義を生成"""
 
     camera_name = f"camera{index}_{rtsp_info['host'].replace('.', '_')}"
@@ -69,6 +52,9 @@ def generate_service(index: int, rtsp_info: dict, settings: dict) -> str:
       - SCALE={settings['scale']}
       - BUFFER={settings['buffer']}
       - EXCLUDE_BOTTOM={settings['exclude_bottom']}
+      - WEB_PORT=8080
+    ports:
+      - "{web_port}:8080"
     volumes:
       - ./detections:/output
     networks:
@@ -81,7 +67,43 @@ def generate_service(index: int, rtsp_info: dict, settings: dict) -> str:
 """
 
 
-def generate_compose(streamers_file: str, settings: dict) -> str:
+def generate_dashboard(cameras: list, base_port: int) -> str:
+    """ダッシュボードサービスを生成"""
+
+    # カメラ環境変数
+    camera_envs = []
+    depends = []
+    for i, cam in enumerate(cameras, 1):
+        camera_envs.append(f"      - CAMERA{i}_NAME=camera{i} ({cam['host']})")
+        camera_envs.append(f"      - CAMERA{i}_URL=http://localhost:{base_port + i}")
+        depends.append(f"camera{i}")
+
+    camera_env_str = "\n".join(camera_envs)
+    depends_str = "\n      - ".join(depends)
+
+    return f"""
+  # ダッシュボード（全カメラ一覧）
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: meteor-dashboard
+    restart: unless-stopped
+    environment:
+      - PORT=8080
+{camera_env_str}
+    ports:
+      - "{base_port}:8080"
+    volumes:
+      - ./detections:/output:ro
+    networks:
+      - meteor-net
+    depends_on:
+      - {depends_str}
+"""
+
+
+def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080) -> str:
     """docker-compose.ymlを生成"""
 
     # streamersファイルを読み込み
@@ -89,21 +111,52 @@ def generate_compose(streamers_file: str, settings: dict) -> str:
         lines = [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
     # 各RTSPストリームをパース
+    cameras = []
     services = []
     for i, url in enumerate(lines, 1):
         info = parse_rtsp_url(url)
         if info:
-            services.append(generate_service(i, info, settings))
+            cameras.append(info)
+            web_port = base_port + i  # 8081, 8082, 8083, ...
+            services.append(generate_service(i, info, settings, web_port))
         else:
             print(f"警告: 無効なURL (行{i}): {url}")
 
     if not services:
         raise ValueError("有効なRTSPストリームが見つかりません")
 
+    # ポート一覧を生成
+    port_list = [f"#   http://localhost:{base_port}/  (ダッシュボード)"]
+    for i, cam in enumerate(cameras, 1):
+        port_list.append(f"#   http://localhost:{base_port + i}/  (カメラ{i}: {cam['host']})")
+    port_list_str = "\n".join(port_list)
+
     # docker-compose.yml を構築
-    compose = COMPOSE_HEADER
-    compose += "services:"
+    compose = f"""# 流星検出 Docker Compose設定（Webプレビュー付き）
+# 自動生成: python generate_compose.py
+#
+# Copyright (c) 2026 Masanori Sakai
+# All rights reserved.
+#
+# 使い方:
+#   起動:     docker compose up -d
+#   停止:     docker compose down
+#   ログ確認: docker compose logs -f
+#
+# Webプレビュー:
+{port_list_str}
+#
+# 検出結果は ./detections/ 以下に保存されます
+
+services:"""
+
+    # ダッシュボード
+    compose += generate_dashboard(cameras, base_port)
+
+    # カメラサービス
     compose += "".join(services)
+
+    # ネットワーク
     compose += """
 networks:
   meteor-net:
@@ -143,6 +196,8 @@ streamersファイルの形式:
                        help="バッファ秒数 (default: 15)")
     parser.add_argument("--exclude-bottom", default="0.0625",
                        help="下部除外範囲 (default: 0.0625)")
+    parser.add_argument("--base-port", type=int, default=8080,
+                       help="ベースポート番号 (default: 8080)")
 
     args = parser.parse_args()
 
@@ -154,7 +209,7 @@ streamersファイルの形式:
     }
 
     # 生成
-    compose = generate_compose(args.streamers, settings)
+    compose = generate_compose(args.streamers, settings, args.base_port)
 
     # 出力
     with open(args.output, 'w') as f:
@@ -164,8 +219,16 @@ streamersファイルの形式:
 
     # 情報表示
     with open(args.streamers, 'r') as f:
-        count = sum(1 for line in f if line.strip() and not line.startswith('#'))
-    print(f"カメラ数: {count}")
+        urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+
+    print(f"カメラ数: {len(urls)}")
+    print()
+    print("Webプレビュー:")
+    print(f"  http://localhost:{args.base_port}/  (ダッシュボード)")
+    for i, url in enumerate(urls, 1):
+        info = parse_rtsp_url(url)
+        if info:
+            print(f"  http://localhost:{args.base_port + i}/  (カメラ{i}: {info['host']})")
     print()
     print("使い方:")
     print("  docker compose build   # イメージをビルド")

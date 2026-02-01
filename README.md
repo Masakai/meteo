@@ -17,12 +17,17 @@
 ```
 .
 ├── meteor_detector.py              # MP4動画からの流星検出
-├── meteor_detector_rtsp_web.py     # RTSPストリームのリアルタイム検出
+├── meteor_detector_rtsp.py         # RTSPストリームのリアルタイム検出（CLI版）
+├── meteor_detector_rtsp_web.py     # RTSPストリームのリアルタイム検出（Webプレビュー付き）
 ├── dashboard.py                    # 複数カメラのダッシュボード
+├── generate_compose.py             # streamersからdocker-compose.ymlを自動生成
+├── streamers                       # RTSPカメラURL一覧
 ├── docker-compose.yml              # Docker Compose設定
 ├── Dockerfile                      # 検出コンテナ用Dockerfile
 ├── Dockerfile.dashboard            # ダッシュボード用Dockerfile
-├── requirements-docker.txt         # Python依存ライブラリ
+├── meteor-docker.sh                # Docker管理スクリプト
+├── requirements.txt                # Python依存ライブラリ
+├── requirements-docker.txt         # Docker用依存ライブラリ
 └── README.md                       # このファイル
 ```
 
@@ -114,15 +119,44 @@ python meteor_detector_rtsp_web.py \
 
 ### 3. Docker Composeで複数カメラを監視
 
+#### streamersファイルの設定
+
+`streamers` ファイルにRTSP URLを1行1カメラで記載：
+
+```
+# コメント行（#で始まる）
+rtsp://user:pass@10.0.1.25/live
+rtsp://user:pass@10.0.1.3/live
+rtsp://user:pass@10.0.1.11/live
+```
+
+#### docker-compose.ymlの自動生成
+
 ```bash
-# 起動
+# streamersファイルからdocker-compose.ymlを生成
+python generate_compose.py
+
+# オプション指定
+python generate_compose.py --sensitivity fireball  # 火球検出モード
+python generate_compose.py --scale 0.25            # 処理解像度を1/4に
+python generate_compose.py --base-port 9080        # ポート番号を変更
+```
+
+#### 起動と管理
+
+```bash
+# ビルド＆起動
+docker compose build
 docker compose up -d
 
-# ログ確認
-docker compose logs -f
-
-# 停止
-docker compose down
+# 管理スクリプトを使う場合
+./meteor-docker.sh start      # 起動
+./meteor-docker.sh stop       # 停止
+./meteor-docker.sh status     # 状態確認（検出件数も表示）
+./meteor-docker.sh logs       # ログ確認
+./meteor-docker.sh logs camera1  # 特定カメラのログ
+./meteor-docker.sh restart    # 再起動
+./meteor-docker.sh build      # 再ビルド
 ```
 
 #### アクセス先

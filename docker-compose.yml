@@ -1,4 +1,5 @@
 # 流星検出 Docker Compose設定（Webプレビュー付き）
+# 自動生成: python generate_compose.py
 #
 # Copyright (c) 2026 Masanori Sakai
 # All rights reserved.
@@ -8,13 +9,13 @@
 #   停止:     docker compose down
 #   ログ確認: docker compose logs -f
 #
-# ダッシュボード（全カメラ一覧）:
-#   http://localhost:8080/
+# Webプレビュー:
+#   http://localhost:8080/  (ダッシュボード)
+#   http://localhost:8081/  (カメラ1: 10.0.1.25)
+#   http://localhost:8082/  (カメラ2: 10.0.1.3)
+#   http://localhost:8083/  (カメラ3: 10.0.1.11)
 #
-# 個別カメラ:
-#   カメラ1: http://localhost:8081/
-#   カメラ2: http://localhost:8082/
-#   カメラ3: http://localhost:8083/
+# 検出結果は ./detections/ 以下に保存されます
 
 services:
   # ダッシュボード（全カメラ一覧）
@@ -26,7 +27,6 @@ services:
     restart: unless-stopped
     environment:
       - PORT=8080
-      # ブラウザからアクセスするURL（localhost経由）
       - CAMERA1_NAME=camera1 (10.0.1.25)
       - CAMERA1_URL=http://localhost:8081
       - CAMERA2_NAME=camera2 (10.0.1.3)
@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
     environment:
       - RTSP_URL=rtsp://6199:4003@10.0.1.25/live
-      - CAMERA_NAME=camera1_10.0.1.25
+      - CAMERA_NAME=camera1_10_0_1_25
       - SENSITIVITY=medium
       - SCALE=0.5
       - BUFFER=15
@@ -76,7 +76,7 @@ services:
     restart: unless-stopped
     environment:
       - RTSP_URL=rtsp://6199:4003@10.0.1.3/live
-      - CAMERA_NAME=camera2_10.0.1.3
+      - CAMERA_NAME=camera2_10_0_1_3
       - SENSITIVITY=medium
       - SCALE=0.5
       - BUFFER=15
@@ -101,7 +101,7 @@ services:
     restart: unless-stopped
     environment:
       - RTSP_URL=rtsp://6199:4003@10.0.1.11/live
-      - CAMERA_NAME=camera3_10.0.1.11
+      - CAMERA_NAME=camera3_10_0_1_11
       - SENSITIVITY=medium
       - SCALE=0.5
       - BUFFER=15
