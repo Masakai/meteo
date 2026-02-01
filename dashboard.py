@@ -284,6 +284,52 @@ class DashboardHandler(BaseHTTPRequestHandler):
             color: #555;
             font-size: 0.85em;
         }}
+        .version-link {{
+            color: #00d4ff;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.2s;
+        }}
+        .version-link:hover {{
+            color: #00ff88;
+        }}
+        .changelog-modal {{
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            align-items: center;
+            justify-content: center;
+        }}
+        .changelog-modal.active {{
+            display: flex;
+        }}
+        .changelog-content {{
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            background: #1e2a4a;
+            padding: 30px;
+            border-radius: 12px;
+            position: relative;
+            color: #eee;
+        }}
+        .changelog-content h1, .changelog-content h2 {{
+            color: #00d4ff;
+        }}
+        .changelog-content h3 {{
+            color: #00ff88;
+        }}
+        .changelog-content pre {{
+            background: #16213e;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }}
     </style>
 </head>
 <body>
@@ -319,7 +365,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     </div>
 
     <div class="footer">
-        Meteor Detection System | Ctrl+C で終了<br>
+        Meteor Detection System <span class="version-link" onclick="showChangelog()">v1.0.0</span> | Ctrl+C で終了<br>
         &copy; 2026 株式会社　リバーランズ・コンサルティング
     </div>
 
@@ -329,6 +375,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             <button class="modal-close" onclick="closeModal()">&times;</button>
             <img id="modal-image" src="" alt="検出画像">
             <div class="modal-info" id="modal-info"></div>
+        </div>
+    </div>
+
+    <!-- CHANGELOG表示モーダル -->
+    <div class="changelog-modal" id="changelog-modal">
+        <div class="changelog-content">
+            <button class="modal-close" onclick="closeChangelog()">&times;</button>
+            <div id="changelog-text">読み込み中...</div>
         </div>
     </div>
 
@@ -427,10 +481,67 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     }}
                 }});
         }}, 3000);
+
+        // CHANGELOG表示
+        function showChangelog() {{
+            document.getElementById('changelog-modal').classList.add('active');
+            fetch('/changelog')
+                .then(r => r.text())
+                .then(text => {{
+                    // マークダウンを簡易HTMLに変換
+                    const lines = text.split('\\n');
+                    let html = '';
+                    for (let line of lines) {{
+                        if (line.startsWith('# ')) {{
+                            html += '<h1>' + line.substring(2) + '</h1>';
+                        }} else if (line.startsWith('## ')) {{
+                            html += '<h2>' + line.substring(3) + '</h2>';
+                        }} else if (line.startsWith('### ')) {{
+                            html += '<h3>' + line.substring(4) + '</h3>';
+                        }} else if (line.startsWith('- ')) {{
+                            html += '<li>' + line.substring(2) + '</li>';
+                        }} else if (line.trim() === '') {{
+                            html += '<br>';
+                        }} else {{
+                            html += '<p>' + line + '</p>';
+                        }}
+                    }}
+                    document.getElementById('changelog-text').innerHTML = html;
+                }})
+                .catch(() => {{
+                    document.getElementById('changelog-text').innerHTML = '<p>CHANGELOGの読み込みに失敗しました</p>';
+                }});
+        }}
+
+        function closeChangelog() {{
+            document.getElementById('changelog-modal').classList.remove('active');
+        }}
+
+        // CHANGELOGモーダルの背景クリックで閉じる
+        document.getElementById('changelog-modal').onclick = function(e) {{
+            if (e.target.id === 'changelog-modal') {{
+                closeChangelog();
+            }}
+        }};
     </script>
 </body>
 </html>'''
             self.wfile.write(html.encode())
+
+        elif self.path == '/changelog':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain; charset=utf-8')
+            self.end_headers()
+
+            try:
+                changelog_path = Path(__file__).parent / 'CHANGELOG.md'
+                if changelog_path.exists():
+                    with open(changelog_path, 'r', encoding='utf-8') as f:
+                        self.wfile.write(f.read().encode('utf-8'))
+                else:
+                    self.wfile.write(b'CHANGELOG.md not found')
+            except Exception as e:
+                self.wfile.write(f'Error: {str(e)}'.encode('utf-8'))
 
         elif self.path == '/detections':
             self.send_response(200)
