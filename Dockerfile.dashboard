@@ -9,6 +9,11 @@ WORKDIR /app
 
 COPY dashboard.py .
 
+# タイムゾーン設定
+ENV TZ=Asia/Tokyo
+RUN ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
+    echo "Asia/Tokyo" > /etc/timezone
+
 ENV PORT=8080
 
 EXPOSE 8080

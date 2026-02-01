@@ -46,6 +46,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int)
     container_name: meteor-{service_name}
     restart: unless-stopped
     environment:
+      - TZ=Asia/Tokyo
       - RTSP_URL={rtsp_info['url']}
       - CAMERA_NAME={camera_name}
       - SENSITIVITY={settings['sensitivity']}
@@ -91,6 +92,7 @@ def generate_dashboard(cameras: list, base_port: int) -> str:
     container_name: meteor-dashboard
     restart: unless-stopped
     environment:
+      - TZ=Asia/Tokyo
       - PORT=8080
 {camera_env_str}
     ports:

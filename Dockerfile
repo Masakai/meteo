@@ -26,6 +26,11 @@ COPY meteor_detector_rtsp_web.py .
 # 出力ディレクトリ
 RUN mkdir -p /output
 
+# タイムゾーン設定
+ENV TZ=Asia/Tokyo
+RUN ln -sf /usr/share/zoneinfo/Asia/Tokyo /etc/localtime && \
+    echo "Asia/Tokyo" > /etc/timezone
+
 # 環境変数のデフォルト値
 ENV RTSP_URL=""
 ENV SENSITIVITY="medium"
