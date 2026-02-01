@@ -11,3 +11,6 @@ gen
 # Docker
 .dockerignore
 .docker-compose.yml
+/detections/
+/meteor_detections/
+/.claude/

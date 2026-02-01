@@ -1,0 +1,4 @@
+# Docker環境用の依存ライブラリ
+# headlessバージョンを使用（GUIなし、軽量）
+opencv-python-headless>=4.5.0
+numpy>=1.20.0
