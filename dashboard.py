@@ -230,6 +230,20 @@ class DashboardHandler(BaseHTTPRequestHandler):
             color: #00d4ff;
             font-weight: bold;
         }}
+        .delete-btn {{
+            background: #ff4444;
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-top: 5px;
+            transition: background 0.2s;
+        }}
+        .delete-btn:hover {{
+            background: #cc0000;
+        }}
         .modal {{
             display: none;
             position: fixed;
@@ -251,8 +265,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             position: relative;
         }}
         .modal-content img {{
-            max-width: 100%;
-            max-height: 90vh;
+            max-width: 70%;
+            max-height: 70vh;
             object-fit: contain;
         }}
         .modal-close {{
@@ -463,8 +477,34 @@ class DashboardHandler(BaseHTTPRequestHandler):
             }}
         }});
 
+        // 検出削除関数
+        function deleteDetection(camera, time, event) {{
+            event.stopPropagation(); // 画像表示イベントを防止
+
+            if (!confirm(`この検出を削除しますか?\\n${{time}} - ${{camera}}`)) {{
+                return;
+            }}
+
+            fetch(`/detection/${{camera}}/${{time}}`, {{
+                method: 'DELETE'
+            }})
+            .then(r => r.json())
+            .then(data => {{
+                if (data.success) {{
+                    alert(data.message);
+                    // 検出リストを即座に更新
+                    updateDetections();
+                }} else {{
+                    alert('削除に失敗しました: ' + (data.error || '不明なエラー'));
+                }}
+            }})
+            .catch(err => {{
+                alert('削除に失敗しました: ' + err.message);
+            }});
+        }}
+
         // 検出一覧を更新
-        setInterval(() => {{
+        function updateDetections() {{
             fetch('/detections')
                 .then(r => r.json())
                 .then(data => {{
@@ -475,12 +515,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                 <div class="time">${{d.time}}</div>
                                 <div>${{d.camera}}</div>
                                 <div>信頼度: ${{d.confidence}}</div>
+                                <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>
                             </div>
                         `).join('');
                         document.getElementById('detection-list').innerHTML = html;
+                    }} else {{
+                        document.getElementById('detection-list').innerHTML = '<div class="detection-item" style="color:#666">検出待機中...</div>';
                     }}
                 }});
-        }}, 3000);
+        }}
+
+        // 定期的に検出一覧を更新
+        setInterval(updateDetections, 3000);
+        updateDetections(); // 初回実行
 
         // CHANGELOG表示
         function showChangelog() {{
@@ -562,11 +609,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                     try:
                                         d = json.loads(line)
                                         timestamp_str = d.get('timestamp', '')
-                                        # composite画像のパスを取得
-                                        composite_file = d.get('composite_file', '')
-                                        if composite_file:
-                                            # 相対パスに変換
-                                            composite_path = f"{cam_dir.name}/{Path(composite_file).name}"
+                                        # タイムスタンプからファイル名を推測
+                                        # timestamp: "2026-02-02T06:55:33.411811"
+                                        # filename: "meteor_20260202_065533_composite.jpg"
+                                        if timestamp_str:
+                                            dt = datetime.fromisoformat(timestamp_str)
+                                            filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}_composite.jpg"
+                                            composite_path = f"{cam_dir.name}/{filename}"
                                         else:
                                             composite_path = ''
 
@@ -618,6 +667,88 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_DELETE(self):
+        """DELETE リクエストを処理（検出結果の削除）"""
+        if self.path.startswith('/detection/'):
+            # /detection/camera_name/timestamp
+            try:
+                parts = self.path[11:].split('/', 1)
+                if len(parts) == 2:
+                    camera_name, timestamp_str = parts
+
+                    # タイムスタンプから datetime オブジェクトを作成
+                    # timestamp_str: "2026-02-02 06:55:33"
+                    dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                    base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
+
+                    cam_dir = Path(DETECTIONS_DIR) / camera_name
+
+                    # 削除するファイルのリスト（3つのファイル）
+                    files_to_delete = [
+                        cam_dir / f"{base_filename}.mp4",
+                        cam_dir / f"{base_filename}_composite.jpg",
+                        cam_dir / f"{base_filename}_composite_original.jpg",
+                    ]
+
+                    deleted_files = []
+                    for file_path in files_to_delete:
+                        if file_path.exists():
+                            file_path.unlink()
+                            deleted_files.append(file_path.name)
+
+                    # detections.jsonl から該当行を削除
+                    jsonl_file = cam_dir / 'detections.jsonl'
+                    if jsonl_file.exists():
+                        # 元のタイムスタンプ形式に戻す（ISO形式）
+                        target_timestamp = dt.isoformat()
+
+                        # 一時ファイルに書き込み
+                        temp_file = cam_dir / 'detections.jsonl.tmp'
+                        removed_count = 0
+
+                        with open(jsonl_file, 'r', encoding='utf-8') as f_in, \
+                             open(temp_file, 'w', encoding='utf-8') as f_out:
+                            for line in f_in:
+                                try:
+                                    d = json.loads(line)
+                                    # タイムスタンプが一致しない行のみ書き込む
+                                    if not d.get('timestamp', '').startswith(target_timestamp):
+                                        f_out.write(line)
+                                    else:
+                                        removed_count += 1
+                                except:
+                                    # パースできない行はそのまま保持
+                                    f_out.write(line)
+
+                        # 元のファイルを置き換え
+                        temp_file.replace(jsonl_file)
+
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+
+                    response = {
+                        'success': True,
+                        'deleted_files': deleted_files,
+                        'message': f'{len(deleted_files)}個のファイルを削除しました'
+                    }
+                    self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                    return
+
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                response = {
+                    'success': False,
+                    'error': str(e)
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                return
+
+        self.send_response(404)
+        self.end_headers()
 
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):

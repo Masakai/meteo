@@ -567,6 +567,101 @@ def save_meteor_event(event, ring_buffer, output_dir, fps=30, extract_clips=True
         print(f"  保存: {base_name}_composite.jpg")
 
 
+def detection_thread_worker(
+    reader,
+    params,
+    process_scale,
+    buffer_seconds,
+    fps,
+    output_path,
+    extract_clips,
+    stop_flag,
+):
+    """検出処理を行うワーカースレッド"""
+    global current_frame, detection_count, last_frame_time
+
+    width, height = reader.frame_size
+    proc_width = int(width * process_scale)
+    proc_height = int(height * process_scale)
+    scale_factor = 1.0 / process_scale
+
+    ring_buffer = RingBuffer(buffer_seconds, fps)
+    detector = RealtimeMeteorDetector(params, fps)
+
+    prev_gray = None
+    frame_count = 0
+
+    while not stop_flag.is_set():
+        ret, timestamp, frame = reader.read()
+        if not ret:
+            break
+        if frame is None:
+            continue
+
+        # ストリーム生存確認用の時刻を更新
+        last_frame_time = time.time()
+
+        ring_buffer.add(timestamp, frame)
+
+        if process_scale != 1.0:
+            proc_frame = cv2.resize(frame, (proc_width, proc_height), interpolation=cv2.INTER_AREA)
+        else:
+            proc_frame = frame
+
+        gray = cv2.cvtColor(proc_frame, cv2.COLOR_BGR2GRAY)
+
+        if prev_gray is not None:
+            objects = detector.detect_bright_objects(gray, prev_gray)
+
+            if process_scale != 1.0:
+                for obj in objects:
+                    cx, cy = obj["centroid"]
+                    obj["centroid"] = (int(cx * scale_factor), int(cy * scale_factor))
+
+            events = detector.track_objects(objects, timestamp)
+
+            for event in events:
+                detection_count += 1
+                print(f"\n[{event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                print(f"  長さ: {event.length:.1f}px, 時間: {event.duration:.2f}秒")
+                save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
+
+            # プレビュー用フレーム生成
+            display = frame.copy()
+
+            for obj in objects:
+                cx, cy = obj["centroid"]
+                cv2.circle(display, (cx, cy), 5, (0, 255, 0), 2)
+
+            with detector.lock:
+                for track_points in detector.active_tracks.values():
+                    if len(track_points) >= 2:
+                        for i in range(1, len(track_points)):
+                            pt1 = (track_points[i-1][1], track_points[i-1][2])
+                            pt2 = (track_points[i][1], track_points[i][2])
+                            cv2.line(display, pt1, pt2, (0, 255, 255), 2)
+
+            elapsed = time.time() - start_time_global
+            cv2.putText(display, f"{camera_name} | {elapsed:.0f}s | Detections: {detection_count}",
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            with current_frame_lock:
+                current_frame = display
+
+        prev_gray = gray.copy()
+        frame_count += 1
+
+        if frame_count % (int(fps) * 60) == 0:
+            elapsed = time.time() - start_time_global
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 稼働: {elapsed/60:.1f}分, 検出: {detection_count}個")
+
+    # 終了処理
+    events = detector.finalize_all()
+    for event in events:
+        detection_count += 1
+        save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
+
+
 def process_rtsp_stream(
     url: str,
     output_dir: str = "meteor_detections",
@@ -630,20 +725,12 @@ def process_rtsp_stream(
 
     width, height = reader.frame_size
     fps = reader.fps
-    proc_width = int(width * process_scale)
-    proc_height = int(height * process_scale)
-    scale_factor = 1.0 / process_scale
 
     print(f"解像度: {width}x{height}")
     print("検出開始 (Ctrl+C で終了)")
     print("-" * 50)
 
-    ring_buffer = RingBuffer(buffer_seconds, fps)
-    detector = RealtimeMeteorDetector(params, fps)
-
-    prev_gray = None
     detection_count = 0
-    frame_count = 0
     start_time_global = time.time()
 
     stop_flag = Event()
@@ -654,84 +741,30 @@ def process_rtsp_stream(
 
     signal.signal(signal.SIGINT, signal_handler)
 
+    # 検出処理を別スレッドで実行
+    detection_thread = Thread(
+        target=detection_thread_worker,
+        args=(reader, params, process_scale, buffer_seconds, fps, output_path, extract_clips, stop_flag),
+        daemon=False,
+    )
+    detection_thread.start()
+
+    # メインスレッドは停止シグナルを待機
     try:
         while not stop_flag.is_set():
-            ret, timestamp, frame = reader.read()
-            if not ret:
-                break
-            if frame is None:
-                continue
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("\n終了中...")
+        stop_flag.set()
 
-            # ストリーム生存確認用の時刻を更新
-            global last_frame_time
-            last_frame_time = time.time()
+    # 検出スレッドの終了を待機
+    detection_thread.join(timeout=5.0)
 
-            ring_buffer.add(timestamp, frame)
+    reader.stop()
+    if httpd:
+        httpd.shutdown()
 
-            if process_scale != 1.0:
-                proc_frame = cv2.resize(frame, (proc_width, proc_height), interpolation=cv2.INTER_AREA)
-            else:
-                proc_frame = frame
-
-            gray = cv2.cvtColor(proc_frame, cv2.COLOR_BGR2GRAY)
-
-            if prev_gray is not None:
-                objects = detector.detect_bright_objects(gray, prev_gray)
-
-                if process_scale != 1.0:
-                    for obj in objects:
-                        cx, cy = obj["centroid"]
-                        obj["centroid"] = (int(cx * scale_factor), int(cy * scale_factor))
-
-                events = detector.track_objects(objects, timestamp)
-
-                for event in events:
-                    detection_count += 1
-                    print(f"\n[{event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
-                    print(f"  長さ: {event.length:.1f}px, 時間: {event.duration:.2f}秒")
-                    save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
-
-                # プレビュー用フレーム生成
-                if web_port > 0:
-                    display = frame.copy()
-
-                    for obj in objects:
-                        cx, cy = obj["centroid"]
-                        cv2.circle(display, (cx, cy), 5, (0, 255, 0), 2)
-
-                    with detector.lock:
-                        for track_points in detector.active_tracks.values():
-                            if len(track_points) >= 2:
-                                for i in range(1, len(track_points)):
-                                    pt1 = (track_points[i-1][1], track_points[i-1][2])
-                                    pt2 = (track_points[i][1], track_points[i][2])
-                                    cv2.line(display, pt1, pt2, (0, 255, 255), 2)
-
-                    elapsed = time.time() - start_time_global
-                    cv2.putText(display, f"{camera_name} | {elapsed:.0f}s | Detections: {detection_count}",
-                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-                    with current_frame_lock:
-                        current_frame = display
-
-            prev_gray = gray.copy()
-            frame_count += 1
-
-            if frame_count % (int(fps) * 60) == 0:
-                elapsed = time.time() - start_time_global
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] 稼働: {elapsed/60:.1f}分, 検出: {detection_count}個")
-
-    finally:
-        events = detector.finalize_all()
-        for event in events:
-            detection_count += 1
-            save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
-
-        reader.stop()
-        if httpd:
-            httpd.shutdown()
-
-        print(f"\n終了 - 検出数: {detection_count}個")
+    print(f"\n終了 - 検出数: {detection_count}個")
 
 
 def main():
