@@ -7,7 +7,7 @@ streamersファイルからdocker-compose.ymlを自動生成
     python generate_compose.py --streamers /path/to/streamers --output docker-compose.yml
 
 Copyright (c) 2026 Masanori Sakai
-All rights reserved.
+Licensed under the MIT License
 """
 
 import argparse

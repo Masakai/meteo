@@ -1,7 +1,7 @@
 # 流星検出用Dockerイメージ
 #
 # Copyright (c) 2026 Masanori Sakai
-# All rights reserved.
+# Licensed under the MIT License
 
 FROM python:3.11-slim
 

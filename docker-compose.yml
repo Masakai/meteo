@@ -2,7 +2,7 @@
 # 自動生成: python generate_compose.py
 #
 # Copyright (c) 2026 Masanori Sakai
-# All rights reserved.
+# Licensed under the MIT License
 #
 # 使い方:
 #   起動:     docker compose up -d

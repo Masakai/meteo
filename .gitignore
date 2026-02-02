@@ -15,3 +15,6 @@ gen
 /detections/
 /meteor_detections/
 /.claude/
+
+# User-specific configuration
+streamers

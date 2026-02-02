@@ -4,7 +4,7 @@
 検出時間帯（天文薄暮期間）の計算
 
 Copyright (c) 2026 Masanori Sakai
-All rights reserved.
+Licensed under the MIT License
 """
 
 from datetime import datetime, timedelta

@@ -9,7 +9,7 @@ http://localhost:8080/ でアクセス
     python meteor_detector_rtsp_web.py rtsp://192.168.1.100:554/stream --web-port 8080
 
 Copyright (c) 2026 Masanori Sakai
-All rights reserved.
+Licensed under the MIT License
 """
 
 import argparse
