@@ -54,6 +54,10 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int)
       - BUFFER={settings['buffer']}
       - EXCLUDE_BOTTOM={settings['exclude_bottom']}
       - EXTRACT_CLIPS={settings['extract_clips']}
+      - LATITUDE={settings.get('latitude', '35.3606')}
+      - LONGITUDE={settings.get('longitude', '138.7274')}
+      - TIMEZONE=Asia/Tokyo
+      - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'false')}
       - WEB_PORT=8080
     ports:
       - "{web_port}:8080"
@@ -69,7 +73,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int)
 """
 
 
-def generate_dashboard(cameras: list, base_port: int) -> str:
+def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     """ダッシュボードサービスを生成"""
 
     # カメラ環境変数
@@ -94,6 +98,10 @@ def generate_dashboard(cameras: list, base_port: int) -> str:
     environment:
       - TZ=Asia/Tokyo
       - PORT=8080
+      - LATITUDE={settings.get('latitude', '35.3606')}
+      - LONGITUDE={settings.get('longitude', '138.7274')}
+      - TIMEZONE=Asia/Tokyo
+      - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'false')}
 {camera_env_str}
     ports:
       - "{base_port}:8080"
@@ -154,7 +162,7 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
 services:"""
 
     # ダッシュボード
-    compose += generate_dashboard(cameras, base_port)
+    compose += generate_dashboard(cameras, base_port, settings)
 
     # カメラサービス
     compose += "".join(services)
@@ -204,6 +212,13 @@ streamersファイルの形式:
                        help="クリップ動画を保存 (default: true)")
     parser.add_argument("--base-port", type=int, default=8080,
                        help="ベースポート番号 (default: 8080)")
+    parser.add_argument("--latitude", default="35.3606",
+                       help="観測地点の緯度 (default: 35.3606 = 富士山頂)")
+    parser.add_argument("--longitude", default="138.7274",
+                       help="観測地点の経度 (default: 138.7274 = 富士山頂)")
+    parser.add_argument("--enable-time-window", default="false",
+                       choices=["true", "false"],
+                       help="天文薄暮期間のみ検出を有効化 (default: false)")
 
     args = parser.parse_args()
 
@@ -213,6 +228,9 @@ streamersファイルの形式:
         'buffer': args.buffer,
         'exclude_bottom': args.exclude_bottom,
         'extract_clips': args.extract_clips,
+        'latitude': args.latitude,
+        'longitude': args.longitude,
+        'enable_time_window': args.enable_time_window,
     }
 
     # 生成

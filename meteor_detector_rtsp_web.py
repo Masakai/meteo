@@ -30,6 +30,12 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
 
+# 天文薄暮期間の判定用
+try:
+    from astro_utils import is_detection_active
+except ImportError:
+    is_detection_active = None
+
 
 @dataclass
 class MeteorEvent:
@@ -576,6 +582,10 @@ def detection_thread_worker(
     output_path,
     extract_clips,
     stop_flag,
+    enable_time_window=False,
+    latitude=35.3606,
+    longitude=138.7274,
+    timezone="Asia/Tokyo",
 ):
     """検出処理を行うワーカースレッド"""
     global current_frame, detection_count, last_frame_time
@@ -590,6 +600,11 @@ def detection_thread_worker(
 
     prev_gray = None
     frame_count = 0
+
+    # 天文薄暮期間のチェック間隔（秒）
+    last_time_check = 0
+    time_check_interval = 60  # 1分ごとにチェック
+    is_detection_time = True  # デフォルトは有効
 
     while not stop_flag.is_set():
         ret, timestamp, frame = reader.read()
@@ -610,8 +625,18 @@ def detection_thread_worker(
 
         gray = cv2.cvtColor(proc_frame, cv2.COLOR_BGR2GRAY)
 
+        # 天文薄暮期間のチェック（定期的に）
+        current_time = time.time()
+        if enable_time_window and is_detection_active and (current_time - last_time_check) > time_check_interval:
+            is_detection_time, _, _ = is_detection_active(latitude, longitude, timezone)
+            last_time_check = current_time
+
         if prev_gray is not None:
-            objects = detector.detect_bright_objects(gray, prev_gray)
+            # 検出期間内の場合のみ検出処理を実行
+            if is_detection_time:
+                objects = detector.detect_bright_objects(gray, prev_gray)
+            else:
+                objects = []
 
             if process_scale != 1.0:
                 for obj in objects:
@@ -741,10 +766,27 @@ def process_rtsp_stream(
 
     signal.signal(signal.SIGINT, signal_handler)
 
+    # 環境変数から天文薄暮期間の設定を取得
+    enable_time_window = os.environ.get('ENABLE_TIME_WINDOW', 'false').lower() == 'true'
+    latitude = float(os.environ.get('LATITUDE', '35.3606'))
+    longitude = float(os.environ.get('LONGITUDE', '138.7274'))
+    timezone = os.environ.get('TIMEZONE', 'Asia/Tokyo')
+
+    if enable_time_window:
+        print(f"検出時間制限: 有効（緯度: {latitude}, 経度: {longitude}）")
+    else:
+        print(f"検出時間制限: 無効（常時検出）")
+
     # 検出処理を別スレッドで実行
     detection_thread = Thread(
         target=detection_thread_worker,
         args=(reader, params, process_scale, buffer_seconds, fps, output_path, extract_clips, stop_flag),
+        kwargs={
+            'enable_time_window': enable_time_window,
+            'latitude': latitude,
+            'longitude': longitude,
+            'timezone': timezone,
+        },
         daemon=False,
     )
     detection_thread.start()

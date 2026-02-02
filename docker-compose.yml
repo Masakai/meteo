@@ -26,7 +26,12 @@ services:
     container_name: meteor-dashboard
     restart: unless-stopped
     environment:
+      - TZ=Asia/Tokyo
       - PORT=8080
+      - LATITUDE=35.6762
+      - LONGITUDE=139.6503
+      - TIMEZONE=Asia/Tokyo
+      - ENABLE_TIME_WINDOW=true
       - CAMERA1_NAME=camera1 (10.0.1.25)
       - CAMERA1_URL=http://localhost:8081
       - CAMERA2_NAME=camera2 (10.0.1.3)
@@ -50,13 +55,18 @@ services:
     container_name: meteor-camera1
     restart: unless-stopped
     environment:
+      - TZ=Asia/Tokyo
       - RTSP_URL=rtsp://6199:4003@10.0.1.25/live
       - CAMERA_NAME=camera1_10_0_1_25
       - SENSITIVITY=medium
       - SCALE=0.5
       - BUFFER=15
-      - EXCLUDE_BOTTOM=0.25
+      - EXCLUDE_BOTTOM=0.0625
       - EXTRACT_CLIPS=true
+      - LATITUDE=35.6762
+      - LONGITUDE=139.6503
+      - TIMEZONE=Asia/Tokyo
+      - ENABLE_TIME_WINDOW=true
       - WEB_PORT=8080
     ports:
       - "8081:8080"
@@ -76,13 +86,18 @@ services:
     container_name: meteor-camera2
     restart: unless-stopped
     environment:
+      - TZ=Asia/Tokyo
       - RTSP_URL=rtsp://6199:4003@10.0.1.3/live
       - CAMERA_NAME=camera2_10_0_1_3
       - SENSITIVITY=medium
       - SCALE=0.5
       - BUFFER=15
-      - EXCLUDE_BOTTOM=0.25
+      - EXCLUDE_BOTTOM=0.0625
       - EXTRACT_CLIPS=true
+      - LATITUDE=35.6762
+      - LONGITUDE=139.6503
+      - TIMEZONE=Asia/Tokyo
+      - ENABLE_TIME_WINDOW=true
       - WEB_PORT=8080
     ports:
       - "8082:8080"
@@ -102,13 +117,18 @@ services:
     container_name: meteor-camera3
     restart: unless-stopped
     environment:
+      - TZ=Asia/Tokyo
       - RTSP_URL=rtsp://6199:4003@10.0.1.11/live
       - CAMERA_NAME=camera3_10_0_1_11
       - SENSITIVITY=medium
       - SCALE=0.5
       - BUFFER=15
-      - EXCLUDE_BOTTOM=0.25
+      - EXCLUDE_BOTTOM=0.0625
       - EXTRACT_CLIPS=true
+      - LATITUDE=35.6762
+      - LONGITUDE=139.6503
+      - TIMEZONE=Asia/Tokyo
+      - ENABLE_TIME_WINDOW=true
       - WEB_PORT=8080
     ports:
       - "8083:8080"

@@ -147,25 +147,53 @@ rtsp://user:pass@10.0.1.11/live
 
 #### docker-compose.ymlの自動生成
 
-```bash
-# streamersファイルからdocker-compose.ymlを生成
-python generate_compose.py
+`generate_compose.py` は `streamers` ファイルから `docker-compose.yml` を自動生成するツールです。
 
-# オプション指定
-python generate_compose.py --sensitivity fireball  # 火球検出モード
-python generate_compose.py --scale 0.25            # 処理解像度を1/4に
-python generate_compose.py --base-port 9080        # ポート番号を変更
-python generate_compose.py --extract-clips false   # クリップ動画を保存しない
+```bash
+# streamersファイルからdocker-compose.ymlを生成（基本）
+python3 generate_compose.py
+
+# 全オプション指定の例
+python3 generate_compose.py \
+  --sensitivity fireball \          # 火球検出モード
+  --scale 0.5 \                     # 処理解像度スケール
+  --buffer 15 \                     # バッファ秒数
+  --exclude-bottom 0.0625 \         # 下部除外範囲
+  --extract-clips true \            # クリップ動画保存
+  --latitude 35.3606 \              # 観測地点の緯度（デフォルト: 富士山頂）
+  --longitude 138.7274 \            # 観測地点の経度（デフォルト: 富士山頂）
+  --enable-time-window true \       # 天文薄暮期間のみ検出
+  --base-port 8080                  # ベースポート番号
 ```
 
-#### 起動と管理
+#### 天文薄暮期間の検出制限
+
+`--enable-time-window true` を指定すると、前日の日の入りから翌日の日の出までの期間のみ検出処理を実行します。
+それ以外の時間帯はストリーム表示のみで、検出処理は行いません。
 
 ```bash
-# ビルド＆起動
-docker compose build
-docker compose up -d
+# 東京の座標で天文薄暮期間のみ検出
+python3 generate_compose.py \
+  --latitude 35.6762 \
+  --longitude 139.6503 \
+  --enable-time-window true
 
-# 管理スクリプトを使う場合
+# デフォルト（富士山頂）で天文薄暮期間のみ検出
+python3 generate_compose.py --enable-time-window true
+```
+
+ダッシュボード（http://localhost:8080/）に検出時間帯が表示されます。
+ブラウザの位置情報を許可すると、現在地の座標で検出時間を自動計算します。
+
+#### 起動と管理（3つの方法）
+
+Dockerシステムの起動・管理には3つの方法があります：
+
+##### 1. meteor-docker.sh を使う（推奨）
+
+最も簡単な方法です。日常的な操作はこのスクリプトを使用してください。
+
+```bash
 ./meteor-docker.sh start      # 起動
 ./meteor-docker.sh stop       # 停止
 ./meteor-docker.sh status     # 状態確認（検出件数も表示）
@@ -173,6 +201,76 @@ docker compose up -d
 ./meteor-docker.sh logs camera1  # 特定カメラのログ
 ./meteor-docker.sh restart    # 再起動
 ./meteor-docker.sh build      # 再ビルド
+./meteor-docker.sh generate   # docker-compose.ymlを再生成
+./meteor-docker.sh clean      # 古い検出結果を削除（7日以上前）
+./meteor-docker.sh cleanup    # 未使用のDockerイメージ・コンテナを削除
+```
+
+`generate` コマンドはオプションも渡せます：
+
+```bash
+./meteor-docker.sh generate --enable-time-window true --latitude 35.6762 --longitude 139.6503
+```
+
+##### 2. docker compose コマンドを直接使う
+
+より細かい制御が必要な場合や、Docker Composeの全機能を使いたい場合：
+
+```bash
+# ビルドと起動
+docker compose build
+docker compose up -d
+
+# 個別サービスの操作
+docker compose restart camera1        # camera1のみ再起動
+docker compose logs -f dashboard      # ダッシュボードのログ
+docker compose stop camera2           # camera2のみ停止
+
+# 完全な停止とクリーンアップ
+docker compose down                   # コンテナ削除
+docker compose down -v                # ボリュームも削除
+```
+
+##### 3. generate_compose.py を直接使う
+
+設定を変更して `docker-compose.yml` を再生成する場合：
+
+```bash
+# 設定を変更して再生成
+python3 generate_compose.py --enable-time-window true --sensitivity fireball
+
+# 再起動して反映
+docker compose up -d
+```
+
+##### 使い分けのポイント
+
+- **日常操作**: `meteor-docker.sh` を使用（簡潔で分かりやすい）
+- **設定変更**: `generate_compose.py` または `meteor-docker.sh generate` で再生成
+- **個別制御**: `docker compose` コマンドを直接使用
+- **トラブル時**: `docker compose` でより詳細な情報を取得
+
+**基本的には `meteor-docker.sh` だけで全ての操作が可能です。**
+
+#### ディスク容量の管理
+
+Dockerイメージは再ビルドの度に蓄積されるため、定期的なクリーンアップを推奨します。
+
+```bash
+# このプロジェクトの未使用イメージ・コンテナを削除
+./meteor-docker.sh cleanup
+```
+
+**注意事項:**
+- `cleanup`コマンドは**このプロジェクトのみ**を対象とします（他のDockerプロジェクトには影響しません）
+- `docker-compose.yml`で定義されているイメージ名のみを処理対象とします
+- 現在使用中のイメージは削除されません
+- `build`コマンド実行後に`cleanup`を実行することを推奨します
+
+**全てのDockerリソースをクリーンアップしたい場合:**
+```bash
+# 警告: 他のプロジェクトにも影響します
+docker system prune -a  # 全未使用リソースを削除
 ```
 
 #### アクセス先
@@ -279,11 +377,28 @@ detections/camera1/
 
 ## Docker環境のカスタマイズ
 
-`docker-compose.yml` で各カメラの設定を変更できます：
+### 推奨方法: generate_compose.py で設定
+
+設定を変更する場合は、`generate_compose.py` で `docker-compose.yml` を再生成するのが推奨です：
+
+```bash
+python3 generate_compose.py \
+  --sensitivity fireball \
+  --scale 0.5 \
+  --buffer 15 \
+  --latitude 35.3606 \
+  --longitude 138.7274 \
+  --enable-time-window true
+```
+
+### 手動編集: docker-compose.yml を直接編集
+
+各カメラの設定を個別に変更したい場合は、`docker-compose.yml` を直接編集できます：
 
 ```yaml
 camera1:
   environment:
+    - TZ=Asia/Tokyo
     - RTSP_URL=rtsp://user:pass@10.0.1.25/live
     - CAMERA_NAME=camera1_10.0.1.25
     - SENSITIVITY=medium        # low/medium/high/fireball
@@ -291,10 +406,16 @@ camera1:
     - BUFFER=15                 # バッファ秒数
     - EXCLUDE_BOTTOM=0.0625     # 下部除外範囲（1/16）
     - EXTRACT_CLIPS=true        # クリップ動画を保存（true/false）
+    - LATITUDE=35.3606          # 観測地点の緯度
+    - LONGITUDE=138.7274        # 観測地点の経度
+    - TIMEZONE=Asia/Tokyo       # タイムゾーン
+    - ENABLE_TIME_WINDOW=false  # 天文薄暮期間制限（true/false）
     - WEB_PORT=8080
   ports:
     - "8081:8080"               # ホスト:コンテナ
 ```
+
+**注意**: 手動編集した場合、次回 `generate_compose.py` を実行すると上書きされます。
 
 ## ライセンス
 

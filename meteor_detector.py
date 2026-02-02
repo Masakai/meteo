@@ -26,6 +26,8 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Thread
 from queue import Queue
 import time
+from datetime import datetime, timedelta
+from astro_utils import get_detection_window, is_detection_active
 
 
 @dataclass
@@ -454,6 +456,10 @@ def process_video(
     process_scale: float = 1.0,
     frame_skip: int = 1,
     use_threading: bool = True,
+    latitude: float = 35.3606,
+    longitude: float = 138.7274,
+    timezone: str = "Asia/Tokyo",
+    enable_time_window: bool = False,
 ) -> List[MeteorCandidate]:
     """
     動画を処理して流星を検出
@@ -469,6 +475,10 @@ def process_video(
         process_scale: 処理解像度スケール（0.5なら半分のサイズで処理、高速化）
         frame_skip: フレームスキップ（2なら1フレームおきに処理、高速化）
         use_threading: マルチスレッド読み込みを使用するか
+        latitude: 緯度
+        longitude: 経度
+        timezone: タイムゾーン
+        enable_time_window: 天文薄暮期間のみ検出を有効化するか
 
     Returns:
         検出された流星のリスト
@@ -504,6 +514,18 @@ def process_video(
         print(f"フレームスキップ: {frame_skip} (実効fps={fps/frame_skip:.1f})")
     if use_threading:
         print(f"マルチスレッド読み込み: 有効")
+
+    # 天文薄暮期間の判定
+    if enable_time_window:
+        is_active, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
+        print(f"検出期間: {detection_start.strftime('%Y-%m-%d %H:%M:%S')} - {detection_end.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"検出状態: {'有効' if is_active else '無効（ストリーム表示のみ）'}")
+    else:
+        is_active = True
+        detection_start = None
+        detection_end = None
+        print(f"検出期間: 常時有効")
+
     print(f"処理中...")
 
     # 画像出力ディレクトリの準備
@@ -561,21 +583,30 @@ def process_video(
         gray = cv2.cvtColor(proc_frame, cv2.COLOR_BGR2GRAY)
 
         if prev_gray is not None:
-            # 明るい移動物体を検出
-            objects = detector.detect_bright_objects(gray, prev_gray,
-                                                     exclude_bottom_ratio=params.exclude_bottom_ratio)
+            # 天文薄暮期間のチェック（有効な場合のみ）
+            if enable_time_window:
+                is_active, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
 
-            # 座標をオリジナルスケールに変換
-            if process_scale != 1.0:
-                for obj in objects:
-                    cx, cy = obj["centroid"]
-                    obj["centroid"] = (int(cx * scale_factor), int(cy * scale_factor))
-                    x, y, w, h = obj["bbox"]
-                    obj["bbox"] = (int(x * scale_factor), int(y * scale_factor),
-                                  int(w * scale_factor), int(h * scale_factor))
+            # 検出処理（検出期間内の場合のみ）
+            if is_active:
+                # 明るい移動物体を検出
+                objects = detector.detect_bright_objects(gray, prev_gray,
+                                                         exclude_bottom_ratio=params.exclude_bottom_ratio)
 
-            # 追跡
-            detector.track_objects(objects, frame_num)
+                # 座標をオリジナルスケールに変換
+                if process_scale != 1.0:
+                    for obj in objects:
+                        cx, cy = obj["centroid"]
+                        obj["centroid"] = (int(cx * scale_factor), int(cy * scale_factor))
+                        x, y, w, h = obj["bbox"]
+                        obj["bbox"] = (int(x * scale_factor), int(y * scale_factor),
+                                      int(w * scale_factor), int(h * scale_factor))
+
+                # 追跡
+                detector.track_objects(objects, frame_num)
+            else:
+                objects = []
+
             processed_frames += 1
 
             # 描画（出力用）

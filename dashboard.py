@@ -14,6 +14,12 @@ import os
 from pathlib import Path
 from datetime import datetime
 
+# 検出時間の取得用
+try:
+    from astro_utils import get_detection_window
+except ImportError:
+    get_detection_window = None
+
 # 環境変数からカメラ設定を取得
 CAMERAS = []
 for i in range(1, 10):
@@ -105,11 +111,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
         }}
         .stats-bar .stat {{
             text-align: center;
+            min-width: 120px;
         }}
         .stats-bar .stat-value {{
             font-size: 2em;
             font-weight: bold;
             color: #00ff88;
+            white-space: nowrap;
+        }}
+        #detection-window {{
+            font-size: 1.2em;
+        }}
+        .stat-wide {{
+            min-width: 200px;
         }}
         .stats-bar .stat-label {{
             color: #888;
@@ -365,6 +379,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             <div class="stat-value" id="uptime">0:00</div>
             <div class="stat-label">稼働時間</div>
         </div>
+        <div class="stat stat-wide">
+            <div class="stat-value" id="detection-window">--:-- ~ --:--</div>
+            <div class="stat-label">検出時間帯</div>
+        </div>
     </div>
 
     <div class="camera-grid">
@@ -412,6 +430,95 @@ class DashboardHandler(BaseHTTPRequestHandler):
             document.getElementById('uptime').textContent =
                 hours > 0 ? hours + ':' + String(mins).padStart(2,'0') + 'h' : mins + 'm';
         }}, 1000);
+
+        // ブラウザから位置情報を取得
+        let userLocation = null;
+        const savedLocation = localStorage.getItem('userLocation');
+        if (savedLocation) {{
+            userLocation = JSON.parse(savedLocation);
+        }}
+
+        // 初回アクセス時に位置情報を取得
+        if (!userLocation && navigator.geolocation) {{
+            navigator.geolocation.getCurrentPosition(
+                (position) => {{
+                    userLocation = {{
+                        lat: position.coords.latitude,
+                        lon: position.coords.longitude
+                    }};
+                    localStorage.setItem('userLocation', JSON.stringify(userLocation));
+                    console.log('位置情報を取得しました:', userLocation);
+                    updateDetectionWindow();  // 位置情報取得後に更新
+                }},
+                (error) => {{
+                    console.warn('位置情報の取得に失敗しました:', error.message);
+                    updateDetectionWindow();  // デフォルト位置で更新
+                }}
+            );
+        }}
+
+        // 検出時間帯を取得・更新
+        function updateDetectionWindow() {{
+            let url = '/detection_window';
+            if (userLocation) {{
+                url += '?lat=' + userLocation.lat + '&lon=' + userLocation.lon;
+            }}
+
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {{
+                    console.log('Detection window data:', data);
+                    if (data.enabled && data.start && data.end) {{
+                        // 日付と時刻を分離
+                        const startParts = data.start.split(' ');
+                        const endParts = data.end.split(' ');
+                        const startDate = startParts[0];
+                        const endDate = endParts[0];
+                        const startTime = startParts[1].substring(0, 5);
+                        const endTime = endParts[1].substring(0, 5);
+
+                        // 前日と翌日の日付を取得
+                        const today = new Date();
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        const tomorrow = new Date(today);
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+
+                        // 日付のフォーマット（YYYY-MM-DD）
+                        const formatDate = (d) => d.toISOString().split('T')[0];
+                        const todayStr = formatDate(today);
+                        const yesterdayStr = formatDate(yesterday);
+                        const tomorrowStr = formatDate(tomorrow);
+
+                        let displayText = '';
+                        if (startDate === yesterdayStr) {{
+                            displayText = '前日' + startTime + ' ~ ';
+                        }} else if (startDate === todayStr) {{
+                            displayText = '当日' + startTime + ' ~ ';
+                        }} else {{
+                            displayText = startTime + ' ~ ';
+                        }}
+
+                        if (endDate === tomorrowStr) {{
+                            displayText += '翌日' + endTime;
+                        }} else if (endDate === todayStr) {{
+                            displayText += '当日' + endTime;
+                        }} else {{
+                            displayText += endTime;
+                        }}
+
+                        document.getElementById('detection-window').textContent = displayText;
+                    }} else {{
+                        document.getElementById('detection-window').textContent = '常時有効';
+                    }}
+                }})
+                .catch((err) => {{
+                    console.error('Detection window fetch error:', err);
+                    document.getElementById('detection-window').textContent = '--:-- ~ --:--';
+                }});
+        }}
+        updateDetectionWindow();
+        setInterval(updateDetectionWindow, 60000);  // 1分ごとに更新
 
         // 各カメラの統計を取得
         let totalDetections = 0;
@@ -574,6 +681,47 @@ class DashboardHandler(BaseHTTPRequestHandler):
 </body>
 </html>'''
             self.wfile.write(html.encode())
+
+        elif self.path.startswith('/detection_window'):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+
+            # クエリパラメータから緯度・経度を取得（ブラウザから送信）
+            from urllib.parse import urlparse, parse_qs
+            query = parse_qs(urlparse(self.path).query)
+
+            # ブラウザから送信された座標、なければ環境変数、なければデフォルト（富士山頂）
+            latitude = float(query.get('lat', [os.environ.get('LATITUDE', '35.3606')])[0])
+            longitude = float(query.get('lon', [os.environ.get('LONGITUDE', '138.7274')])[0])
+            timezone = os.environ.get('TIMEZONE', 'Asia/Tokyo')
+
+            try:
+                if get_detection_window:
+                    start, end = get_detection_window(latitude, longitude, timezone)
+                    result = {
+                        'start': start.strftime('%Y-%m-%d %H:%M:%S'),
+                        'end': end.strftime('%Y-%m-%d %H:%M:%S'),
+                        'enabled': os.environ.get('ENABLE_TIME_WINDOW', 'false').lower() == 'true',
+                        'latitude': latitude,
+                        'longitude': longitude
+                    }
+                else:
+                    result = {
+                        'start': '',
+                        'end': '',
+                        'enabled': False,
+                        'error': 'meteor_detector module not available'
+                    }
+            except Exception as e:
+                result = {
+                    'start': '',
+                    'end': '',
+                    'enabled': False,
+                    'error': str(e)
+                }
+
+            self.wfile.write(json.dumps(result).encode('utf-8'))
 
         elif self.path == '/changelog':
             self.send_response(200)

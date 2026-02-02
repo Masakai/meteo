@@ -26,6 +26,7 @@ RUN apt-get update && \
 
 # アプリケーションコード
 COPY meteor_detector_rtsp_web.py .
+COPY astro_utils.py .
 
 # 出力ディレクトリ
 RUN mkdir -p /output

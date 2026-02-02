@@ -124,6 +124,55 @@ case "$1" in
         fi
         ;;
 
+    cleanup)
+        log_info "このプロジェクトの古いイメージを削除します..."
+        echo ""
+
+        # docker-compose.ymlで定義されているイメージ名を取得
+        PROJECT_IMAGE_NAMES=$(docker compose config --images 2>/dev/null)
+
+        if [ -z "$PROJECT_IMAGE_NAMES" ]; then
+            log_error "docker-compose.ymlが見つかりません"
+            exit 1
+        fi
+
+        # 各イメージ名について、古いバージョンを探す
+        REMOVED=0
+        for img_name in $PROJECT_IMAGE_NAMES; do
+            # このイメージ名の全バージョンを取得（:latest以外も含む）
+            ALL_VERSIONS=$(docker images "$img_name" --format "{{.ID}}" 2>/dev/null)
+
+            if [ -n "$ALL_VERSIONS" ]; then
+                echo "=== $img_name の全バージョン ==="
+                docker images "$img_name"
+
+                # 現在使用中のイメージIDを取得
+                USED_IMAGE=$(docker compose ps -q | xargs -I {} docker inspect --format='{{.Image}}' {} 2>/dev/null | grep "$(echo $img_name | cut -d: -f1)" | head -1)
+
+                # 未使用バージョンを削除
+                for img_id in $ALL_VERSIONS; do
+                    if [ "$img_id" != "$USED_IMAGE" ]; then
+                        docker rmi "$img_id" 2>/dev/null && REMOVED=$((REMOVED + 1)) || true
+                    fi
+                done
+            fi
+        done
+
+        if [ $REMOVED -gt 0 ]; then
+            log_info "${REMOVED}個の未使用イメージを削除しました"
+        else
+            log_info "削除対象のイメージはありませんでした"
+        fi
+
+        echo ""
+        log_info "このプロジェクトの停止中コンテナを削除します..."
+        docker compose rm -f
+
+        echo ""
+        log_info "ディスク使用状況:"
+        docker system df
+        ;;
+
     *)
         echo "流星検出Docker管理スクリプト"
         echo ""
@@ -139,11 +188,13 @@ case "$1" in
         echo "  build     Dockerイメージを再ビルド"
         echo "  generate  streamersからdocker-compose.ymlを再生成"
         echo "  clean     古い検出結果を削除（7日以上前）"
+        echo "  cleanup   このプロジェクトの未使用イメージ・コンテナを削除"
         echo ""
         echo "例:"
         echo "  $0 start"
         echo "  $0 logs camera1"
         echo "  $0 generate --sensitivity fireball"
+        echo "  $0 cleanup  # ディスク容量を確保"
         exit 1
         ;;
 esac
