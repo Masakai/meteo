@@ -5,20 +5,24 @@
 
 FROM python:3.11-slim
 
-# OpenCV-headless用の依存ライブラリ
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-0 \
-    libgomp1 \
-    libxcb1 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
 # 作業ディレクトリ
 WORKDIR /app
 
-# Python依存ライブラリ（Docker用のheadlessバージョン）
+# Python依存ライブラリを先にインストール
 COPY requirements-docker.txt .
 RUN pip install --no-cache-dir -r requirements-docker.txt
+
+# OpenCV実行に必要な最小限のシステムライブラリをインストール
+# libxcb1はopencv-python-headlessでも必要
+# -o APT::Keep-Downloaded-Packages=false でキャッシュを無効化してディスク容量を節約
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        -o APT::Keep-Downloaded-Packages=false \
+        libxcb1 \
+        libglib2.0-0 \
+        libgomp1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # アプリケーションコード
 COPY meteor_detector_rtsp_web.py .
