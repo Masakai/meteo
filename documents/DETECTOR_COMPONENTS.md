@@ -1,5 +1,14 @@
 # meteor_detector_rtsp_web.py - 内部コンポーネント仕様書
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## 概要
 
 `meteor_detector_rtsp_web.py` は、RTSPストリームから流星を検出し、Webプレビューを提供するリアルタイム検出エンジンです。

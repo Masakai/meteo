@@ -1,5 +1,14 @@
 # 天文計算モジュール仕様 (Astronomical Utilities)
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## 概要
 
 `astro_utils.py` は、天文薄暮期間の計算と検出時間帯の判定を行うモジュールです。

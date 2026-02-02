@@ -1,5 +1,14 @@
 # 設定ガイド (Configuration Guide)
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## 概要
 
 このガイドでは、流星検出システムの各種設定方法とチューニング手法について説明します。

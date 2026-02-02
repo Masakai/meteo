@@ -1,5 +1,14 @@
 # セキュリティガイド (Security Guide)
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## 概要
 
 流星検出システムを安全に運用するためのセキュリティガイドラインです。

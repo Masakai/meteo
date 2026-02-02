@@ -1,5 +1,14 @@
 # Docker コンテナ構成ドキュメント
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## システム概要
 
 流星検出システムは、Docker Composeで管理される4つのコンテナで構成されています。

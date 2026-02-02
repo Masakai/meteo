@@ -1,5 +1,14 @@
 # アーキテクチャドキュメント
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## システム構成
 
 流星検出システムは、以下の2つの主要コンポーネントで構成されています：

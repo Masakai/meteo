@@ -1,5 +1,14 @@
 # 運用ガイド (Operations Guide)
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## 概要
 
 このガイドでは、流星検出システムの日常的な運用方法について説明します。

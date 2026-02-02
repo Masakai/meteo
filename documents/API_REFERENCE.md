@@ -1,5 +1,14 @@
 # API リファレンス (API Reference)
 
+---
+
+**Copyright (c) 2026 Masanori Sakai**
+
+Licensed under the MIT License
+
+---
+
+
 ## 概要
 
 流星検出システムが提供するHTTP APIの完全なリファレンスです。
