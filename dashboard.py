@@ -57,7 +57,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 <div class="camera-card">
                     <div class="camera-header">
                         <span class="camera-name">{cam['name']}</span>
-                        <span class="camera-status" id="status{i}">●</span>
+                        <div class="status-indicators">
+                            <span class="camera-status" id="status{i}" title="ストリーム接続">●</span>
+                            <span class="detection-status" id="detection{i}" title="検出処理">●</span>
+                        </div>
                     </div>
                     <div class="camera-video">
                         <img src="{cam['url']}/stream" alt="{cam['name']}"
@@ -154,12 +157,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
             font-weight: bold;
             color: #00d4ff;
         }}
+        .status-indicators {{
+            display: flex;
+            gap: 8px;
+        }}
         .camera-status {{
             color: #00ff88;
             font-size: 0.8em;
         }}
         .camera-status.offline {{
             color: #ff4444;
+        }}
+        .detection-status {{
+            color: #666;
+            font-size: 0.8em;
+        }}
+        .detection-status.detecting {{
+            color: #ff4444;
+            animation: blink 1s infinite;
+        }}
+        @keyframes blink {{
+            0%, 50% {{ opacity: 1; }}
+            51%, 100% {{ opacity: 0.3; }}
         }}
         .camera-video {{
             position: relative;
@@ -551,9 +570,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         }} else {{
                             document.getElementById('status' + i).className = 'camera-status';
                         }}
+                        // 検出処理中の表示（is_detectingフィールドをチェック）
+                        if (data.is_detecting === true) {{
+                            document.getElementById('detection' + i).className = 'detection-status detecting';
+                        }} else {{
+                            document.getElementById('detection' + i).className = 'detection-status';
+                        }}
                     }})
                     .catch(() => {{
                         document.getElementById('status' + i).className = 'camera-status offline';
+                        document.getElementById('detection' + i).className = 'detection-status';
                     }});
             }}, 2000);
         }});

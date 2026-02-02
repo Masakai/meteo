@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- ダッシュボードに検出処理中インディケータを追加（赤点滅：検出処理中、グレー：停止中）
+- `meteor_detector_rtsp_web.py`の`/stats` APIに`is_detecting`フィールドを追加
+
+### Changed
+- ダッシュボードのカメラカード右上に2つのインディケータを配置（ストリーム接続状態と検出処理状態）
+
 ## [1.1.0] - 2026-02-02
 
 ### Added

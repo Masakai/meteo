@@ -394,6 +394,7 @@ start_time_global = None
 camera_name = ""
 last_frame_time = 0  # 最後にフレームを受信した時刻
 stream_timeout = 10.0  # ストリームがタイムアウトとみなす秒数
+is_detecting_now = False  # 現在検出処理中かどうか
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -512,6 +513,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "settings": current_settings,
                 "stream_alive": is_stream_alive,
                 "time_since_last_frame": round(time_since_last_frame, 1),
+                "is_detecting": is_detecting_now,
             }
             self.wfile.write(json.dumps(stats).encode())
 
@@ -588,7 +590,7 @@ def detection_thread_worker(
     timezone="Asia/Tokyo",
 ):
     """検出処理を行うワーカースレッド"""
-    global current_frame, detection_count, last_frame_time
+    global current_frame, detection_count, last_frame_time, is_detecting_now
 
     width, height = reader.frame_size
     proc_width = int(width * process_scale)
@@ -635,8 +637,10 @@ def detection_thread_worker(
             # 検出期間内の場合のみ検出処理を実行
             if is_detection_time:
                 objects = detector.detect_bright_objects(gray, prev_gray)
+                is_detecting_now = True
             else:
                 objects = []
+                is_detecting_now = False
 
             if process_scale != 1.0:
                 for obj in objects:
