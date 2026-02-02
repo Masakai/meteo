@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-02
+
+### Added
+- 天文薄暮期間の検出制限機能（緯度・経度・タイムゾーンを考慮した検出期間の設定）
+- 実行オプションおよび環境変数による検出期間の制御機能
+
+### Changed
+- 著作権表記を「MIT License」に統一
+- `.gitignore` にユーザー固有設定（`streamers`）を追加
+- サンプルストリーマー設定ファイル（`streamers.sample`）を作成
+
+### Documentation
+- READMEの改善（`meteor-docker.sh`の安全性に関する詳細を追記）
+- `cleanup`コマンドの動作説明を改善
+
 ## [1.0.0] - 2026-02-01
 
 ### Added

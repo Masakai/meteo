@@ -397,7 +397,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     </div>
 
     <div class="footer">
-        Meteor Detection System <span class="version-link" onclick="showChangelog()">v1.0.0</span> | Ctrl+C で終了<br>
+        Meteor Detection System <span class="version-link" onclick="showChangelog()">v1.1.0</span> | Ctrl+C で終了<br>
         &copy; 2026 株式会社　リバーランズ・コンサルティング
     </div>
 
