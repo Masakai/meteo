@@ -261,8 +261,17 @@ Dockerイメージは再ビルドの度に蓄積されるため、定期的な�
 ./meteor-docker.sh cleanup
 ```
 
+**安全性の保証:**
+
+`meteor-docker.sh`の全てのコマンドは**他のDockerプロジェクトに一切影響を与えません。**
+
+- 全てのコマンドが`docker compose`経由で実行され、カレントディレクトリの`docker-compose.yml`のみを参照します
+- `cleanup`コマンドは`docker compose config --images`で取得したイメージ名のみを処理対象とします
+- グローバルなDockerコマンド（`docker system prune`等）は使用していません
+- ファイル操作も全て`./detections`ディレクトリ内のみです
+
 **注意事項:**
-- `cleanup`コマンドは**このプロジェクトのみ**を対象とします（他のDockerプロジェクトには影響しません）
+- `cleanup`コマンドは**このプロジェクトのみ**を対象とします
 - `docker-compose.yml`で定義されているイメージ名のみを処理対象とします
 - 現在使用中のイメージは削除されません
 - `build`コマンド実行後に`cleanup`を実行することを推奨します
