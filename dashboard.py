@@ -847,9 +847,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path.startswith('/detection/'):
             # /detection/camera_name/timestamp
             try:
+                from urllib.parse import unquote
                 parts = self.path[11:].split('/', 1)
                 if len(parts) == 2:
                     camera_name, timestamp_str = parts
+                    # URL デコード（%20 -> 空白）
+                    timestamp_str = unquote(timestamp_str)
 
                     # タイムスタンプから datetime オブジェクトを作成
                     # timestamp_str: "2026-02-02 06:55:33"
