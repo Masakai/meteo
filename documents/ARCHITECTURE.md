@@ -242,6 +242,7 @@ sequenceDiagram
 | `/` | GET | プレビューHTML | `text/html` |
 | `/stream` | GET | MJPEGストリーム | `multipart/x-mixed-replace` |
 | `/stats` | GET | 統計情報 | `application/json` |
+| `/update_mask` | POST | 現在フレームからマスク更新 | `application/json` |
 
 #### /stats レスポンス例
 
@@ -255,7 +256,10 @@ sequenceDiagram
     "scale": 0.5,
     "buffer": 15.0,
     "extract_clips": true,
-    "exclude_bottom": 0.0625
+    "exclude_bottom": 0.0625,
+    "mask_image": "/app/mask_image.png",
+    "mask_from_day": "",
+    "mask_dilate": 5
   },
   "stream_alive": true,
   "time_since_last_frame": 0.03,

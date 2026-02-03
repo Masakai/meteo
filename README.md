@@ -145,6 +145,20 @@ rtsp://user:pass@10.0.1.3/live
 rtsp://user:pass@10.0.1.11/live
 ```
 
+**昼間画像による自動マスク（任意）**
+
+RTSP URLの末尾に `| 昼間画像パス` を付けると、`generate_compose.py` 実行時に
+除外マスクを生成してコンテナに同梱します（他PCへの展開が簡単になります）。
+
+```
+rtsp://user:pass@10.0.1.25/live | camera1.jpg
+rtsp://user:pass@10.0.1.3/live  | camera2.jpg
+rtsp://user:pass@10.0.1.11/live
+```
+
+- 右側の画像は相対パスでOK（`streamers` と同じフォルダ基準）
+- マスク生成には **OpenCV** が必要です（ローカル実行時）
+
 #### docker-compose.ymlの自動生成
 
 `generate_compose.py` は `streamers` ファイルから `docker-compose.yml` を自動生成するツールです。
@@ -163,8 +177,12 @@ python3 generate_compose.py \
   --latitude 35.3606 \              # 観測地点の緯度（デフォルト: 富士山頂）
   --longitude 138.7274 \            # 観測地点の経度（デフォルト: 富士山頂）
   --enable-time-window true \       # 天文薄暮期間のみ検出
+  --mask-output-dir masks \         # 生成マスクの保存先
   --base-port 8080                  # ベースポート番号
 ```
+
+**補足**: `streamers` に `| 昼間画像パス` を付けた場合、`generate_compose.py` 実行時に
+マスクを自動生成して `--mask-output-dir` に保存します。OpenCV が必要です。
 
 #### 天文薄暮期間の検出制限
 

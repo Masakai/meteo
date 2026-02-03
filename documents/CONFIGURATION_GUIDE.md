@@ -46,6 +46,10 @@ docker-compose.ymlで設定される環境変数:
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 | `UTC` / `Europe/London` |
 | `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限 | `true` / `false` |
 | `WEB_PORT` | `8080` | 内部HTTPポート | 通常変更不要 |
+| `MASK_IMAGE` | `""` | 事前生成済みマスク画像（優先） | `/app/mask_image.png` |
+| `MASK_FROM_DAY` | `""` | 昼間画像からマスク生成 | `/app/mask_from_day.jpg` |
+| `MASK_DILATE` | `5` | マスク拡張ピクセル数 | `3` / `7` |
+| `MASK_SAVE` | `""` | マスク保存先 | `/output/masks/camera1_mask.png` |
 
 ### ダッシュボードの環境変数
 
@@ -73,7 +77,8 @@ python generate_compose.py \
   --latitude 35.6762 \
   --longitude 139.6503 \
   --enable-time-window true \
-  --extract-clips true
+  --extract-clips true \
+  --mask-output-dir masks
 ```
 
 #### 方法2: docker-compose.ymlを直接編集
@@ -117,6 +122,29 @@ environment:
   - SENSITIVITY=${SENSITIVITY:-medium}
   - RTSP_URL=rtsp://${RTSP_USER}:${RTSP_PASS}@10.0.1.25/live
 ```
+
+---
+
+## マスク設定（固定カメラ向け）
+
+### streamers に昼間画像を指定
+
+`streamers` で `RTSP URL | 昼間画像` の形式にすると、`generate_compose.py` 実行時に
+除外マスクを自動生成してコンテナに同梱します。
+
+```
+rtsp://user:pass@10.0.1.25/live | camera1.jpg
+rtsp://user:pass@10.0.1.3/live  | camera2.jpg
+rtsp://user:pass@10.0.1.11/live
+```
+
+- 画像パスは `streamers` と同じフォルダ基準（相対パス可）
+- マスク生成には OpenCV が必要
+
+### その場でマスクを更新（永続化）
+
+ダッシュボードの「マスク更新」ボタンで、**現在フレームからマスクを再生成**できます。
+保存先は `/output/masks/<camera>_mask.png` です。
 
 ---
 

@@ -298,6 +298,7 @@ curl http://localhost:8080/changelog
 | `/` | GET | プレビューHTML |
 | `/stream` | GET | MJPEGストリーム |
 | `/stats` | GET | 統計情報 |
+| `/update_mask` | POST | 現在フレームからマスク再生成 |
 
 ---
 
@@ -383,7 +384,10 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
     "scale": 0.5,
     "buffer": 15.0,
     "extract_clips": true,
-    "exclude_bottom": 0.0625
+    "exclude_bottom": 0.0625,
+    "mask_image": "/app/mask_image.png",
+    "mask_from_day": "",
+    "mask_dilate": 5
   },
   "stream_alive": true,
   "time_since_last_frame": 0.03,
@@ -404,6 +408,9 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.buffer` | float | バッファ秒数 |
 | `settings.extract_clips` | boolean | MP4保存の有効/無効 |
 | `settings.exclude_bottom` | float | 画面下部除外率 |
+| `settings.mask_image` | string | マスク画像（優先） |
+| `settings.mask_from_day` | string | 昼間画像から生成するマスク |
+| `settings.mask_dilate` | integer | マスク拡張ピクセル数 |
 | `stream_alive` | boolean | ストリーム生存確認 |
 | `time_since_last_frame` | float | 最終フレームからの経過時間（秒） |
 | `is_detecting` | boolean | 現在検出処理中か |
@@ -439,13 +446,46 @@ setInterval(() => {
 
 ---
 
+### POST /update_mask
+
+**説明**: 現在フレームから除外マスクを再生成して即時反映（固定カメラ向け）
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "success": true,
+  "message": "mask updated",
+  "saved": "/output/masks/camera1_10_0_1_25_mask.png"
+}
+```
+
+**フィールド説明**:
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `success` | boolean | 更新成功/失敗 |
+| `message` | string | 結果メッセージ |
+| `saved` | string | 保存先（永続化ファイル） |
+
+**使用例**:
+```bash
+# マスク更新
+curl -X POST http://localhost:8081/update_mask | jq
+```
+
+---
+
 ## 共通仕様
 
 ### CORS（Cross-Origin Resource Sharing）
 
 **現在の設定**:
 ```python
-# /stats エンドポイントのみCORS許可
+# /stats と /update_mask はCORS許可
 self.send_header('Access-Control-Allow-Origin', '*')
 ```
 

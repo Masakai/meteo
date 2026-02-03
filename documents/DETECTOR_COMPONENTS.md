@@ -210,10 +210,11 @@ event_frames = ring_buffer.get_range(
 
 ```python
 class RealtimeMeteorDetector:
-    def __init__(self, params: DetectionParams, fps: float = 30)
+    def __init__(self, params: DetectionParams, fps: float = 30, exclusion_mask: Optional[np.ndarray] = None)
     def detect_bright_objects(self, frame, prev_frame) -> List[dict]
     def track_objects(self, objects, timestamp) -> List[MeteorEvent]
     def finalize_all(self) -> List[MeteorEvent]
+    def update_exclusion_mask(self, new_mask: Optional[np.ndarray]) -> None
 ```
 
 #### 検出アルゴリズムフロー
@@ -223,6 +224,7 @@ flowchart TD
     Start["フレーム取得<br/>(gray, prev_gray)"]
     Diff["差分計算<br/>cv2.absdiff()"]
     Thresh["二値化<br/>threshold > 30"]
+    Mask["除外マスク適用<br/>mask > 0 を除外"]
     Morph["モルフォロジー処理<br/>open → close"]
     Contours["輪郭検出<br/>findContours()"]
 
@@ -239,7 +241,8 @@ flowchart TD
 
     Start --> Diff
     Diff --> Thresh
-    Thresh --> Morph
+    Thresh --> Mask
+    Mask --> Morph
     Morph --> Contours
     Contours --> Filter1
     Filter1 -->|"No"| End
@@ -303,6 +306,12 @@ stateDiagram-v2
 | `max_gap_time` | 0.2 秒 | 最大トラッキング間隔 |
 | `max_distance` | 80 px | 最大移動距離 |
 | `exclude_bottom_ratio` | 1/16 | 画面下部除外率 |
+
+#### 除外マスク（固定カメラ向け）
+
+- 事前生成済みマスク（`MASK_IMAGE`）がある場合は優先して適用
+- `MASK_FROM_DAY` が設定されている場合は、昼間画像からマスクを生成
+- ダッシュボードの「マスク更新」ボタンで現在フレームから再生成（永続化）
 
 #### 感度プリセット
 

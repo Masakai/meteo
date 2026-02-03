@@ -628,6 +628,16 @@ rtsp://username:password@192.168.1.102/live
 rtsp://192.168.1.103:554/stream  # 認証なしも可能
 ```
 
+昼間画像を指定してマスクを自動生成する場合:
+```
+rtsp://username:password@192.168.1.100/live | camera1.jpg
+rtsp://username:password@192.168.1.101/live | camera2.jpg
+rtsp://192.168.1.103:554/stream
+```
+
+- `|` 右側は昼間画像パス（相対パス可）
+- マスク生成には OpenCV が必要
+
 #### 2. docker-compose.yml を再生成
 
 ```bash
@@ -644,7 +654,8 @@ python generate_compose.py \
   --base-port 8080 \
   --latitude 35.6762 \
   --longitude 139.6503 \
-  --enable-time-window true
+  --enable-time-window true \
+  --mask-output-dir masks
 ```
 
 #### 3. コンテナを再起動
@@ -675,6 +686,8 @@ docker compose ps
 | `--latitude` | `35.3606` | 観測地の緯度（富士山頂） |
 | `--longitude` | `138.7274` | 観測地の経度（富士山頂） |
 | `--enable-time-window` | `false` | 天文薄暮時間帯制限 |
+| `--mask-output-dir` | `masks` | 生成マスクの保存先 |
+| `--mask-dilate` | `5` | マスク拡張ピクセル数 |
 
 ### 自動生成される構成
 
@@ -707,6 +720,8 @@ sequenceDiagram
 rtsp://6199:4003@10.0.1.25/live
 rtsp://6199:4003@10.0.1.3/live
 ```
+
+※ 昼間画像を指定する場合は `| camera1.jpg` のように行末に追加します。
 
 **出力 (docker-compose.yml)**:
 - ダッシュボード: `localhost:8080`

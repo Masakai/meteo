@@ -66,6 +66,10 @@ flowchart TD
 cp streamers.sample streamers
 vim streamers  # RTSP URLを設定
 
+# 昼間画像を指定する場合（任意）
+# rtsp://user:pass@10.0.1.25/live | camera1.jpg
+# マスク生成には OpenCV が必要
+
 # 2. docker-compose.ymlを生成
 python generate_compose.py
 
@@ -88,6 +92,11 @@ python generate_compose.py
 # ログをリアルタイム表示
 ./meteor-docker.sh logs
 ```
+
+### マスク更新（固定カメラ向け）
+
+ダッシュボード上の「マスク更新」ボタンで、現在フレームから除外マスクを再生成します。
+生成されたマスクは `/output/masks/<camera>_mask.png` に保存され、再起動後も有効です。
 
 ### 停止
 

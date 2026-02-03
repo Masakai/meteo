@@ -7,12 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-03
+
 ### Added
+- streamersの各行に`RTSP URL | 昼間画像パス`を指定し、マスクを自動生成してコンテナに同梱する機能
+- 事前生成マスクを優先適用する`MASK_IMAGE`と、マスク永続化（`/output/masks/<camera>_mask.png`）
+- ダッシュボードにマスク更新ボタンを追加（現在フレームからマスク再生成）
+- カメラAPIに`POST /update_mask`を追加
 - ダッシュボードに検出処理中インディケータを追加（赤点滅：検出処理中、グレー：停止中）
 - `meteor_detector_rtsp_web.py`の`/stats` APIに`is_detecting`フィールドを追加
 
 ### Changed
+- 検出ロジックに除外マスク適用を追加（差分画像でマスク領域を除外）
+- マスク生成アルゴリズムを改良（空の最下端より下を除外）
+- `generate_compose.py`がマスク自動生成・同梱を行うよう拡張
 - ダッシュボードのカメラカード右上に2つのインディケータを配置（ストリーム接続状態と検出処理状態）
+
+### Documentation
+- マスク機能とstreamersの拡張形式、API/設定/運用手順を追加
 
 ## [1.1.0] - 2026-02-02
 
