@@ -14,6 +14,18 @@ import argparse
 import re
 from pathlib import Path
 
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
+try:
+    from meteor_detector_rtsp_web import build_exclusion_mask
+except Exception:
+    build_exclusion_mask = None
+
+VERSION = "1.2.0"
+
 
 def parse_rtsp_url(url: str) -> dict:
     """RTSPのURLをパース"""
@@ -33,16 +45,64 @@ def parse_rtsp_url(url: str) -> dict:
     }
 
 
-def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int) -> str:
+def parse_streamers_line(line: str) -> dict:
+    if '|' in line:
+        url, mask_path = [part.strip() for part in line.split('|', 1)]
+        return {"url": url, "mask_path": mask_path}
+    return {"url": line.strip(), "mask_path": ""}
+
+
+def expand_mask_path(mask_template: str, index: int, rtsp_info: dict, base_dir: Path) -> str:
+    if not mask_template:
+        return ""
+    expanded = (mask_template
+                .replace("{index}", str(index))
+                .replace("{host}", rtsp_info["host"]))
+    path = Path(expanded)
+    if path.is_absolute():
+        try:
+            return str(path.relative_to(base_dir))
+        except ValueError:
+            print(f"警告: マスク画像が作業ディレクトリ外のためビルドで失敗する可能性があります: {expanded}")
+            return expanded
+    return expanded
+
+
+def generate_mask_file(mask_src: Path, output_path: Path, scale: float, dilate: int) -> str:
+    if cv2 is None or build_exclusion_mask is None:
+        raise RuntimeError("OpenCVが利用できないためマスク生成に失敗しました")
+
+    img = cv2.imread(str(mask_src))
+    if img is None:
+        raise RuntimeError(f"マスク元画像を読み込めません: {mask_src}")
+
+    height, width = img.shape[:2]
+    proc_w = max(1, int(width * scale))
+    proc_h = max(1, int(height * scale))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    mask = build_exclusion_mask(str(mask_src), (proc_w, proc_h), dilate_px=dilate, save_path=output_path)
+    if mask is None:
+        raise RuntimeError(f"マスク生成に失敗しました: {mask_src}")
+
+    return str(output_path)
+
+
+def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int, mask_image: str) -> str:
     """1つのカメラ用のサービス定義を生成"""
 
     camera_name = f"camera{index}_{rtsp_info['host'].replace('.', '_')}"
     service_name = f"camera{index}"
+    mask_env = "/app/mask_image.png" if mask_image else ""
+    mask_build_arg = mask_image if mask_image else "mask_none.jpg"
 
     return f"""
   # カメラ{index} ({rtsp_info['host']})
   {service_name}:
-    build: .
+    build:
+      context: .
+      args:
+        MASK_IMAGE: {mask_build_arg}
     container_name: meteor-{service_name}
     restart: unless-stopped
     environment:
@@ -58,6 +118,9 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int)
       - LONGITUDE={settings.get('longitude', '138.7274')}
       - TIMEZONE=Asia/Tokyo
       - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'false')}
+      - MASK_IMAGE={mask_env}
+      - MASK_DILATE={settings.get('mask_dilate', '5')}
+      - MASK_SAVE={settings.get('mask_save', '')}
       - WEB_PORT=8080
     ports:
       - "{web_port}:8080"
@@ -124,14 +187,33 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
     # 各RTSPストリームをパース
     cameras = []
     services = []
-    for i, url in enumerate(lines, 1):
-        info = parse_rtsp_url(url)
+    mask_output_dir = Path(settings.get("mask_output_dir", "masks"))
+    streamers_path = Path(streamers_file)
+    for i, line in enumerate(lines, 1):
+        parsed = parse_streamers_line(line)
+        info = parse_rtsp_url(parsed["url"])
         if info:
             cameras.append(info)
             web_port = base_port + i  # 8081, 8082, 8083, ...
-            services.append(generate_service(i, info, settings, web_port))
+            mask_image = ""
+            if parsed["mask_path"]:
+                mask_src = Path(parsed["mask_path"])
+                if not mask_src.is_absolute():
+                    mask_src = (streamers_path.parent / mask_src).resolve()
+                mask_output = mask_output_dir / f"camera{i}_mask.png"
+                mask_image = generate_mask_file(
+                    mask_src,
+                    Path(mask_output),
+                    float(settings["scale"]),
+                    int(settings.get("mask_dilate", "5")),
+                )
+                try:
+                    mask_image = str(Path(mask_image).relative_to(Path.cwd()))
+                except ValueError:
+                    pass
+            services.append(generate_service(i, info, settings, web_port, mask_image))
         else:
-            print(f"警告: 無効なURL (行{i}): {url}")
+            print(f"警告: 無効なURL (行{i}): {parsed['url']}")
 
     if not services:
         raise ValueError("有効なRTSPストリームが見つかりません")
@@ -219,6 +301,12 @@ streamersファイルの形式:
     parser.add_argument("--enable-time-window", default="false",
                        choices=["true", "false"],
                        help="天文薄暮期間のみ検出を有効化 (default: false)")
+    parser.add_argument("--mask-output-dir", default="masks",
+                       help="生成したマスク画像の保存先ディレクトリ (default: masks)")
+    parser.add_argument("--mask-dilate", default="5",
+                       help="除外マスクの拡張ピクセル数 (default: 5)")
+    parser.add_argument("--mask-save", default="",
+                       help="生成マスク画像の保存先 (空で保存しない)")
 
     args = parser.parse_args()
 
@@ -231,6 +319,9 @@ streamersファイルの形式:
         'latitude': args.latitude,
         'longitude': args.longitude,
         'enable_time_window': args.enable_time_window,
+        'mask_output_dir': args.mask_output_dir,
+        'mask_dilate': args.mask_dilate,
+        'mask_save': args.mask_save,
     }
 
     # 生成

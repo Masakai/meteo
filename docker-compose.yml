@@ -2,7 +2,7 @@
 # 自動生成: python generate_compose.py
 #
 # Copyright (c) 2026 Masanori Sakai
-# Licensed under the MIT License
+# All rights reserved.
 #
 # 使い方:
 #   起動:     docker compose up -d
@@ -28,10 +28,10 @@ services:
     environment:
       - TZ=Asia/Tokyo
       - PORT=8080
-      - LATITUDE=35.6762
-      - LONGITUDE=139.6503
+      - LATITUDE=35.3606
+      - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=true
+      - ENABLE_TIME_WINDOW=false
       - CAMERA1_NAME=camera1 (10.0.1.25)
       - CAMERA1_URL=http://localhost:8081
       - CAMERA2_NAME=camera2 (10.0.1.3)
@@ -41,7 +41,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./detections:/output
+      - ./detections:/output:ro
     networks:
       - meteor-net
     depends_on:
@@ -51,7 +51,10 @@ services:
 
   # カメラ1 (10.0.1.25)
   camera1:
-    build: .
+    build:
+      context: .
+      args:
+        MASK_IMAGE: masks/camera1_mask.png
     container_name: meteor-camera1
     restart: unless-stopped
     environment:
@@ -63,10 +66,13 @@ services:
       - BUFFER=15
       - EXCLUDE_BOTTOM=0.0625
       - EXTRACT_CLIPS=true
-      - LATITUDE=35.6762
-      - LONGITUDE=139.6503
+      - LATITUDE=35.3606
+      - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=true
+      - ENABLE_TIME_WINDOW=false
+      - MASK_IMAGE=/app/mask_image.png
+      - MASK_DILATE=5
+      - MASK_SAVE=
       - WEB_PORT=8080
     ports:
       - "8081:8080"
@@ -82,7 +88,10 @@ services:
 
   # カメラ2 (10.0.1.3)
   camera2:
-    build: .
+    build:
+      context: .
+      args:
+        MASK_IMAGE: masks/camera2_mask.png
     container_name: meteor-camera2
     restart: unless-stopped
     environment:
@@ -94,10 +103,13 @@ services:
       - BUFFER=15
       - EXCLUDE_BOTTOM=0.0625
       - EXTRACT_CLIPS=true
-      - LATITUDE=35.6762
-      - LONGITUDE=139.6503
+      - LATITUDE=35.3606
+      - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=true
+      - ENABLE_TIME_WINDOW=false
+      - MASK_IMAGE=/app/mask_image.png
+      - MASK_DILATE=5
+      - MASK_SAVE=
       - WEB_PORT=8080
     ports:
       - "8082:8080"
@@ -113,7 +125,10 @@ services:
 
   # カメラ3 (10.0.1.11)
   camera3:
-    build: .
+    build:
+      context: .
+      args:
+        MASK_IMAGE: masks/camera3_mask.png
     container_name: meteor-camera3
     restart: unless-stopped
     environment:
@@ -125,10 +140,13 @@ services:
       - BUFFER=15
       - EXCLUDE_BOTTOM=0.0625
       - EXTRACT_CLIPS=true
-      - LATITUDE=35.6762
-      - LONGITUDE=139.6503
+      - LATITUDE=35.3606
+      - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=true
+      - ENABLE_TIME_WINDOW=false
+      - MASK_IMAGE=/app/mask_image.png
+      - MASK_DILATE=5
+      - MASK_SAVE=
       - WEB_PORT=8080
     ports:
       - "8083:8080"

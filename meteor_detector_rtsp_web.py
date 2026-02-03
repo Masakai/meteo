@@ -30,6 +30,8 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
 
+VERSION = "1.2.0"
+
 # 天文薄暮期間の判定用
 try:
     from astro_utils import is_detection_active
@@ -193,12 +195,14 @@ class RTSPReader:
 
 class RealtimeMeteorDetector:
     """リアルタイム流星検出器"""
-    def __init__(self, params: DetectionParams, fps: float = 30):
+    def __init__(self, params: DetectionParams, fps: float = 30, exclusion_mask: Optional[np.ndarray] = None):
         self.params = params
         self.fps = fps
+        self.exclusion_mask = exclusion_mask
         self.active_tracks: Dict[int, List[Tuple[float, int, int, float]]] = {}
         self.next_track_id = 0
         self.lock = Lock()
+        self.mask_lock = Lock()
 
     def detect_bright_objects(self, frame: np.ndarray, prev_frame: np.ndarray) -> List[dict]:
         height = frame.shape[0]
@@ -207,6 +211,10 @@ class RealtimeMeteorDetector:
         diff = cv2.absdiff(frame, prev_frame)
         _, thresh = cv2.threshold(diff, self.params.diff_threshold, 255, cv2.THRESH_BINARY)
         thresh[max_y:, :] = 0
+        with self.mask_lock:
+            mask = self.exclusion_mask
+        if mask is not None:
+            thresh[mask > 0] = 0
 
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
@@ -385,6 +393,10 @@ class RealtimeMeteorDetector:
                     events.append(event)
         return events
 
+    def update_exclusion_mask(self, new_mask: Optional[np.ndarray]) -> None:
+        with self.mask_lock:
+            self.exclusion_mask = new_mask
+
 
 # グローバル変数（Webサーバー用）
 current_frame = None
@@ -395,6 +407,12 @@ camera_name = ""
 last_frame_time = 0  # 最後にフレームを受信した時刻
 stream_timeout = 10.0  # ストリームがタイムアウトとみなす秒数
 is_detecting_now = False  # 現在検出処理中かどうか
+current_detector = None
+current_proc_size = (0, 0)
+current_mask_dilate = 5
+current_mask_save = None
+current_output_dir = None
+current_camera_name = ""
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -521,9 +539,174 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
+    def do_POST(self):
+        if self.path == '/update_mask':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            if current_detector is None or current_proc_size == (0, 0):
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "detector not ready"
+                }).encode())
+                return
+
+            with current_frame_lock:
+                frame = None if current_frame is None else current_frame.copy()
+
+            if frame is None:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "current frame not available"
+                }).encode())
+                return
+
+            save_path = None
+            if current_output_dir and current_camera_name:
+                save_dir = current_output_dir / "masks"
+                save_dir.mkdir(parents=True, exist_ok=True)
+                save_path = save_dir / f"{current_camera_name}_mask.png"
+
+            mask = build_exclusion_mask_from_frame(
+                frame,
+                current_proc_size,
+                dilate_px=current_mask_dilate,
+                save_path=save_path,
+            )
+            current_detector.update_exclusion_mask(mask)
+
+            self.wfile.write(json.dumps({
+                "success": mask is not None,
+                "message": "mask updated" if mask is not None else "mask update failed",
+                "saved": str(save_path) if save_path else ""
+            }).encode())
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     daemon_threads = True
+
+
+def build_exclusion_mask(
+    day_image_path: str,
+    proc_size: Tuple[int, int],
+    dilate_px: int = 5,
+    save_path: Optional[Path] = None,
+) -> Optional[np.ndarray]:
+    """昼間画像から検出除外マスクを生成（空以外を除外）"""
+    img = cv2.imread(day_image_path)
+    if img is None:
+        print(f"[WARN] マスク画像を読み込めません: {day_image_path}")
+        return None
+
+    proc_w, proc_h = proc_size
+    resized = cv2.resize(img, (proc_w, proc_h), interpolation=cv2.INTER_AREA)
+    hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
+
+    # 青空（H:90-140）と白い雲（S低 & V高）を空として扱う
+    sky_blue = cv2.inRange(hsv, (90, 20, 80), (140, 200, 255))
+    sky_white = cv2.inRange(hsv, (0, 0, 160), (180, 40, 255))
+    sky_mask = cv2.bitwise_or(sky_blue, sky_white)
+
+    # 空は上端と連結している領域を優先
+    num_labels, labels = cv2.connectedComponents(sky_mask)
+    top_labels = set(labels[0, :]) - {0}
+    if top_labels:
+        sky_keep = np.isin(labels, list(top_labels)).astype(np.uint8) * 255
+    else:
+        sky_keep = sky_mask
+
+    # 空以外を除外領域としてマスク化
+    exclusion = cv2.bitwise_not(sky_keep)
+
+    # 空の最下端より下はすべて除外（屋根・山・電柱などを確実にマスク）
+    h, w = sky_keep.shape[:2]
+    for x in range(w):
+        ys = np.where(sky_keep[:, x] > 0)[0]
+        if ys.size == 0:
+            exclusion[:, x] = 255
+        else:
+            y_max = ys.max()
+            if y_max + 1 < h:
+                exclusion[y_max + 1:, x] = 255
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    exclusion = cv2.morphologyEx(exclusion, cv2.MORPH_CLOSE, kernel)
+    if dilate_px > 0:
+        dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_px, dilate_px))
+        exclusion = cv2.dilate(exclusion, dilate_kernel)
+
+    if save_path:
+        try:
+            cv2.imwrite(str(save_path), exclusion)
+        except Exception:
+            print(f"[WARN] マスク保存に失敗: {save_path}")
+
+    return exclusion
+
+
+def build_exclusion_mask_from_frame(
+    frame: np.ndarray,
+    proc_size: Tuple[int, int],
+    dilate_px: int = 5,
+    save_path: Optional[Path] = None,
+) -> Optional[np.ndarray]:
+    """現在フレームから検出除外マスクを生成（空以外を除外）"""
+    if frame is None:
+        return None
+    proc_w, proc_h = proc_size
+    resized = cv2.resize(frame, (proc_w, proc_h), interpolation=cv2.INTER_AREA)
+    hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
+
+    sky_blue = cv2.inRange(hsv, (90, 20, 80), (140, 200, 255))
+    sky_white = cv2.inRange(hsv, (0, 0, 160), (180, 40, 255))
+    sky_mask = cv2.bitwise_or(sky_blue, sky_white)
+
+    num_labels, labels = cv2.connectedComponents(sky_mask)
+    top_labels = set(labels[0, :]) - {0}
+    if top_labels:
+        sky_keep = np.isin(labels, list(top_labels)).astype(np.uint8) * 255
+    else:
+        sky_keep = sky_mask
+
+    exclusion = cv2.bitwise_not(sky_keep)
+
+    # 空の最下端より下はすべて除外（屋根・山・電柱などを確実にマスク）
+    h, w = sky_keep.shape[:2]
+    for x in range(w):
+        ys = np.where(sky_keep[:, x] > 0)[0]
+        if ys.size == 0:
+            exclusion[:, x] = 255
+        else:
+            y_max = ys.max()
+            if y_max + 1 < h:
+                exclusion[y_max + 1:, x] = 255
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    exclusion = cv2.morphologyEx(exclusion, cv2.MORPH_CLOSE, kernel)
+    if dilate_px > 0:
+        dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (dilate_px, dilate_px))
+        exclusion = cv2.dilate(exclusion, dilate_kernel)
+
+    if save_path:
+        try:
+            cv2.imwrite(str(save_path), exclusion)
+        except Exception:
+            print(f"[WARN] マスク保存に失敗: {save_path}")
+
+    return exclusion
 
 
 def save_meteor_event(event, ring_buffer, output_dir, fps=30, extract_clips=True):
@@ -584,6 +767,10 @@ def detection_thread_worker(
     output_path,
     extract_clips,
     stop_flag,
+    mask_image=None,
+    mask_from_day=None,
+    mask_dilate=5,
+    mask_save=None,
     enable_time_window=False,
     latitude=35.3606,
     longitude=138.7274,
@@ -591,6 +778,8 @@ def detection_thread_worker(
 ):
     """検出処理を行うワーカースレッド"""
     global current_frame, detection_count, last_frame_time, is_detecting_now
+    global current_detector, current_proc_size, current_mask_dilate, current_mask_save
+    global current_output_dir, current_camera_name
 
     width, height = reader.frame_size
     proc_width = int(width * process_scale)
@@ -598,7 +787,38 @@ def detection_thread_worker(
     scale_factor = 1.0 / process_scale
 
     ring_buffer = RingBuffer(buffer_seconds, fps)
-    detector = RealtimeMeteorDetector(params, fps)
+    exclusion_mask = None
+    persistent_mask_path = None
+    if output_path:
+        persistent_mask_path = Path(output_path) / "masks" / f"{camera_name}_mask.png"
+        if mask_image is None and persistent_mask_path.exists():
+            mask_image = str(persistent_mask_path)
+    if mask_image:
+        mask_img = cv2.imread(mask_image, cv2.IMREAD_GRAYSCALE)
+        if mask_img is None:
+            print(f"[WARN] マスク画像を読み込めません: {mask_image}")
+        else:
+            if (mask_img.shape[1], mask_img.shape[0]) != (proc_width, proc_height):
+                mask_img = cv2.resize(mask_img, (proc_width, proc_height), interpolation=cv2.INTER_NEAREST)
+            _, exclusion_mask = cv2.threshold(mask_img, 1, 255, cv2.THRESH_BINARY)
+            print(f"マスク適用: {mask_image}")
+    elif mask_from_day:
+        exclusion_mask = build_exclusion_mask(
+            mask_from_day,
+            (proc_width, proc_height),
+            dilate_px=mask_dilate,
+            save_path=mask_save,
+        )
+        if exclusion_mask is not None:
+            print(f"マスク適用: {mask_from_day}")
+
+    detector = RealtimeMeteorDetector(params, fps, exclusion_mask=exclusion_mask)
+    current_detector = detector
+    current_proc_size = (proc_width, proc_height)
+    current_mask_dilate = mask_dilate
+    current_mask_save = mask_save
+    current_output_dir = Path(output_path)
+    current_camera_name = camera_name
 
     prev_gray = None
     frame_count = 0
@@ -701,6 +921,10 @@ def process_rtsp_stream(
     web_port: int = 0,
     cam_name: str = "camera",
     extract_clips: bool = True,
+    mask_image: Optional[str] = None,
+    mask_from_day: Optional[str] = None,
+    mask_dilate: int = 5,
+    mask_save: Optional[str] = None,
 ):
     global current_frame, detection_count, start_time_global, camera_name, current_settings
 
@@ -714,6 +938,9 @@ def process_rtsp_stream(
         "buffer": buffer_seconds,
         "extract_clips": extract_clips,
         "exclude_bottom": params.exclude_bottom_ratio,
+        "mask_image": mask_image or "",
+        "mask_from_day": mask_from_day or "",
+        "mask_dilate": mask_dilate,
     })
 
     if sensitivity == "low":
@@ -786,6 +1013,10 @@ def process_rtsp_stream(
         target=detection_thread_worker,
         args=(reader, params, process_scale, buffer_seconds, fps, output_path, extract_clips, stop_flag),
         kwargs={
+            'mask_image': mask_image,
+            'mask_from_day': mask_from_day,
+            'mask_dilate': mask_dilate,
+            'mask_save': Path(mask_save) if mask_save else None,
             'enable_time_window': enable_time_window,
             'latitude': latitude,
             'longitude': longitude,
@@ -828,6 +1059,10 @@ def main():
                         help="流星検出時にMP4クリップを保存 (デフォルト: 有効)")
     parser.add_argument("--no-clips", action="store_true",
                         help="MP4クリップを保存しない（コンポジット画像のみ）")
+    parser.add_argument("--mask-image", help="作成済みの除外マスク画像を使用（優先）")
+    parser.add_argument("--mask-from-day", help="昼間画像から検出除外マスクを生成（空以外を除外）")
+    parser.add_argument("--mask-dilate", type=int, default=5, help="除外マスクの拡張ピクセル数")
+    parser.add_argument("--mask-save", help="生成した除外マスク画像の保存先")
 
     args = parser.parse_args()
 
@@ -837,6 +1072,13 @@ def main():
     # クリップ抽出の判定（--no-clips または環境変数 EXTRACT_CLIPS=false で無効化）
     env_extract = os.environ.get("EXTRACT_CLIPS", "true").lower()
     extract_clips = not args.no_clips and env_extract not in ("false", "0", "no")
+
+    mask_image = args.mask_image.strip() if args.mask_image else None
+    mask_image = mask_image if mask_image else None
+    mask_from_day = args.mask_from_day.strip() if args.mask_from_day else None
+    mask_from_day = mask_from_day if mask_from_day else None
+    mask_save = args.mask_save.strip() if args.mask_save else None
+    mask_save = mask_save if mask_save else None
 
     process_rtsp_stream(
         args.url,
@@ -848,6 +1090,10 @@ def main():
         web_port=args.web_port,
         cam_name=args.camera_name,
         extract_clips=extract_clips,
+        mask_image=mask_image,
+        mask_from_day=mask_from_day,
+        mask_dilate=args.mask_dilate,
+        mask_save=mask_save,
     )
 
 

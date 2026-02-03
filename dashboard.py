@@ -14,6 +14,8 @@ import os
 from pathlib import Path
 from datetime import datetime
 
+VERSION = "1.2.0"
+
 # 検出時間の取得用
 try:
     from astro_utils import get_detection_window
@@ -61,6 +63,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                             <span class="camera-status" id="status{i}" title="ストリーム接続">●</span>
                             <span class="detection-status" id="detection{i}" title="検出処理">●</span>
                         </div>
+                    </div>
+                    <div class="camera-actions">
+                        <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
                     </div>
                     <div class="camera-video">
                         <img src="{cam['url']}/stream" alt="{cam['name']}"
@@ -184,6 +189,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
             position: relative;
             background: #000;
             aspect-ratio: 16/9;
+        }}
+        .camera-actions {{
+            padding: 8px 12px;
+            background: #16213e;
+            border-bottom: 1px solid #2a3f6f;
+            text-align: right;
+        }}
+        .mask-btn {{
+            background: #2a3f6f;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .mask-btn:hover {{
+            background: #00d4ff;
+            color: #0f1530;
+        }}
+        .mask-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
         }}
         .camera-video img {{
             width: 100%;
@@ -416,7 +444,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
     </div>
 
     <div class="footer">
-        Meteor Detection System <span class="version-link" onclick="showChangelog()">v1.1.0</span> | Ctrl+C で終了<br>
+        Meteor Detection System <span class="version-link" onclick="showChangelog()">v{VERSION}</span> | Ctrl+C で終了<br>
         &copy; 2026 株式会社　リバーランズ・コンサルティング
     </div>
 
@@ -583,6 +611,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     }});
             }}, 2000);
         }});
+
+        // マスク更新
+        function updateMask(i) {{
+            const btn = document.querySelectorAll('.mask-btn')[i];
+            if (!btn) return;
+            btn.disabled = true;
+            btn.textContent = '更新中...';
+            fetch(cameras[i].url + '/update_mask', {{ method: 'POST' }})
+                .then(r => r.json())
+                .then(data => {{
+                    btn.textContent = data.success ? '更新完了' : '失敗';
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = 'マスク更新';
+                        btn.disabled = false;
+                    }}, 1500);
+                }});
+        }}
 
         // 画像モーダル表示
         function showImage(imagePath, time, camera, confidence) {{

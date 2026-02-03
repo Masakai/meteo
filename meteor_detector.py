@@ -27,6 +27,8 @@ from threading import Thread
 from queue import Queue
 import time
 from datetime import datetime, timedelta
+
+VERSION = "1.2.0"
 from astro_utils import get_detection_window, is_detection_active
 
 

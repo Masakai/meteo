@@ -28,6 +28,12 @@ RUN apt-get update && \
 COPY meteor_detector_rtsp_web.py .
 COPY astro_utils.py .
 
+# マスク画像（デフォルトは空ファイル）
+ARG MASK_FROM_DAY=mask_none.jpg
+ARG MASK_IMAGE=mask_none.jpg
+COPY ${MASK_FROM_DAY} /app/mask_from_day.jpg
+COPY ${MASK_IMAGE} /app/mask_image.png
+
 # 出力ディレクトリ
 RUN mkdir -p /output
 
@@ -45,6 +51,10 @@ ENV EXCLUDE_BOTTOM="0.125"
 ENV CAMERA_NAME="camera"
 ENV WEB_PORT="8080"
 ENV EXTRACT_CLIPS="true"
+ENV MASK_FROM_DAY="/app/mask_from_day.jpg"
+ENV MASK_IMAGE=""
+ENV MASK_DILATE="5"
+ENV MASK_SAVE=""
 
 # Webプレビュー用ポート
 EXPOSE 8080
@@ -57,5 +67,9 @@ CMD python meteor_detector_rtsp_web.py \
     --scale "${SCALE}" \
     --buffer "${BUFFER}" \
     --exclude-bottom "${EXCLUDE_BOTTOM}" \
+    --mask-image "${MASK_IMAGE}" \
+    --mask-from-day "${MASK_FROM_DAY}" \
+    --mask-dilate "${MASK_DILATE}" \
+    --mask-save "${MASK_SAVE}" \
     --web-port "${WEB_PORT}" \
     --camera-name "${CAMERA_NAME}"

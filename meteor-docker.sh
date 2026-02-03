@@ -107,7 +107,11 @@ case "$1" in
     generate)
         log_info "docker-compose.ymlを生成中..."
         if [ -f "streamers" ]; then
-            python3 generate_compose.py "$@"
+            if [ -x ".venv/bin/python" ]; then
+                .venv/bin/python generate_compose.py "${@:2}"
+            else
+                python3 generate_compose.py "${@:2}"
+            fi
         else
             log_error "streamersファイルが見つかりません"
             exit 1
