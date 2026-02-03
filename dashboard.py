@@ -273,7 +273,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         }}
         .detection-list {{
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 10px;
         }}
         .detection-item {{
@@ -281,7 +281,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
             background: #16213e;
             border-radius: 8px;
             font-size: 0.85em;
-            cursor: pointer;
             transition: background 0.2s;
         }}
         .detection-item:hover {{
@@ -290,6 +289,28 @@ class DashboardHandler(BaseHTTPRequestHandler):
         .detection-item .time {{
             color: #00d4ff;
             font-weight: bold;
+            margin-bottom: 5px;
+        }}
+        .detection-links {{
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }}
+        .detection-link {{
+            padding: 3px 8px;
+            background: #2a3f6f;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .detection-link:hover {{
+            background: #00d4ff;
+            color: #0f1530;
         }}
         .delete-btn {{
             background: #ff4444;
@@ -324,11 +345,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
             max-width: 90%;
             max-height: 90%;
             position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }}
-        .modal-content img {{
-            max-width: 70%;
-            max-height: 70vh;
+        .modal-content img, .modal-content video {{
+            max-width: 90%;
+            max-height: 80vh;
             object-fit: contain;
+            z-index: 1001;
+        }}
+        .modal-content video {{
+            background: #000;
         }}
         .modal-close {{
             position: absolute;
@@ -448,11 +476,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         &copy; 2026 株式会社　リバーランズ・コンサルティング
     </div>
 
-    <!-- 画像表示モーダル -->
+    <!-- 画像・動画表示モーダル -->
     <div class="modal" id="image-modal">
         <div class="modal-content">
             <button class="modal-close" onclick="closeModal()">&times;</button>
-            <img id="modal-image" src="" alt="検出画像">
+            <img id="modal-image" src="" alt="検出画像" style="display:none;">
+            <video id="modal-video" controls autoplay loop style="display:none;"></video>
             <div class="modal-info" id="modal-info"></div>
         </div>
     </div>
@@ -636,21 +665,53 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
         // 画像モーダル表示
         function showImage(imagePath, time, camera, confidence) {{
-            document.getElementById('modal-image').src = '/image/' + imagePath;
+            const imgEl = document.getElementById('modal-image');
+            const videoEl = document.getElementById('modal-video');
+
+            imgEl.src = '/image/' + imagePath;
+            imgEl.style.display = 'block';
+            videoEl.style.display = 'none';
+            videoEl.pause();
+
+            document.getElementById('modal-info').innerHTML =
+                `${{time}} | ${{camera}} | 信頼度: ${{confidence}}`;
+            document.getElementById('image-modal').classList.add('active');
+        }}
+
+        // 動画モーダル表示
+        function showVideo(videoPath, time, camera, confidence) {{
+            const imgEl = document.getElementById('modal-image');
+            const videoEl = document.getElementById('modal-video');
+
+            videoEl.src = '/image/' + videoPath;
+            videoEl.style.display = 'block';
+            imgEl.style.display = 'none';
+
             document.getElementById('modal-info').innerHTML =
                 `${{time}} | ${{camera}} | 信頼度: ${{confidence}}`;
             document.getElementById('image-modal').classList.add('active');
         }}
 
         function closeModal() {{
+            const videoEl = document.getElementById('modal-video');
+            videoEl.pause();
+            videoEl.src = '';
             document.getElementById('image-modal').classList.remove('active');
         }}
 
-        // モーダルの背景クリックで閉じる
+        // モーダルの背景クリックで閉じる（動画のコントロールは除外）
         document.getElementById('image-modal').onclick = function(e) {{
             if (e.target.id === 'image-modal') {{
                 closeModal();
             }}
+        }};
+
+        // 動画とコントロールのクリックでモーダルが閉じないようにする
+        document.getElementById('modal-video').onclick = function(e) {{
+            e.stopPropagation();
+        }};
+        document.getElementById('modal-image').onclick = function(e) {{
+            e.stopPropagation();
         }};
 
         // ESCキーでモーダルを閉じる
@@ -694,10 +755,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     document.getElementById('total-detections').textContent = data.total;
                     if (data.recent.length > 0) {{
                         const html = data.recent.map(d => `
-                            <div class="detection-item" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">
+                            <div class="detection-item">
                                 <div class="time">${{d.time}}</div>
                                 <div>${{d.camera}}</div>
                                 <div>信頼度: ${{d.confidence}}</div>
+                                <div class="detection-links">
+                                    <span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">MP4</span>
+                                    <span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">合成</span>
+                                    <span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>
+                                </div>
                                 <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>
                             </div>
                         `).join('');
@@ -835,13 +901,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                         timestamp_str = d.get('timestamp', '')
                                         # タイムスタンプからファイル名を推測
                                         # timestamp: "2026-02-02T06:55:33.411811"
-                                        # filename: "meteor_20260202_065533_composite.jpg"
+                                        # filename: "meteor_20260202_065533"
                                         if timestamp_str:
                                             dt = datetime.fromisoformat(timestamp_str)
-                                            filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}_composite.jpg"
-                                            composite_path = f"{cam_dir.name}/{filename}"
+                                            base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
+                                            mp4_path = f"{cam_dir.name}/{base_filename}.mp4"
+                                            composite_path = f"{cam_dir.name}/{base_filename}_composite.jpg"
+                                            composite_orig_path = f"{cam_dir.name}/{base_filename}_composite_original.jpg"
                                         else:
+                                            mp4_path = ''
                                             composite_path = ''
+                                            composite_orig_path = ''
 
                                         total += 1
                                         detections.append({
@@ -849,6 +919,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                                             'camera': cam_dir.name,
                                             'confidence': f"{d.get('confidence', 0):.0%}",
                                             'image': composite_path,
+                                            'mp4': mp4_path,
+                                            'composite_original': composite_orig_path,
                                         })
                                     except:
                                         pass
@@ -864,7 +936,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(result).encode())
 
         elif self.path.startswith('/image/'):
-            # /image/camera_name/filename.jpg
+            # /image/camera_name/filename.jpg or /image/camera_name/filename.mp4
             try:
                 parts = self.path[7:].split('/', 1)
                 if len(parts) == 2:
@@ -872,17 +944,75 @@ class DashboardHandler(BaseHTTPRequestHandler):
                     image_path = Path(DETECTIONS_DIR) / camera_name / filename
 
                     if image_path.exists() and image_path.is_file():
-                        self.send_response(200)
-                        if filename.endswith('.jpg') or filename.endswith('.jpeg'):
-                            self.send_header('Content-type', 'image/jpeg')
-                        elif filename.endswith('.png'):
-                            self.send_header('Content-type', 'image/png')
-                        self.end_headers()
+                        file_size = image_path.stat().st_size
 
-                        with open(image_path, 'rb') as f:
-                            self.wfile.write(f.read())
+                        # MP4ファイルの場合は範囲リクエストに対応
+                        if filename.endswith('.mp4'):
+                            range_header = self.headers.get('Range')
+
+                            if range_header:
+                                # 範囲リクエスト処理
+                                try:
+                                    byte_range = range_header.replace('bytes=', '').split('-')
+                                    start = int(byte_range[0]) if byte_range[0] else 0
+                                    end = int(byte_range[1]) if len(byte_range) > 1 and byte_range[1] else file_size - 1
+
+                                    # 範囲が正しいか確認
+                                    if start >= file_size:
+                                        start = 0
+                                    if end >= file_size:
+                                        end = file_size - 1
+
+                                    length = end - start + 1
+
+                                    self.send_response(206)
+                                    self.send_header('Content-Type', 'video/mp4')
+                                    self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
+                                    self.send_header('Content-Length', str(length))
+                                    self.send_header('Accept-Ranges', 'bytes')
+                                    self.send_header('Cache-Control', 'no-cache')
+                                    self.end_headers()
+
+                                    with open(image_path, 'rb') as f:
+                                        f.seek(start)
+                                        chunk = f.read(length)
+                                        self.wfile.write(chunk)
+                                except Exception as e:
+                                    print(f"Range request error: {e}")
+                                    # エラー時はファイル全体を返す
+                                    self.send_response(200)
+                                    self.send_header('Content-Type', 'video/mp4')
+                                    self.send_header('Content-Length', str(file_size))
+                                    self.send_header('Accept-Ranges', 'bytes')
+                                    self.end_headers()
+                                    with open(image_path, 'rb') as f:
+                                        self.wfile.write(f.read())
+                            else:
+                                # 範囲リクエストなし（Chromeは必ず範囲リクエストを送るので、これは最初のリクエスト）
+                                self.send_response(200)
+                                self.send_header('Content-Type', 'video/mp4')
+                                self.send_header('Content-Length', str(file_size))
+                                self.send_header('Accept-Ranges', 'bytes')
+                                self.send_header('Cache-Control', 'no-cache')
+                                self.end_headers()
+
+                                with open(image_path, 'rb') as f:
+                                    self.wfile.write(f.read())
+                        else:
+                            # 画像ファイル
+                            self.send_response(200)
+                            if filename.endswith('.jpg') or filename.endswith('.jpeg'):
+                                self.send_header('Content-type', 'image/jpeg')
+                            elif filename.endswith('.png'):
+                                self.send_header('Content-type', 'image/png')
+                            self.send_header('Content-Length', str(file_size))
+                            self.end_headers()
+
+                            with open(image_path, 'rb') as f:
+                                self.wfile.write(f.read())
                         return
-            except:
+            except Exception as e:
+                print(f"Error serving file: {e}")
                 pass
 
             self.send_response(404)

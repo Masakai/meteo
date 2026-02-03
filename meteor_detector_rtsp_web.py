@@ -80,6 +80,7 @@ class DetectionParams:
     """検出パラメータ"""
     diff_threshold: int = 30
     min_brightness: int = 200
+    min_brightness_tracking: int = 150  # 追跡中は低い閾値で検出
     min_length: int = 20
     max_length: int = 5000
     min_duration: float = 0.1
@@ -88,7 +89,7 @@ class DetectionParams:
     min_linearity: float = 0.7
     min_area: int = 5
     max_area: int = 10000
-    max_gap_time: float = 1.0  # 流星が消えていく過程を追跡するため延長
+    max_gap_time: float = 2.0  # 流星が消えていく過程を追跡するため延長（1.0→2.0秒）
     max_distance: float = 80
     exclude_bottom_ratio: float = 1/16
 
@@ -204,7 +205,15 @@ class RealtimeMeteorDetector:
         self.lock = Lock()
         self.mask_lock = Lock()
 
-    def detect_bright_objects(self, frame: np.ndarray, prev_frame: np.ndarray) -> List[dict]:
+    def detect_bright_objects(self, frame: np.ndarray, prev_frame: np.ndarray, tracking_mode: bool = False) -> List[dict]:
+        """
+        明るい移動物体を検出
+
+        Args:
+            frame: 現在のフレーム
+            prev_frame: 前のフレーム
+            tracking_mode: True の場合、追跡中物体のために低い閾値で検出
+        """
         height = frame.shape[0]
         max_y = int(height * (1 - self.params.exclude_bottom_ratio))
 
@@ -221,6 +230,9 @@ class RealtimeMeteorDetector:
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
 
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # 追跡中は低い閾値を使用
+        min_brightness = self.params.min_brightness_tracking if tracking_mode else self.params.min_brightness
 
         objects = []
         for contour in contours:
@@ -241,7 +253,7 @@ class RealtimeMeteorDetector:
             cv2.drawContours(mask, [contour], -1, 255, -1)
             brightness = cv2.mean(frame, mask=mask)[0]
 
-            if brightness >= self.params.min_brightness:
+            if brightness >= min_brightness:
                 objects.append({
                     "centroid": (cx, cy),
                     "area": area,
@@ -733,7 +745,9 @@ def save_meteor_event(event, ring_buffer, output_dir, fps=30, extract_clips=True
             writer.write(frame)
         writer.release()
 
-    event_frames = ring_buffer.get_range(event.start_time, event.end_time)
+    # 合成画像用のフレーム範囲を拡張（終了時刻+1秒）
+    composite_end = min(event.end_time + 1.0, end)
+    event_frames = ring_buffer.get_range(event.start_time, composite_end)
     if event_frames:
         composite = event_frames[0][1].astype(np.float32)
         for _, f in event_frames[1:]:
@@ -856,7 +870,9 @@ def detection_thread_worker(
         if prev_gray is not None:
             # 検出期間内の場合のみ検出処理を実行
             if is_detection_time:
-                objects = detector.detect_bright_objects(gray, prev_gray)
+                # アクティブなトラックがある場合は追跡モードを有効化
+                tracking_mode = len(detector.active_tracks) > 0
+                objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
                 is_detecting_now = True
             else:
                 objects = []
