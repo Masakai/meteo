@@ -18,3 +18,12 @@ gen
 
 # User-specific configuration
 streamers
+/camera1.jpg
+/masks/camera1_mask.png
+/camera1_mask.png
+/camera2.jpg
+/masks/camera2_mask.png
+/camera2_mask.png
+/camera3.jpg
+/masks/camera3_mask.png
+/camera3_mask.png
