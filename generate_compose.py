@@ -169,7 +169,7 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     ports:
       - "{base_port}:8080"
     volumes:
-      - ./detections:/output:ro
+      - ./detections:/output
     networks:
       - meteor-net
     depends_on:
