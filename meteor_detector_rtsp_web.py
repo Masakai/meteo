@@ -88,7 +88,7 @@ class DetectionParams:
     min_linearity: float = 0.7
     min_area: int = 5
     max_area: int = 10000
-    max_gap_time: float = 0.2
+    max_gap_time: float = 1.0  # 流星が消えていく過程を追跡するため延長
     max_distance: float = 80
     exclude_bottom_ratio: float = 1/16
 
@@ -711,7 +711,7 @@ def build_exclusion_mask_from_frame(
 
 def save_meteor_event(event, ring_buffer, output_dir, fps=30, extract_clips=True):
     """流星イベントを保存"""
-    start = max(0, event.start_time - 2.0)
+    start = max(0, event.start_time - 1.0)
     end = event.end_time + 2.0
     frames = ring_buffer.get_range(start, end)
 
@@ -998,7 +998,7 @@ def process_rtsp_stream(
     signal.signal(signal.SIGINT, signal_handler)
 
     # 環境変数から天文薄暮期間の設定を取得
-    enable_time_window = os.environ.get('ENABLE_TIME_WINDOW', 'false').lower() == 'true'
+    enable_time_window = os.environ.get('ENABLE_TIME_WINDOW', 'true').lower() == 'true'
     latitude = float(os.environ.get('LATITUDE', '35.3606'))
     longitude = float(os.environ.get('LONGITUDE', '138.7274'))
     timezone = os.environ.get('TIMEZONE', 'Asia/Tokyo')

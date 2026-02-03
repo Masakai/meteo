@@ -808,7 +808,8 @@ def extract_meteor_clips(
     input_path: str,
     meteors: List[MeteorCandidate],
     output_dir: str = "meteor_clips",
-    margin_frames: int = 30,
+    margin_before: int = 30,
+    margin_after: int = 60,
 ):
     """
     流星が写っている部分を切り出して保存
@@ -817,7 +818,8 @@ def extract_meteor_clips(
         input_path: 入力動画パス
         meteors: 検出された流星リスト
         output_dir: 出力ディレクトリ
-        margin_frames: 前後のマージン（フレーム数）
+        margin_before: 前のマージン（フレーム数、デフォルト30=1秒）
+        margin_after: 後のマージン（フレーム数、デフォルト60=2秒）
     """
     if not meteors:
         print("流星が検出されていません")
@@ -829,10 +831,11 @@ def extract_meteor_clips(
     fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     for i, meteor in enumerate(meteors):
-        start = max(0, meteor.start_frame - margin_frames)
-        end = meteor.end_frame + margin_frames
+        start = max(0, meteor.start_frame - margin_before)
+        end = min(total_frames - 1, meteor.end_frame + margin_after)
 
         output_path = Path(output_dir) / f"meteor_{i+1:03d}.mp4"
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')

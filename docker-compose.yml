@@ -31,7 +31,7 @@ services:
       - LATITUDE=35.3606
       - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=false
+      - ENABLE_TIME_WINDOW=true
       - CAMERA1_NAME=camera1 (10.0.1.25)
       - CAMERA1_URL=http://localhost:8081
       - CAMERA2_NAME=camera2 (10.0.1.3)
@@ -69,7 +69,7 @@ services:
       - LATITUDE=35.3606
       - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=false
+      - ENABLE_TIME_WINDOW=true
       - MASK_IMAGE=/app/mask_image.png
       - MASK_DILATE=5
       - MASK_SAVE=
@@ -106,7 +106,7 @@ services:
       - LATITUDE=35.3606
       - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=false
+      - ENABLE_TIME_WINDOW=true
       - MASK_IMAGE=/app/mask_image.png
       - MASK_DILATE=5
       - MASK_SAVE=
@@ -143,7 +143,7 @@ services:
       - LATITUDE=35.3606
       - LONGITUDE=138.7274
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW=false
+      - ENABLE_TIME_WINDOW=true
       - MASK_IMAGE=/app/mask_image.png
       - MASK_DILATE=5
       - MASK_SAVE=

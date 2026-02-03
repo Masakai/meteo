@@ -117,7 +117,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
       - LATITUDE={settings.get('latitude', '35.3606')}
       - LONGITUDE={settings.get('longitude', '138.7274')}
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'false')}
+      - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'true')}
       - MASK_IMAGE={mask_env}
       - MASK_DILATE={settings.get('mask_dilate', '5')}
       - MASK_SAVE={settings.get('mask_save', '')}
@@ -164,7 +164,7 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
       - LATITUDE={settings.get('latitude', '35.3606')}
       - LONGITUDE={settings.get('longitude', '138.7274')}
       - TIMEZONE=Asia/Tokyo
-      - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'false')}
+      - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'true')}
 {camera_env_str}
     ports:
       - "{base_port}:8080"
@@ -298,9 +298,9 @@ streamersファイルの形式:
                        help="観測地点の緯度 (default: 35.3606 = 富士山頂)")
     parser.add_argument("--longitude", default="138.7274",
                        help="観測地点の経度 (default: 138.7274 = 富士山頂)")
-    parser.add_argument("--enable-time-window", default="false",
+    parser.add_argument("--enable-time-window", default="true",
                        choices=["true", "false"],
-                       help="天文薄暮期間のみ検出を有効化 (default: false)")
+                       help="天文薄暮期間のみ検出を有効化 (default: true)")
     parser.add_argument("--mask-output-dir", default="masks",
                        help="生成したマスク画像の保存先ディレクトリ (default: masks)")
     parser.add_argument("--mask-dilate", default="5",
