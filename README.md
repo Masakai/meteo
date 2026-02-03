@@ -444,6 +444,214 @@ camera1:
 
 **注意**: 手動編集した場合、次回 `generate_compose.py` を実行すると上書きされます。
 
+## デプロイ（他のサーバーへの展開）
+
+本システムを別のサーバーやマシンにデプロイする手順です。
+
+### 前提条件
+
+デプロイ先のサーバーに以下がインストールされている必要があります：
+
+- Docker 20.10以上
+- Docker Compose V2以上
+- git（リポジトリからクローンする場合）
+
+### デプロイ手順
+
+#### 1. リポジトリのクローン
+
+```bash
+# サーバーにSSH接続
+ssh user@server-ip
+
+# リポジトリをクローン
+git clone <repository-url> meteo
+cd meteo
+```
+
+#### 2. streamersファイルの設定
+
+```bash
+# streamersファイルを作成・編集
+vim streamers
+
+# RTSP URLを1行1カメラで記載
+# rtsp://user:pass@10.0.1.25/live
+# rtsp://user:pass@10.0.1.3/live
+# rtsp://user:pass@10.0.1.11/live
+
+# 昼間画像による自動マスク（任意）
+# rtsp://user:pass@10.0.1.25/live | camera1.jpg
+```
+
+#### 3. docker-compose.ymlの生成
+
+```bash
+# 基本設定で生成
+python3 generate_compose.py
+
+# または、カスタム設定で生成
+python3 generate_compose.py \
+  --sensitivity fireball \
+  --scale 0.5 \
+  --buffer 15 \
+  --latitude 35.6762 \
+  --longitude 139.6503 \
+  --enable-time-window true \
+  --base-port 8080
+```
+
+#### 4. Dockerイメージのビルドと起動
+
+```bash
+# イメージをビルド
+docker compose build
+
+# バックグラウンドで起動
+docker compose up -d
+
+# 状態確認
+docker compose ps
+```
+
+#### 5. 動作確認
+
+```bash
+# ログを確認
+docker compose logs -f
+
+# ブラウザでアクセス
+# http://server-ip:8080/  (ダッシュボード)
+# http://server-ip:8081/  (カメラ1)
+```
+
+### ファイアウォール設定
+
+外部からアクセスする場合、ファイアウォールでポートを開放する必要があります：
+
+```bash
+# UFWの場合
+sudo ufw allow 8080/tcp  # ダッシュボード
+sudo ufw allow 8081/tcp  # カメラ1
+sudo ufw allow 8082/tcp  # カメラ2
+sudo ufw allow 8083/tcp  # カメラ3
+
+# firewalldの場合
+sudo firewall-cmd --add-port=8080-8083/tcp --permanent
+sudo firewall-cmd --reload
+```
+
+### systemdによる自動起動設定
+
+サーバー再起動時に自動起動させる場合：
+
+```bash
+# systemdサービスファイルを作成
+sudo vim /etc/systemd/system/meteor-detection.service
+```
+
+```ini
+[Unit]
+Description=Meteor Detection System
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/path/to/meteo
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+User=your-user
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# サービスを有効化
+sudo systemctl enable meteor-detection.service
+sudo systemctl start meteor-detection.service
+
+# 状態確認
+sudo systemctl status meteor-detection.service
+```
+
+### 既存環境からの移行
+
+既存の環境からデプロイ先にデータを移行する場合：
+
+```bash
+# 移行元でバックアップを作成
+tar -czf meteor-backup.tar.gz detections/ streamers docker-compose.yml
+
+# デプロイ先にコピー
+scp meteor-backup.tar.gz user@server-ip:/path/to/meteo/
+
+# デプロイ先で展開
+ssh user@server-ip
+cd /path/to/meteo
+tar -xzf meteor-backup.tar.gz
+
+# システムを起動
+docker compose up -d
+```
+
+### リバースプロキシの設定（Nginx）
+
+HTTPSでアクセスさせたい場合や、ドメイン名でアクセスさせたい場合：
+
+```nginx
+# /etc/nginx/sites-available/meteor
+server {
+    listen 80;
+    server_name meteor.example.com;
+
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+```bash
+# 有効化
+sudo ln -s /etc/nginx/sites-available/meteor /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Let's EncryptでSSL化（オプション）
+sudo certbot --nginx -d meteor.example.com
+```
+
+### デプロイ後のメンテナンス
+
+```bash
+# ログ確認
+docker compose logs -f
+
+# 状態確認
+docker compose ps
+
+# 再起動
+docker compose restart
+
+# 更新（新しいコードを取得）
+git pull
+docker compose build
+docker compose up -d
+
+# 古いファイルの削除
+find ./detections -type f -mtime +7 -delete
+```
+
 ## ライセンス
 
 このプロジェクトはMITライセンスです。
