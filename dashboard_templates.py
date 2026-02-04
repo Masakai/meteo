@@ -366,6 +366,21 @@ def render_dashboard_html(cameras, version):
             color: #aaa;
             font-size: 0.9em;
         }}
+        .modal-downloads {{
+            position: absolute;
+            bottom: -85px;
+            left: 0;
+            right: 0;
+            text-align: center;
+        }}
+        .modal-downloads a {{
+            color: #00d4ff;
+            text-decoration: none;
+            font-size: 0.9em;
+        }}
+        .modal-downloads a:hover {{
+            text-decoration: underline;
+        }}
         .footer {{
             text-align: center;
             padding: 30px;
@@ -468,6 +483,7 @@ def render_dashboard_html(cameras, version):
             <img id="modal-image" src="" alt="検出画像" style="display:none;">
             <video id="modal-video" controls autoplay loop muted playsinline preload="metadata" style="display:none;"></video>
             <div class="modal-info" id="modal-info"></div>
+            <div class="modal-downloads" id="modal-downloads"></div>
         </div>
     </div>
 
@@ -518,6 +534,26 @@ def render_dashboard_html(cameras, version):
             );
         }}
 
+        const detectionWindowState = {{
+            enabled: false,
+            start: null,
+            end: null
+        }};
+
+        function parseDetectionWindowTime(value) {{
+            if (!value) return null;
+            const iso = value.replace(' ', 'T');
+            const dt = new Date(iso);
+            return Number.isNaN(dt.getTime()) ? null : dt;
+        }}
+
+        function isWithinDetectionWindow() {{
+            if (!detectionWindowState.enabled) return true;
+            if (!detectionWindowState.start || !detectionWindowState.end) return true;
+            const now = new Date();
+            return now >= detectionWindowState.start && now <= detectionWindowState.end;
+        }}
+
         // 検出時間帯を取得・更新
         function updateDetectionWindow() {{
             let url = '/detection_window';
@@ -528,6 +564,9 @@ def render_dashboard_html(cameras, version):
             fetch(url)
                 .then(r => r.json())
                 .then(data => {{
+                    detectionWindowState.enabled = data.enabled === true;
+                    detectionWindowState.start = parseDetectionWindowTime(data.start);
+                    detectionWindowState.end = parseDetectionWindowTime(data.end);
                     console.log('Detection window data:', data);
                     if (data.enabled && data.start && data.end) {{
                         // 日付と時刻を分離
@@ -576,6 +615,9 @@ def render_dashboard_html(cameras, version):
                 .catch((err) => {{
                     console.error('Detection window fetch error:', err);
                     document.getElementById('detection-window').textContent = '--:-- ~ --:--';
+                    detectionWindowState.enabled = false;
+                    detectionWindowState.start = null;
+                    detectionWindowState.end = null;
                 }});
         }}
         updateDetectionWindow();
@@ -596,8 +638,8 @@ def render_dashboard_html(cameras, version):
         function updateCameraStats(i) {{
             const cam = cameras[i];
             if (!cam) return;
-            const baseDelay = 2000;
-            const maxDelay = 30000;
+            const baseDelay = 60000;
+            const maxDelay = 300000;
             if (!cameraStatsState[i]) {{
                 cameraStatsState[i] = {{ delay: baseDelay }};
             }}
@@ -674,6 +716,7 @@ def render_dashboard_html(cameras, version):
         function showImage(imagePath, time, camera, confidence) {{
             const imgEl = document.getElementById('modal-image');
             const videoEl = document.getElementById('modal-video');
+            const downloadsEl = document.getElementById('modal-downloads');
 
             imgEl.src = '/image/' + encodeURI(imagePath);
             imgEl.style.display = 'block';
@@ -682,6 +725,8 @@ def render_dashboard_html(cameras, version):
 
             document.getElementById('modal-info').innerHTML =
                 `${{time}} | ${{camera}} | 信頼度: ${{confidence}}`;
+            downloadsEl.innerHTML =
+                `<a href="/image/${{encodeURI(imagePath)}}" download>画像をダウンロード</a>`;
             document.getElementById('image-modal').classList.add('active');
         }}
 
@@ -689,6 +734,7 @@ def render_dashboard_html(cameras, version):
         function showVideo(videoPath, time, camera, confidence) {{
             const imgEl = document.getElementById('modal-image');
             const videoEl = document.getElementById('modal-video');
+            const downloadsEl = document.getElementById('modal-downloads');
 
             videoEl.src = '/image/' + encodeURI(videoPath);
             videoEl.style.display = 'block';
@@ -698,13 +744,17 @@ def render_dashboard_html(cameras, version):
 
             document.getElementById('modal-info').innerHTML =
                 `${{time}} | ${{camera}} | 信頼度: ${{confidence}}`;
+            downloadsEl.innerHTML =
+                `<a href="/image/${{encodeURI(videoPath)}}" download>MP4をダウンロード</a>`;
             document.getElementById('image-modal').classList.add('active');
         }}
 
         function closeModal() {{
             const videoEl = document.getElementById('modal-video');
+            const downloadsEl = document.getElementById('modal-downloads');
             videoEl.pause();
             videoEl.src = '';
+            downloadsEl.innerHTML = '';
             document.getElementById('image-modal').classList.remove('active');
         }}
 
@@ -757,8 +807,10 @@ def render_dashboard_html(cameras, version):
         }}
 
         let lastDetectionsKey = '';
+        let lastDetectionsMtime = 0;
         const detectionPollBaseDelay = 3000;
         const detectionPollMaxDelay = 30000;
+        const detectionWindowIdleDelay = 60000;
         let detectionPollDelay = detectionPollBaseDelay;
         let detectionPollTimer = null;
 
@@ -766,12 +818,12 @@ def render_dashboard_html(cameras, version):
             if (detectionPollTimer) {{
                 clearTimeout(detectionPollTimer);
             }}
-            detectionPollTimer = setTimeout(updateDetections, delay);
+            detectionPollTimer = setTimeout(pollDetections, delay);
         }}
 
         // 検出一覧を更新
         function updateDetections() {{
-            fetch('/detections', {{ cache: 'no-store' }})
+            return fetch('/detections', {{ cache: 'no-store' }})
                 .then(r => r.json())
                 .then(data => {{
                     detectionPollDelay = detectionPollBaseDelay;
@@ -838,6 +890,27 @@ def render_dashboard_html(cameras, version):
                 .catch(err => {{
                     detectionPollDelay = Math.min(detectionPollDelay * 2, detectionPollMaxDelay);
                     console.warn('Detections fetch error:', err);
+                }});
+        }}
+
+        function pollDetections() {{
+            if (detectionWindowState.enabled && !isWithinDetectionWindow()) {{
+                scheduleDetectionPoll(detectionWindowIdleDelay);
+                return;
+            }}
+            fetch('/detections_mtime', {{ cache: 'no-store' }})
+                .then(r => r.json())
+                .then(data => {{
+                    detectionPollDelay = detectionPollBaseDelay;
+                    const mtime = data.mtime || 0;
+                    if (mtime !== lastDetectionsMtime) {{
+                        lastDetectionsMtime = mtime;
+                        return updateDetections();
+                    }}
+                }})
+                .catch(err => {{
+                    detectionPollDelay = Math.min(detectionPollDelay * 2, detectionPollMaxDelay);
+                    console.warn('Detections mtime fetch error:', err);
                 }})
                 .finally(() => {{
                     scheduleDetectionPoll(detectionPollDelay);
@@ -845,7 +918,7 @@ def render_dashboard_html(cameras, version):
         }}
 
         // 定期的に検出一覧を更新
-        updateDetections(); // 初回実行
+        pollDetections();
 
         // CHANGELOG表示
         function showChangelog() {{

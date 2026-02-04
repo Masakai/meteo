@@ -149,6 +149,31 @@ def handle_detections(handler):
     handler.wfile.write(json.dumps(result).encode())
 
 
+def handle_detections_mtime(handler):
+    if handler.path != "/detections_mtime":
+        return False
+
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.end_headers()
+
+    latest_mtime = 0.0
+    try:
+        for cam_dir in Path(DETECTIONS_DIR).iterdir():
+            if cam_dir.is_dir():
+                jsonl_file = cam_dir / "detections.jsonl"
+                if jsonl_file.exists():
+                    mtime = jsonl_file.stat().st_mtime
+                    if mtime > latest_mtime:
+                        latest_mtime = mtime
+    except Exception:
+        pass
+
+    handler.wfile.write(json.dumps({"mtime": latest_mtime}).encode("utf-8"))
+    return True
+
+
 def handle_image(handler):
     try:
         parts = handler.path[7:].split("/", 1)

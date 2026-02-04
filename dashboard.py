@@ -16,6 +16,7 @@ from dashboard_routes import (
     handle_delete_detection,
     handle_detection_window,
     handle_detections,
+    handle_detections_mtime,
     handle_camera_mask,
     handle_camera_stats,
     handle_camera_stream,
@@ -40,6 +41,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if self.path == '/detections':
             handle_detections(self)
+            return
+        if self.path == '/detections_mtime':
+            handle_detections_mtime(self)
             return
         if self.path.startswith('/camera_stats/'):
             handle_camera_stats(self)
