@@ -19,7 +19,7 @@ from threading import Thread, Lock, Event
 from queue import Queue, Empty
 import json
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 from pathlib import Path
 from datetime import datetime
 import time
@@ -78,6 +78,9 @@ class DetectionParams:
     max_area: int = 10000
     max_gap_time: float = 0.2  # 秒
     max_distance: float = 80
+    merge_max_gap_time: float = 0.7  # 秒
+    merge_max_distance: float = 80
+    merge_max_speed_ratio: float = 0.5
     exclude_bottom_ratio: float = 1/16
 
 
@@ -415,6 +418,69 @@ class RealtimeMeteorDetector:
         return events
 
 
+class EventMerger:
+    """近接イベントを結合して1イベント化"""
+
+    def __init__(self, params: DetectionParams):
+        self.params = params
+        self.pending: deque[MeteorEvent] = deque()
+
+    def add_event(self, event: MeteorEvent) -> List[MeteorEvent]:
+        """イベントを追加し、確定したイベントを返す"""
+        finalized = []
+
+        if self.pending and self._is_mergeable(self.pending[-1], event):
+            self.pending[-1] = self._merge(self.pending[-1], event)
+        else:
+            self.pending.append(event)
+
+        finalized.extend(self.flush_expired(event.start_time))
+        return finalized
+
+    def flush_expired(self, current_time: float) -> List[MeteorEvent]:
+        """時間窓を超えたイベントを確定"""
+        finalized = []
+        cutoff = current_time - self.params.merge_max_gap_time
+        while self.pending and self.pending[0].end_time < cutoff:
+            finalized.append(self.pending.popleft())
+        return finalized
+
+    def flush_all(self) -> List[MeteorEvent]:
+        finalized = list(self.pending)
+        self.pending.clear()
+        return finalized
+
+    def _is_mergeable(self, prev: MeteorEvent, new: MeteorEvent) -> bool:
+        gap = new.start_time - prev.end_time
+        if gap < 0 or gap > self.params.merge_max_gap_time:
+            return False
+
+        dist = np.hypot(
+            new.start_point[0] - prev.end_point[0],
+            new.start_point[1] - prev.end_point[1],
+        )
+        if dist > self.params.merge_max_distance:
+            return False
+
+        prev_speed = prev.length / max(prev.duration, 0.001)
+        new_speed = new.length / max(new.duration, 0.001)
+        max_speed = max(prev_speed, new_speed, 0.001)
+        speed_ratio = abs(prev_speed - new_speed) / max_speed
+        return speed_ratio <= self.params.merge_max_speed_ratio
+
+    def _merge(self, prev: MeteorEvent, new: MeteorEvent) -> MeteorEvent:
+        return MeteorEvent(
+            timestamp=prev.timestamp,
+            start_time=prev.start_time,
+            end_time=new.end_time,
+            start_point=prev.start_point,
+            end_point=new.end_point,
+            peak_brightness=max(prev.peak_brightness, new.peak_brightness),
+            confidence=max(prev.confidence, new.confidence),
+            frames=[],
+        )
+
+
 def save_meteor_event(
     event: MeteorEvent,
     ring_buffer: RingBuffer,
@@ -550,6 +616,7 @@ def process_rtsp_stream(
     # コンポーネント初期化
     ring_buffer = RingBuffer(buffer_seconds, fps)
     detector = RealtimeMeteorDetector(params, fps)
+    merger = EventMerger(params)
 
     prev_gray = None
     detection_count = 0
@@ -602,11 +669,21 @@ def process_rtsp_stream(
 
                 # 流星イベントを保存
                 for event in events:
+                    merged_events = merger.add_event(event)
+                    for merged_event in merged_events:
+                        detection_count += 1
+                        print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                        print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
+                        print(f"  信頼度: {merged_event.confidence:.0%}")
+                        save_meteor_event(merged_event, ring_buffer, output_path, fps=fps)
+
+                expired_events = merger.flush_expired(timestamp)
+                for expired_event in expired_events:
                     detection_count += 1
-                    print(f"\n[{event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
-                    print(f"  長さ: {event.length:.1f}px, 時間: {event.duration:.2f}秒")
-                    print(f"  信頼度: {event.confidence:.0%}")
-                    save_meteor_event(event, ring_buffer, output_path, fps=fps)
+                    print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                    print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
+                    print(f"  信頼度: {expired_event.confidence:.0%}")
+                    save_meteor_event(expired_event, ring_buffer, output_path, fps=fps)
 
                 # プレビュー
                 if show_preview:
@@ -648,6 +725,13 @@ def process_rtsp_stream(
         # 残りのトラックを処理
         events = detector.finalize_all()
         for event in events:
+            merged_events = merger.add_event(event)
+            for merged_event in merged_events:
+                detection_count += 1
+                print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                save_meteor_event(merged_event, ring_buffer, output_path, fps=fps)
+
+        for event in merger.flush_all():
             detection_count += 1
             print(f"\n[{event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
             save_meteor_event(event, ring_buffer, output_path, fps=fps)

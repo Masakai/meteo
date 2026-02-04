@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
 from urllib.request import Request, urlopen
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 
 from dashboard_config import CAMERAS, DETECTIONS_DIR, VERSION, get_detection_window
 from dashboard_templates import render_dashboard_html
@@ -424,6 +424,43 @@ def handle_camera_mask(handler):
         handler.send_header("Content-type", "application/json")
         handler.end_headers()
         handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+
+
+def handle_camera_mask_image(handler):
+    if not handler.path.startswith("/camera_mask_image/"):
+        return False
+
+    parsed = urlparse(handler.path)
+    try:
+        camera_index = int(parsed.path.split("/")[-1])
+        if camera_index < 0 or camera_index >= len(CAMERAS):
+            raise ValueError("camera index out of range")
+        cam = CAMERAS[camera_index]
+        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/mask"
+        if parsed.query:
+            target_url += "?" + parsed.query
+        req = Request(target_url)
+        with urlopen(req, timeout=5) as response:
+            payload = response.read()
+
+        handler.send_response(200)
+        handler.send_header("Content-type", "image/png")
+        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        handler.end_headers()
+        handler.wfile.write(payload)
+        return True
+    except HTTPError as e:
+        handler.send_response(404 if e.code == 404 else 503)
+        handler.end_headers()
+        return True
+    except (ValueError, URLError, TimeoutError):
+        handler.send_response(503)
+        handler.end_headers()
+        return True
+    except Exception:
+        handler.send_response(500)
+        handler.end_headers()
         return True
     except Exception as e:
         handler.send_response(500)

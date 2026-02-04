@@ -29,8 +29,9 @@ import sys
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
+from urllib.parse import urlparse, parse_qs
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -91,6 +92,9 @@ class DetectionParams:
     max_area: int = 10000
     max_gap_time: float = 2.0  # 流星が消えていく過程を追跡するため延長（1.0→2.0秒）
     max_distance: float = 80
+    merge_max_gap_time: float = 1.5
+    merge_max_distance: float = 80
+    merge_max_speed_ratio: float = 0.5
     exclude_bottom_ratio: float = 1/16
 
 
@@ -410,6 +414,67 @@ class RealtimeMeteorDetector:
             self.exclusion_mask = new_mask
 
 
+class EventMerger:
+    """近接イベントを結合して1イベント化"""
+
+    def __init__(self, params: DetectionParams):
+        self.params = params
+        self.pending: deque[MeteorEvent] = deque()
+
+    def add_event(self, event: MeteorEvent) -> List[MeteorEvent]:
+        finalized = []
+
+        if self.pending and self._is_mergeable(self.pending[-1], event):
+            self.pending[-1] = self._merge(self.pending[-1], event)
+        else:
+            self.pending.append(event)
+
+        finalized.extend(self.flush_expired(event.start_time))
+        return finalized
+
+    def flush_expired(self, current_time: float) -> List[MeteorEvent]:
+        finalized = []
+        cutoff = current_time - self.params.merge_max_gap_time
+        while self.pending and self.pending[0].end_time < cutoff:
+            finalized.append(self.pending.popleft())
+        return finalized
+
+    def flush_all(self) -> List[MeteorEvent]:
+        finalized = list(self.pending)
+        self.pending.clear()
+        return finalized
+
+    def _is_mergeable(self, prev: MeteorEvent, new: MeteorEvent) -> bool:
+        gap = new.start_time - prev.end_time
+        if gap < 0 or gap > self.params.merge_max_gap_time:
+            return False
+
+        dist = np.hypot(
+            new.start_point[0] - prev.end_point[0],
+            new.start_point[1] - prev.end_point[1],
+        )
+        if dist > self.params.merge_max_distance:
+            return False
+
+        prev_speed = prev.length / max(prev.duration, 0.001)
+        new_speed = new.length / max(new.duration, 0.001)
+        max_speed = max(prev_speed, new_speed, 0.001)
+        speed_ratio = abs(prev_speed - new_speed) / max_speed
+        return speed_ratio <= self.params.merge_max_speed_ratio
+
+    def _merge(self, prev: MeteorEvent, new: MeteorEvent) -> MeteorEvent:
+        return MeteorEvent(
+            timestamp=prev.timestamp,
+            start_time=prev.start_time,
+            end_time=new.end_time,
+            start_point=prev.start_point,
+            end_point=new.end_point,
+            peak_brightness=max(prev.peak_brightness, new.peak_brightness),
+            confidence=max(prev.confidence, new.confidence),
+            frames=[],
+        )
+
+
 # グローバル変数（Webサーバー用）
 current_frame = None
 current_frame_lock = Lock()
@@ -442,7 +507,9 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         pass  # ログを抑制
 
     def do_GET(self):
-        if self.path == '/':
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == '/':
             self.send_response(200)
             self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
@@ -466,8 +533,59 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             border: 2px solid #00d4ff;
             border-radius: 8px;
             overflow: hidden;
+            position: relative;
         }}
         .video img {{ width: 100%; display: block; }}
+        .mask-overlay {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+            pointer-events: none;
+        }}
+        .actions {{
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }}
+        .mask-btn {{
+            background: #2a3f6f;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .mask-btn:hover {{
+            background: #00d4ff;
+            color: #0f1530;
+        }}
+        .mask-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .mask-toggle-btn {{
+            background: #1f324f;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .mask-toggle-btn:hover {{
+            background: #ff6b6b;
+            color: #0f1530;
+        }}
+        .mask-toggle-btn:disabled {{
+            opacity: 0.5;
+            cursor: not-allowed;
+        }}
         .stats {{
             margin-top: 20px;
             padding: 15px;
@@ -480,6 +598,13 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             font-size: 18px;
         }}
         .count {{ color: #00ff88; font-weight: bold; }}
+        .status {{
+            font-weight: bold;
+        }}
+        .status.online {{ color: #00ff88; }}
+        .status.offline {{ color: #ff4444; }}
+        .status.detecting {{ color: #ff4444; }}
+        .status.idle {{ color: #888; }}
     </style>
 </head>
 <body>
@@ -487,9 +612,16 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         <h1>Meteor Detector - {camera_name}</h1>
         <div class="video">
             <img src="/stream" alt="Live Stream">
+            <img class="mask-overlay" id="mask-overlay" data-src="/mask" alt="mask">
+        </div>
+        <div class="actions">
+            <button class="mask-btn" id="mask-update-btn" onclick="updateMask()">マスク更新</button>
+            <button class="mask-toggle-btn" id="mask-toggle-btn" onclick="toggleMask()" disabled>マスク表示</button>
         </div>
         <div class="stats">
-            <span>Status: <b style="color:#00ff88">RUNNING</b></span>
+            <span>Stream: <b class="status online" id="stream-status">ONLINE</b></span>
+            <span>Detect: <b class="status idle" id="detect-status">IDLE</b></span>
+            <span>Mask: <b class="status idle" id="mask-status">OFF</b></span>
             <span>Detections: <b class="count" id="count">-</b></span>
         </div>
         <p style="color:#888; margin-top:20px;">
@@ -497,9 +629,79 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         </p>
     </div>
     <script>
+        let maskVisible = false;
+
+        function setMaskOverlay(visible) {{
+            const overlay = document.getElementById('mask-overlay');
+            const btn = document.getElementById('mask-toggle-btn');
+            if (!overlay || !btn) return;
+            if (visible) {{
+                overlay.src = overlay.dataset.src + '?t=' + Date.now();
+                overlay.style.display = 'block';
+                btn.textContent = 'マスク非表示';
+                maskVisible = true;
+            }} else {{
+                overlay.style.display = 'none';
+                btn.textContent = 'マスク表示';
+                maskVisible = false;
+            }}
+        }}
+
+        function toggleMask() {{
+            setMaskOverlay(!maskVisible);
+        }}
+
+        function updateMask() {{
+            const btn = document.getElementById('mask-update-btn');
+            if (!btn) return;
+            btn.disabled = true;
+            btn.textContent = '更新中...';
+            fetch('/update_mask', {{ method: 'POST' }})
+                .then(r => r.json())
+                .then(data => {{
+                    btn.textContent = data.success ? '更新完了' : '失敗';
+                    if (data.success && maskVisible) {{
+                        setMaskOverlay(true);
+                    }}
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = 'マスク更新';
+                        btn.disabled = false;
+                    }}, 1500);
+                }});
+        }}
+
         setInterval(() => {{
             fetch('/stats').then(r => r.json()).then(data => {{
                 document.getElementById('count').textContent = data.detections;
+                const streamStatus = document.getElementById('stream-status');
+                const detectStatus = document.getElementById('detect-status');
+                const maskStatus = document.getElementById('mask-status');
+                const maskToggleBtn = document.getElementById('mask-toggle-btn');
+
+                if (streamStatus) {{
+                    streamStatus.textContent = data.stream_alive ? 'ONLINE' : 'OFFLINE';
+                    streamStatus.className = data.stream_alive ? 'status online' : 'status offline';
+                }}
+                if (detectStatus) {{
+                    detectStatus.textContent = data.is_detecting ? 'DETECTING' : 'IDLE';
+                    detectStatus.className = data.is_detecting ? 'status detecting' : 'status idle';
+                }}
+                if (maskStatus) {{
+                    const maskActive = data.mask_active === true;
+                    maskStatus.textContent = maskActive ? 'ON' : 'OFF';
+                    maskStatus.className = maskActive ? 'status online' : 'status idle';
+                    if (maskToggleBtn) {{
+                        maskToggleBtn.disabled = !maskActive;
+                        if (!maskActive) {{
+                            setMaskOverlay(false);
+                        }}
+                    }}
+                }}
             }});
         }}, 1000);
     </script>
@@ -507,7 +709,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
 </html>'''
             self.wfile.write(html.encode())
 
-        elif self.path == '/stream':
+        elif path == '/stream':
             self.send_response(200)
             self.send_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
             self.end_headers()
@@ -527,7 +729,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 except:
                     break
 
-        elif self.path == '/stats':
+        elif path == '/stats':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -536,6 +738,10 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             current_time = time.time()
             time_since_last_frame = current_time - last_frame_time if last_frame_time > 0 else 0
             is_stream_alive = time_since_last_frame < stream_timeout
+            mask_active = False
+            if current_detector is not None:
+                with current_detector.mask_lock:
+                    mask_active = current_detector.exclusion_mask is not None
             stats = {
                 "detections": detection_count,
                 "elapsed": round(elapsed, 1),
@@ -544,8 +750,37 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "stream_alive": is_stream_alive,
                 "time_since_last_frame": round(time_since_last_frame, 1),
                 "is_detecting": is_detecting_now,
+                "mask_active": mask_active,
             }
             self.wfile.write(json.dumps(stats).encode())
+        elif path == '/mask':
+            mask = None
+            if current_detector is not None:
+                with current_detector.mask_lock:
+                    if current_detector.exclusion_mask is not None:
+                        mask = current_detector.exclusion_mask.copy()
+            if mask is None:
+                self.send_response(404)
+                self.end_headers()
+                return
+            query = parse_qs(parsed.query)
+            try:
+                alpha = int(query.get("alpha", ["120"])[0])
+            except (TypeError, ValueError):
+                alpha = 120
+            alpha = max(0, min(alpha, 255))
+            overlay = np.zeros((mask.shape[0], mask.shape[1], 4), dtype=np.uint8)
+            overlay[mask > 0] = (0, 0, 255, alpha)
+            ok, png = cv2.imencode('.png', overlay)
+            if not ok:
+                self.send_response(500)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header('Content-type', 'image/png')
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.end_headers()
+            self.wfile.write(png.tobytes())
 
         else:
             self.send_response(404)
@@ -836,6 +1071,7 @@ def detection_thread_worker(
             print(f"マスク適用: {mask_from_day}")
 
     detector = RealtimeMeteorDetector(params, fps, exclusion_mask=exclusion_mask)
+    merger = EventMerger(params)
     current_detector = detector
     current_proc_size = (proc_width, proc_height)
     current_mask_dilate = mask_dilate
@@ -895,10 +1131,19 @@ def detection_thread_worker(
             events = detector.track_objects(objects, timestamp)
 
             for event in events:
+                merged_events = merger.add_event(event)
+                for merged_event in merged_events:
+                    detection_count += 1
+                    print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                    print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
+                    save_meteor_event(merged_event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
+
+            expired_events = merger.flush_expired(timestamp)
+            for expired_event in expired_events:
                 detection_count += 1
-                print(f"\n[{event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
-                print(f"  長さ: {event.length:.1f}px, 時間: {event.duration:.2f}秒")
-                save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
+                print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
+                save_meteor_event(expired_event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
 
             # プレビュー用フレーム生成
             display = frame.copy()
@@ -932,6 +1177,12 @@ def detection_thread_worker(
     # 終了処理
     events = detector.finalize_all()
     for event in events:
+        merged_events = merger.add_event(event)
+        for merged_event in merged_events:
+            detection_count += 1
+            save_meteor_event(merged_event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
+
+    for event in merger.flush_all():
         detection_count += 1
         save_meteor_event(event, ring_buffer, output_path, fps=fps, extract_clips=extract_clips)
 

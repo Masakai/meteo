@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-02-05
+
+### Added
+- Webプレビュー（単体カメラ）にマスク表示/更新ボタンとオーバーレイ表示を追加
+- Webプレビュー（単体カメラ）にストリーム/検出/マスク状態のステータス表示を追加
+
 ## [1.3.0] - 2026-02-04
 
 ### Added

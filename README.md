@@ -104,6 +104,8 @@ python meteor_detector_rtsp_web.py rtsp://192.168.1.100:554/stream --web-port 80
 # http://localhost:8080/
 ```
 
+単体カメラのWebプレビューでは、マスクの表示/更新とストリーム・検出・マスク状態の確認ができます。
+
 #### オプション
 
 ```bash
@@ -219,6 +221,7 @@ Dockerシステムの起動・管理には3つの方法があります：
 ./meteor-docker.sh logs camera1  # 特定カメラのログ
 ./meteor-docker.sh restart    # 再起動
 ./meteor-docker.sh build      # 再ビルド
+./meteor-docker.sh rebuild    # ビルドして再起動
 ./meteor-docker.sh generate   # docker-compose.ymlを再生成
 ./meteor-docker.sh clean      # 古い検出結果を削除（7日以上前）
 ./meteor-docker.sh cleanup    # 未使用のDockerイメージ・コンテナを削除
@@ -389,6 +392,7 @@ detections/camera1/
 - `--sensitivity high` で感度を上げる
 - `--min-brightness` を下げる（180など）
 - `--min-speed` を下げる（3.0など）
+- 詳細は `documents/DETECTION_TUNING.md` を参照
 
 ### 処理が遅い場合
 

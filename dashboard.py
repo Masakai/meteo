@@ -18,6 +18,7 @@ from dashboard_routes import (
     handle_detections,
     handle_detections_mtime,
     handle_camera_mask,
+    handle_camera_mask_image,
     handle_camera_stats,
     handle_camera_stream,
     handle_image,
@@ -53,6 +54,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if self.path.startswith('/camera_mask/'):
             handle_camera_mask(self)
+            return
+        if self.path.startswith('/camera_mask_image/'):
+            handle_camera_mask_image(self)
             return
         if self.path.startswith('/image/'):
             handle_image(self)

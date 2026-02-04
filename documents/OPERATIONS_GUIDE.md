@@ -95,7 +95,7 @@ python generate_compose.py
 
 ### マスク更新（固定カメラ向け）
 
-ダッシュボード上の「マスク更新」ボタンで、現在フレームから除外マスクを再生成します。
+ダッシュボード上、または単体カメラのWebプレビュー上の「マスク更新」ボタンで、現在フレームから除外マスクを再生成します。
 生成されたマスクは `/output/masks/<camera>_mask.png` に保存され、再起動後も有効です。
 
 ### 停止
@@ -268,6 +268,23 @@ meteor-dashboard  2.5%     78.3MiB / 8GiB       0.95%
 - コードを変更した時
 - requirements.txtを変更した時
 - Dockerfileを変更した時
+
+---
+
+### rebuild - ビルドして再起動
+
+```bash
+./meteor-docker.sh rebuild
+```
+
+**動作**:
+- `docker compose build --no-cache` を実行
+- `docker compose down` で停止
+- `docker compose up -d` で再起動
+
+**使用場面**:
+- ビルド結果をすぐ反映したい時
+- コンテナを一度止めてクリーンに起動し直したい時
 
 ---
 

@@ -14,14 +14,18 @@ def render_dashboard_html(cameras, version):
                         <div class="status-indicators">
                             <span class="camera-status" id="status{i}" title="ストリーム接続">●</span>
                             <span class="detection-status" id="detection{i}" title="検出処理">●</span>
+                            <span class="mask-status" id="mask-status{i}" title="マスク適用">MASK</span>
                         </div>
                     </div>
                     <div class="camera-actions">
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
+                        <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="camera-video">
                         <img src="/camera_stream/{i}" alt="{cam['name']}"
                              onerror="this.style.display='none'; document.getElementById('error{i}').style.display='flex';">
+                        <img class="mask-overlay" id="mask{i}" data-src="/camera_mask_image/{i}" alt="mask"
+                             onerror="this.style.display='none'; this.dataset.visible='';">
                         <div class="camera-error" id="error{i}">
                             <span>接続中...</span>
                         </div>
@@ -146,7 +150,9 @@ def render_dashboard_html(cameras, version):
             padding: 8px 12px;
             background: #16213e;
             border-bottom: 1px solid #2a3f6f;
-            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
         }}
         .mask-btn {{
             background: #2a3f6f;
@@ -165,10 +171,37 @@ def render_dashboard_html(cameras, version):
             opacity: 0.6;
             cursor: wait;
         }}
+        .mask-preview-btn {{
+            background: #1f324f;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .mask-preview-btn:hover {{
+            background: #ff6b6b;
+            color: #0f1530;
+        }}
+        .mask-preview-btn:disabled {{
+            opacity: 0.5;
+            cursor: not-allowed;
+        }}
         .camera-video img {{
             width: 100%;
             height: 100%;
             object-fit: contain;
+        }}
+        .mask-overlay {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+            pointer-events: none;
         }}
         .camera-error {{
             position: absolute;
@@ -211,6 +244,17 @@ def render_dashboard_html(cameras, version):
         }}
         .camera-params .param-no-clip {{
             color: #ff8844;
+        }}
+        .mask-status {{
+            color: #666;
+            border: 1px solid #666;
+            font-size: 0.65em;
+            padding: 1px 4px;
+            border-radius: 4px;
+        }}
+        .mask-status.active {{
+            color: #ff6b6b;
+            border-color: #ff6b6b;
         }}
         .recent-detections {{
             max-width: 1800px;
@@ -659,6 +703,18 @@ def render_dashboard_html(cameras, version):
                     }} else {{
                         document.getElementById('detection' + i).className = 'detection-status';
                     }}
+                    const maskActive = data.mask_active === true;
+                    const maskStatusEl = document.getElementById('mask-status' + i);
+                    if (maskStatusEl) {{
+                        maskStatusEl.className = maskActive ? 'mask-status active' : 'mask-status';
+                    }}
+                    const maskBtn = document.getElementById('mask-btn' + i);
+                    if (maskBtn) {{
+                        maskBtn.disabled = !maskActive;
+                        if (!maskActive) {{
+                            setMaskOverlay(i, false);
+                        }}
+                    }}
                 }})
                 .catch(() => {{
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
@@ -700,6 +756,12 @@ def render_dashboard_html(cameras, version):
                 .then(r => r.json())
                 .then(data => {{
                     btn.textContent = data.success ? '更新完了' : '失敗';
+                    if (data.success) {{
+                        const overlay = document.getElementById('mask' + i);
+                        if (overlay && overlay.dataset.visible === '1') {{
+                            setMaskOverlay(i, true);
+                        }}
+                    }}
                 }})
                 .catch(() => {{
                     btn.textContent = '失敗';
@@ -710,6 +772,29 @@ def render_dashboard_html(cameras, version):
                         btn.disabled = false;
                     }}, 1500);
                 }});
+        }}
+
+        function setMaskOverlay(i, visible) {{
+            const overlay = document.getElementById('mask' + i);
+            const btn = document.getElementById('mask-btn' + i);
+            if (!overlay || !btn) return;
+            if (visible) {{
+                overlay.src = overlay.dataset.src + '?t=' + Date.now();
+                overlay.style.display = 'block';
+                overlay.dataset.visible = '1';
+                btn.textContent = 'マスク非表示';
+            }} else {{
+                overlay.style.display = 'none';
+                overlay.dataset.visible = '';
+                btn.textContent = 'マスク表示';
+            }}
+        }}
+
+        function toggleMask(i) {{
+            const overlay = document.getElementById('mask' + i);
+            if (!overlay) return;
+            const visible = overlay.dataset.visible === '1';
+            setMaskOverlay(i, !visible);
         }}
 
         // 画像モーダル表示
@@ -850,6 +935,15 @@ def render_dashboard_html(cameras, version):
                             if (!cameraOrder.includes(name)) {{
                                 cameraOrder.push(name);
                             }}
+                        }});
+
+                        cameraOrder.sort((a, b) => {{
+                            const aMatch = a.match(/(\\d+)$/);
+                            const bMatch = b.match(/(\\d+)$/);
+                            if (aMatch && bMatch) {{
+                                return Number(aMatch[1]) - Number(bMatch[1]);
+                            }}
+                            return a.localeCompare(b);
                         }});
 
                         const html = cameraOrder.map(camera => {{

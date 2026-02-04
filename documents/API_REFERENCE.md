@@ -34,6 +34,7 @@ Licensed under the MIT License
 | `/` | GET | ダッシュボードHTML |
 | `/detection_window` | GET | 検出時間帯取得 |
 | `/detections` | GET | 検出一覧取得 |
+| `/detections_mtime` | GET | 検出ログ更新時刻取得 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
 | `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 |
 | `/changelog` | GET | CHANGELOG表示 |
@@ -134,13 +135,17 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
       "time": "2026-02-02 06:55:33",
       "camera": "camera1_10_0_1_25",
       "confidence": "87%",
-      "image": "camera1_10_0_1_25/meteor_20260202_065533_composite.jpg"
+      "image": "camera1_10_0_1_25/meteor_20260202_065533_composite.jpg",
+      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mp4",
+      "composite_original": "camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg"
     },
     {
       "time": "2026-02-02 05:32:18",
       "camera": "camera2_10_0_1_3",
       "confidence": "92%",
-      "image": "camera2_10_0_1_3/meteor_20260202_053218_composite.jpg"
+      "image": "camera2_10_0_1_3/meteor_20260202_053218_composite.jpg",
+      "mp4": "camera2_10_0_1_3/meteor_20260202_053218.mp4",
+      "composite_original": "camera2_10_0_1_3/meteor_20260202_053218_composite_original.jpg"
     }
   ]
 }
@@ -151,11 +156,13 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | `total` | integer | 総検出数 |
-| `recent` | array | 最新10件の検出リスト |
+| `recent` | array | 検出リスト（時刻降順） |
 | `recent[].time` | string | 検出時刻 |
 | `recent[].camera` | string | カメラ名 |
 | `recent[].confidence` | string | 信頼度（パーセント表示） |
 | `recent[].image` | string | 画像パス |
+| `recent[].mp4` | string | MP4パス |
+| `recent[].composite_original` | string | 元画像の比較明合成パス |
 
 **使用例**:
 ```bash
@@ -175,6 +182,34 @@ fetch('/detections')
     console.log('Total:', data.total);
     data.recent.forEach(d => console.log(d.time, d.camera));
   });
+```
+
+---
+
+### GET /detections_mtime
+
+**説明**: 各カメラの `detections.jsonl` の更新時刻（UNIXエポック秒）を取得
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "mtime": 1751461442.123
+}
+```
+
+**使用例**:
+```bash
+curl http://localhost:8080/detections_mtime | jq
+```
+
+```javascript
+fetch('/detections_mtime')
+  .then(r => r.json())
+  .then(data => console.log('mtime:', data.mtime));
 ```
 
 ---
