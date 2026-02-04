@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-04
+
+### Added
+- ダッシュボードに動画モーダル表示を追加（MP4の範囲リクエスト対応、画像/動画切り替え）
+- 流星検出に追跡モードを追加（低い閾値を使用、`detect_bright_objects` に `tracking_mode` を追加）
+- `dashboard_templates.py` を追加（カメラグリッドや統計情報のHTMLテンプレート）
+- `mask_none.jpg` を追加
+
+### Changed
+- 流星切り出しマージンを `margin_before` / `margin_after` に分割し処理範囲を最適化
+- RTSP検出のマージン制御を調整し、`max_gap_time` のデフォルトを `1.0s` に延長、イベント開始時刻を修正
+- 天文薄暮期間の検出制限をデフォルト有効化（`ENABLE_TIME_WINDOW=true`）し `docker-compose.yml` と関連スクリプトへ反映
+- `docker-compose.yml` のボリュームを書き込み可能に変更（read-only削除）、`generate_compose.py` も更新
+- `.gitignore` にカメラ画像とマスクファイルを追加（`/camera*.jpg`、`/masks/camera*_mask.png`）
+- ダッシュボードのレイアウト/スタイルを調整（アイテム表示サイズ、動画リンク統合）
+
+### Fixed
+- `generate_compose.py` の引数伝播を `$@` で修正
+- `cv2.VideoWriter` の初期化で複数のFourCCを試行し、失敗時に警告を出力
+
+### Documentation
+- README にデプロイ手順を追加（サーバー展開、ファイアウォール、自動起動、リバースプロキシ、移行手順）
+
 ## [1.2.0] - 2026-02-03
 
 ### Added

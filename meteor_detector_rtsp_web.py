@@ -30,7 +30,7 @@ import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 # 天文薄暮期間の判定用
 try:
