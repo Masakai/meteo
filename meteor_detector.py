@@ -542,8 +542,17 @@ def process_video(
     # 出力動画の準備
     writer = None
     if output_path:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        writer = None
+        for fourcc_name in ("avc1", "H264", "mp4v"):
+            fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
+            writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            if writer.isOpened():
+                break
+            writer.release()
+            writer = None
+        if writer is None:
+            print("[WARN] 動画エンコーダの初期化に失敗しました")
+            return
 
     # フレームバッファ（流星画像保存用）
     frame_buffer: Dict[int, np.ndarray] = {}
@@ -838,8 +847,17 @@ def extract_meteor_clips(
         end = min(total_frames - 1, meteor.end_frame + margin_after)
 
         output_path = Path(output_dir) / f"meteor_{i+1:03d}.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+        writer = None
+        for fourcc_name in ("avc1", "H264", "mp4v"):
+            fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
+            writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
+            if writer.isOpened():
+                break
+            writer.release()
+            writer = None
+        if writer is None:
+            print("[WARN] 動画エンコーダの初期化に失敗しました")
+            continue
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, start)
         for frame_num in range(start, end + 1):

@@ -13,6 +13,7 @@
 #   ./meteor-docker.sh logs      # ログ表示
 #   ./meteor-docker.sh logs camera1  # 特定カメラのログ
 #   ./meteor-docker.sh build     # イメージ再ビルド
+#   ./meteor-docker.sh rebuild   # ビルドして再起動
 #   ./meteor-docker.sh generate  # docker-compose.yml再生成
 
 set -e
@@ -104,6 +105,15 @@ case "$1" in
         log_info "ビルド完了"
         ;;
 
+    rebuild)
+        log_info "イメージをビルドして再起動中..."
+        docker compose build --no-cache
+        docker compose down
+        docker compose up -d
+        log_info "再起動完了"
+        docker compose ps
+        ;;
+
     generate)
         log_info "docker-compose.ymlを生成中..."
         if [ -f "streamers" ]; then
@@ -192,6 +202,7 @@ case "$1" in
         echo "  logs      ログを表示（Ctrl+Cで終了）"
         echo "  logs <カメラ名>  特定カメラのログを表示"
         echo "  build     Dockerイメージを再ビルド"
+        echo "  rebuild   ビルドして再起動"
         echo "  generate  streamersからdocker-compose.ymlを再生成"
         echo "  clean     古い検出結果を削除（7日以上前）"
         echo "  cleanup   このプロジェクトの未使用イメージ・コンテナを削除"

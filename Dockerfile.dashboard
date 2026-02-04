@@ -8,7 +8,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # 必要なファイルをコピー
-COPY dashboard.py .
+COPY dashboard*.py .
 COPY astro_utils.py .
 
 # 依存関係をインストール（検出時間計算に必要）

@@ -439,8 +439,17 @@ def save_meteor_event(
     # クリップを保存
     height, width = frames[0][1].shape[:2]
     clip_path = output_dir / f"{base_name}.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
+    writer = None
+    for fourcc_name in ("avc1", "H264", "mp4v"):
+        fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
+        writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
+        if writer.isOpened():
+            break
+        writer.release()
+        writer = None
+    if writer is None:
+        print("[WARN] 動画エンコーダの初期化に失敗しました")
+        return
 
     for _, frame in frames:
         writer.write(frame)
