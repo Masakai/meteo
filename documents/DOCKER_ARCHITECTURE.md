@@ -687,7 +687,7 @@ docker compose ps
 | `--longitude` | `138.7274` | 観測地の経度（富士山頂） |
 | `--enable-time-window` | `false` | 天文薄暮時間帯制限 |
 | `--mask-output-dir` | `masks` | 生成マスクの保存先 |
-| `--mask-dilate` | `5` | マスク拡張ピクセル数 |
+| `--mask-dilate` | `20` | マスク拡張ピクセル数 |
 
 ### 自動生成される構成
 

@@ -71,7 +71,7 @@ services:
       - TIMEZONE=Asia/Tokyo
       - ENABLE_TIME_WINDOW=true
       - MASK_IMAGE=/app/mask_image.png
-      - MASK_DILATE=5
+      - MASK_DILATE=20
       - MASK_SAVE=
       - WEB_PORT=8080
     ports:
@@ -108,7 +108,7 @@ services:
       - TIMEZONE=Asia/Tokyo
       - ENABLE_TIME_WINDOW=true
       - MASK_IMAGE=/app/mask_image.png
-      - MASK_DILATE=5
+      - MASK_DILATE=20
       - MASK_SAVE=
       - WEB_PORT=8080
     ports:
@@ -145,7 +145,7 @@ services:
       - TIMEZONE=Asia/Tokyo
       - ENABLE_TIME_WINDOW=true
       - MASK_IMAGE=/app/mask_image.png
-      - MASK_DILATE=5
+      - MASK_DILATE=20
       - MASK_SAVE=
       - WEB_PORT=8080
     ports:

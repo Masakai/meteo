@@ -53,7 +53,7 @@ ENV WEB_PORT="8080"
 ENV EXTRACT_CLIPS="true"
 ENV MASK_FROM_DAY="/app/mask_from_day.jpg"
 ENV MASK_IMAGE=""
-ENV MASK_DILATE="5"
+ENV MASK_DILATE="20"
 ENV MASK_SAVE=""
 
 # Webプレビュー用ポート

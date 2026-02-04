@@ -486,7 +486,7 @@ stream_timeout = 10.0  # ストリームがタイムアウトとみなす秒数
 is_detecting_now = False  # 現在検出処理中かどうか
 current_detector = None
 current_proc_size = (0, 0)
-current_mask_dilate = 5
+current_mask_dilate = 20
 current_mask_save = None
 current_output_dir = None
 current_camera_name = ""
@@ -849,7 +849,7 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
 def build_exclusion_mask(
     day_image_path: str,
     proc_size: Tuple[int, int],
-    dilate_px: int = 5,
+    dilate_px: int = 20,
     save_path: Optional[Path] = None,
 ) -> Optional[np.ndarray]:
     """昼間画像から検出除外マスクを生成（空以外を除外）"""
@@ -907,7 +907,7 @@ def build_exclusion_mask(
 def build_exclusion_mask_from_frame(
     frame: np.ndarray,
     proc_size: Tuple[int, int],
-    dilate_px: int = 5,
+    dilate_px: int = 20,
     save_path: Optional[Path] = None,
 ) -> Optional[np.ndarray]:
     """現在フレームから検出除外マスクを生成（空以外を除外）"""
@@ -1337,7 +1337,7 @@ def main():
                         help="MP4クリップを保存しない（コンポジット画像のみ）")
     parser.add_argument("--mask-image", help="作成済みの除外マスク画像を使用（優先）")
     parser.add_argument("--mask-from-day", help="昼間画像から検出除外マスクを生成（空以外を除外）")
-    parser.add_argument("--mask-dilate", type=int, default=5, help="除外マスクの拡張ピクセル数")
+    parser.add_argument("--mask-dilate", type=int, default=20, help="除外マスクの拡張ピクセル数")
     parser.add_argument("--mask-save", help="生成した除外マスク画像の保存先")
 
     args = parser.parse_args()

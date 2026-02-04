@@ -303,8 +303,8 @@ streamersファイルの形式:
                        help="天文薄暮期間のみ検出を有効化 (default: true)")
     parser.add_argument("--mask-output-dir", default="masks",
                        help="生成したマスク画像の保存先ディレクトリ (default: masks)")
-    parser.add_argument("--mask-dilate", default="5",
-                       help="除外マスクの拡張ピクセル数 (default: 5)")
+    parser.add_argument("--mask-dilate", default="20",
+                       help="除外マスクの拡張ピクセル数 (default: 20)")
     parser.add_argument("--mask-save", default="",
                        help="生成マスク画像の保存先 (空で保存しない)")
 
