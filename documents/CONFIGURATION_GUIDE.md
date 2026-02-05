@@ -38,7 +38,7 @@ docker-compose.ymlで設定される環境変数:
 | `CAMERA_NAME` | `camera` | カメラ識別名 | `camera1_10_0_1_25` |
 | `SENSITIVITY` | `medium` | 検出感度 | `low` / `medium` / `high` / `fireball` |
 | `SCALE` | `0.5` | 処理スケール | `0.25` ~ `1.0` |
-| `BUFFER` | `15` | リングバッファ秒数 | `10` ~ `30` |
+| `BUFFER` | `15` | リングバッファ秒数（RTSP Webは検出前後1秒+最大検出時間に上限調整） | `10` ~ `30` |
 | `EXCLUDE_BOTTOM` | `0.0625` | 画面下部除外率 | `0.0` ~ `0.25` |
 | `EXTRACT_CLIPS` | `true` | MP4クリップ保存 | `true` / `false` |
 | `LATITUDE` | `35.3606` | 観測地の緯度 | `35.6762`（東京） |

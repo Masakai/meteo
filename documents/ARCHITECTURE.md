@@ -16,6 +16,8 @@ Licensed under the MIT License
 1. **meteor_detector_rtsp_web.py** - 流星検出エンジン（個別カメラ用）
 2. **dashboard.py** - 統合ダッシュボード（複数カメラ管理）
 
+RTSP/MP4検出で共通化したロジックは `meteor_detector_common.py` に集約しています。
+
 ## コンポーネント間の関係
 
 ```mermaid
@@ -145,7 +147,7 @@ sequenceDiagram
     Reader-->>DetectionThread: (timestamp, frame)
 
     DetectionThread->>RingBuffer: add(timestamp, frame)
-    Note over RingBuffer: 過去15秒分を保持
+    Note over RingBuffer: 検出前後1秒 + 最大検出時間を保持
 
     DetectionThread->>DetectionThread: グレースケール変換
     DetectionThread->>DetectionThread: 前フレームとの差分計算
@@ -159,7 +161,7 @@ sequenceDiagram
         alt トラック完了 (流星判定)
             Detector-->>DetectionThread: MeteorEvent
 
-            DetectionThread->>RingBuffer: get_range(start-2s, end+2s)
+            DetectionThread->>RingBuffer: get_range(start-1s, end+1s)
             RingBuffer-->>DetectionThread: frames[]
 
             DetectionThread->>Storage: MP4動画保存 (オプション)
@@ -307,8 +309,8 @@ sequenceDiagram
 - **MJPEGHandlerスレッド**: Webストリーム配信専用
 
 ### 3. リングバッファ方式
-- 常時15秒分のフレームをメモリに保持
-- 流星検出時に前後2秒を含めて保存
+- 最大検出時間 + 2秒分（検出前後1秒）をメモリに保持
+- 流星検出時に前後1秒を含めて保存
 - メモリ効率と検出精度のバランス
 
 ### 4. リアルタイム性

@@ -37,7 +37,7 @@ from meteor_detector_realtime import (
     save_meteor_event,
 )
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 # 天文薄暮期間の判定用
 try:

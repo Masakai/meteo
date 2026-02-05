@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-02-05
+
+### Added
+- 検出共通ユーティリティ（`meteor_detector_common.py`）を追加してRTSP実装を共通化
+- 基本ユニットテストを追加
+
+### Changed
+- RTSP検出のバッファを検出前後1秒 + 最大検出時間に合わせて自動調整
+- 追跡時の輝度閾値を感度プリセットに連動
+- 天文薄暮期間の判定をキャッシュし、再計算頻度を抑制
+
+### Removed
+- 未使用のフレームバッファを削除
+
 ## [1.4.0] - 2026-02-05
 
 ### Added

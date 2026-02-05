@@ -28,7 +28,7 @@ from queue import Queue
 import time
 from datetime import datetime, timedelta
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 from astro_utils import get_detection_window, is_detection_active
 from meteor_detector_common import calculate_linearity, calculate_confidence, open_video_writer
 

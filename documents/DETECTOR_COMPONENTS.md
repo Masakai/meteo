@@ -158,22 +158,22 @@ class RingBuffer:
 
 ```mermaid
 graph LR
-    subgraph "RingBuffer (maxlen=450 for 15秒@30fps)"
+    subgraph "RingBuffer (maxlen=360 for 12秒@30fps)"
         F1["(t=0.00, frame1)"]
         F2["(t=0.03, frame2)"]
         F3["(t=0.07, frame3)"]
         Dots["..."]
-        F450["(t=14.97, frame450)"]
+        F360["(t=11.97, frame360)"]
     end
 
     F1 --> F2
     F2 --> F3
     F3 --> Dots
-    Dots --> F450
-    F450 -.->|"新フレーム追加で<br/>古いフレーム削除"| F1
+    Dots --> F360
+    F360 -.->|"新フレーム追加で<br/>古いフレーム削除"| F1
 
     style F1 fill:#16213e
-    style F450 fill:#2a3f6f
+    style F360 fill:#2a3f6f
 ```
 
 #### メソッド
@@ -186,19 +186,21 @@ graph LR
 #### 使用例
 
 ```python
-# 初期化（15秒、30fps = 最大450フレーム）
-ring_buffer = RingBuffer(max_seconds=15.0, fps=30.0)
+# 初期化（12秒、30fps = 最大360フレーム）
+ring_buffer = RingBuffer(max_seconds=12.0, fps=30.0)
 
 # フレーム追加
 ring_buffer.add(timestamp=0.0, frame=frame1)
 ring_buffer.add(timestamp=0.033, frame=frame2)
 
-# 流星検出時: 検出時刻の前後2秒を取得
+# 流星検出時: 検出時刻の前後1秒を取得
 event_frames = ring_buffer.get_range(
-    start_time=event.start_time - 2.0,
-    end_time=event.end_time + 2.0
+    start_time=event.start_time - 1.0,
+    end_time=event.end_time + 1.0
 )
 ```
+
+RTSP Web版では `buffer_seconds` が `max_duration + 2.0` 秒を上限に自動調整されます。
 
 ---
 
@@ -229,7 +231,7 @@ flowchart TD
     Contours["輪郭検出<br/>findContours()"]
 
     Filter1{"面積フィルタ<br/>5 ≤ area ≤ 10000"}
-    Filter2{"輝度フィルタ<br/>brightness ≥ 200"}
+    Filter2{"輝度フィルタ<br/>brightness ≥ min_brightness"}
     Filter3{"画面下部除外<br/>y < height×15/16"}
 
     Objects["検出物体リスト<br/>{centroid, brightness, area}"]
@@ -269,7 +271,7 @@ stateDiagram-v2
     [*] --> NewObject: 物体検出
     NewObject --> Tracking: 次フレームで追跡成功
     Tracking --> Tracking: 連続追跡
-    Tracking --> Lost: max_gap_time (0.2秒) 超過
+    Tracking --> Lost: max_gap_time (2.0秒) 超過
     Tracking --> Completed: トラック終了判定
     Lost --> Finalize: 軌跡評価
     Completed --> Finalize: 軌跡評価
@@ -295,6 +297,7 @@ stateDiagram-v2
 |-----------|------------|------|
 | `diff_threshold` | 30 | 差分閾値 |
 | `min_brightness` | 200 | 最小輝度 |
+| `min_brightness_tracking` | min_brightness | 追跡時の最小輝度 |
 | `min_length` | 20 px | 最小軌跡長 |
 | `max_length` | 5000 px | 最大軌跡長 |
 | `min_duration` | 0.1 秒 | 最小継続時間 |
@@ -303,8 +306,11 @@ stateDiagram-v2
 | `min_linearity` | 0.7 | 最小直線性 (0-1) |
 | `min_area` | 5 px² | 最小面積 |
 | `max_area` | 10000 px² | 最大面積 |
-| `max_gap_time` | 0.2 秒 | 最大トラッキング間隔 |
+| `max_gap_time` | 2.0 秒 | 最大トラッキング間隔 |
 | `max_distance` | 80 px | 最大移動距離 |
+| `merge_max_gap_time` | 1.5 秒 | イベント結合の最大間隔 |
+| `merge_max_distance` | 80 px | イベント結合の最大距離 |
+| `merge_max_speed_ratio` | 0.5 | イベント結合の最大速度比 |
 | `exclude_bottom_ratio` | 1/16 | 画面下部除外率 |
 
 #### 除外マスク（固定カメラ向け）
@@ -322,15 +328,17 @@ stateDiagram-v2
 | `high` | 20 | 180 | 暗い流星も検出 |
 | `fireball` | 15 | 150 | 火球専用（長時間OK） |
 
+追跡中は `min_brightness_tracking` を使用し、RTSP Webでは `min_brightness` の80%に設定されます。
+
 #### 信頼度計算
 
 ```python
-def _calculate_confidence(self, length, speed, linearity, brightness, duration) -> float:
-    length_score = min(1.0, length / 100)           # 25%の重み
-    speed_score = min(1.0, speed / 500)             # 20%の重み
+def calculate_confidence(length, speed, linearity, brightness, duration) -> float:
+    length_score = min(1.0, length / 100.0)         # 25%の重み
+    speed_score = min(1.0, speed / 20.0)            # 20%の重み
     linearity_score = linearity                     # 25%の重み
     brightness_score = min(1.0, brightness / 255)   # 20%の重み
-    duration_bonus = min(0.2, duration * 0.1)       # 最大10%のボーナス
+    duration_bonus = min(0.2, duration / 100.0 * 0.2)  # 最大20%のボーナス
 
     return min(1.0, length_score * 0.25 + speed_score * 0.2 +
                linearity_score * 0.25 + brightness_score * 0.2 + duration_bonus)
@@ -338,7 +346,17 @@ def _calculate_confidence(self, length, speed, linearity, brightness, duration) 
 
 ---
 
-### 4. MeteorEvent
+### 4. 共通ユーティリティ (meteor_detector_common.py)
+
+RTSP/MP4検出で共通利用する補助関数群です。
+
+- `calculate_linearity(xs, ys)`: 直線性の評価
+- `calculate_confidence(...)`: 信頼度スコアの算出
+- `open_video_writer(...)`: 利用可能なコーデックでVideoWriterを初期化
+
+---
+
+### 5. MeteorEvent
 
 **責務**: 検出された流星イベントのデータクラス
 
@@ -518,9 +536,12 @@ sequenceDiagram
   "settings": {
     "sensitivity": "medium",
     "scale": 0.5,
-    "buffer": 15.0,
+    "buffer": 12.0,
     "extract_clips": true,
-    "exclude_bottom": 0.0625
+    "exclude_bottom": 0.0625,
+    "mask_image": "",
+    "mask_from_day": "",
+    "mask_dilate": 5
   },
   "stream_alive": true,
   "time_since_last_frame": 0.03,
@@ -561,7 +582,7 @@ sequenceDiagram
 
     alt 流星検出
         Detector-->>Worker: MeteorEvent
-        Worker->>Buffer: get_range(start-2s, end+2s)
+        Worker->>Buffer: get_range(start-1s, end+1s)
         Buffer-->>Worker: frames[]
         Worker->>Storage: MP4 + JPEG + JSONL保存
     end
@@ -588,7 +609,7 @@ graph TD
     Event["MeteorEvent"]
 
     subgraph "save_meteor_event()"
-        GetFrames["RingBuffer.get_range<br/>(start-2s, end+2s)"]
+        GetFrames["RingBuffer.get_range<br/>(start-1s, end+1s)"]
 
         Video["MP4動画<br/>meteor_YYYYMMDD_HHMMSS.mp4"]
         Composite["コンポジット画像<br/>meteor_YYYYMMDD_HHMMSS_composite.jpg"]
