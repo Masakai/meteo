@@ -1,6 +1,7 @@
 """HTTP route handlers for the dashboard."""
 
 from datetime import datetime
+from time import time
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ from dashboard_templates import render_dashboard_html
 
 
 _IN_DOCKER = os.path.exists("/.dockerenv")
+_SERVER_START_TIME = time()
 
 
 def _camera_url_for_proxy(raw_url, camera_index=None):
@@ -35,7 +37,7 @@ def handle_index(handler):
     handler.send_header("Pragma", "no-cache")
     handler.end_headers()
 
-    html = render_dashboard_html(CAMERAS, VERSION)
+    html = render_dashboard_html(CAMERAS, VERSION, _SERVER_START_TIME)
     handler.wfile.write(html.encode())
 
 

@@ -3,7 +3,7 @@
 import json
 
 
-def render_dashboard_html(cameras, version):
+def render_dashboard_html(cameras, version, server_start_time):
     # カメラグリッドを生成
     camera_cards = ""
     for i, cam in enumerate(cameras):
@@ -541,11 +541,11 @@ def render_dashboard_html(cameras, version):
 
     <script>
         const cameras = {json.dumps(cameras)};
-        const startTime = Date.now();
+        const serverStartTime = {int(server_start_time * 1000)};
 
         // 稼働時間を更新
         setInterval(() => {{
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const elapsed = Math.floor((Date.now() - serverStartTime) / 1000);
             const hours = Math.floor(elapsed / 3600);
             const mins = Math.floor((elapsed % 3600) / 60);
             document.getElementById('uptime').textContent =
