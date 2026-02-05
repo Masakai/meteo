@@ -8,6 +8,10 @@ gen
 .env
 .claude
 /.idea/
+.venv/
+__pycache__/
+*.pyc
+tests/__pycache__/
 
 # Docker
 .dockerignore
@@ -15,6 +19,10 @@ gen
 /detections/
 /meteor_detections/
 /.claude/
+/output/
+/tmp/
+/meteor_*.mov
+/meteor_*.mp4
 
 # User-specific configuration
 streamers

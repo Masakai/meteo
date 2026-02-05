@@ -145,6 +145,7 @@ python meteor_detector.py input.mp4 --realtime
 ```
 
 `--realtime` を付けると Web版と同じ検出ロジックを使って再検出します。
+マスクを使う場合は `--mask-image` / `--mask-from-day` / `--mask-dilate` / `--mask-save` が利用できます。
 
 ### 3. Docker Composeで複数カメラを監視
 

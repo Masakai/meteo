@@ -38,6 +38,7 @@ from meteor_detector_realtime import (
     RingBuffer,
     save_meteor_event,
 )
+from meteor_detector_rtsp_web import build_exclusion_mask
 
 
 @dataclass
@@ -860,6 +861,10 @@ def process_video_realtime(
     sensitivity: str = "medium",
     extract_clips: bool = True,
     exclude_bottom_ratio: float = 1 / 16,
+    mask_image: str | None = None,
+    mask_from_day: str | None = None,
+    mask_dilate: int = 20,
+    mask_save: str | None = None,
 ) -> None:
     """リアルタイム検出ロジックでファイルを再検出（Web版と同等の再現用）"""
     params = params or RealtimeDetectionParams()
@@ -904,7 +909,30 @@ def process_video_realtime(
     print("-" * 50)
 
     ring_buffer = RingBuffer(effective_buffer_seconds, fps=fps)
-    detector = RealtimeMeteorDetector(params, fps)
+    exclusion_mask = None
+    proc_width = int(width * process_scale)
+    proc_height = int(height * process_scale)
+
+    if mask_image:
+        mask_img = cv2.imread(mask_image, cv2.IMREAD_GRAYSCALE)
+        if mask_img is None:
+            print(f"[WARN] マスク画像を読み込めません: {mask_image}")
+        else:
+            if (mask_img.shape[1], mask_img.shape[0]) != (proc_width, proc_height):
+                mask_img = cv2.resize(mask_img, (proc_width, proc_height), interpolation=cv2.INTER_NEAREST)
+            _, exclusion_mask = cv2.threshold(mask_img, 1, 255, cv2.THRESH_BINARY)
+            print(f"マスク適用: {mask_image}")
+    elif mask_from_day:
+        exclusion_mask = build_exclusion_mask(
+            mask_from_day,
+            (proc_width, proc_height),
+            dilate_px=mask_dilate,
+            save_path=Path(mask_save) if mask_save else None,
+        )
+        if exclusion_mask is not None:
+            print(f"マスク適用: {mask_from_day}")
+
+    detector = RealtimeMeteorDetector(params, fps, exclusion_mask=exclusion_mask)
     merger = EventMerger(params)
 
     prev_gray = None
@@ -912,9 +940,6 @@ def process_video_realtime(
     detection_count = 0
 
     scale_factor = 1.0 / process_scale if process_scale != 0 else 1.0
-    proc_width = int(width * process_scale)
-    proc_height = int(height * process_scale)
-
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -1066,6 +1091,11 @@ def main():
                        help="リアルタイム再検出時の出力ディレクトリ (default: meteor_detections)")
     parser.add_argument("--buffer", type=float, default=15.0,
                        help="リアルタイム再検出時のバッファ秒数 (default: 15.0)")
+    parser.add_argument("--mask-image", help="作成済みの除外マスク画像を使用（リアルタイム再検出）")
+    parser.add_argument("--mask-from-day", help="昼間画像から検出除外マスクを生成（リアルタイム再検出）")
+    parser.add_argument("--mask-dilate", type=int, default=20,
+                       help="除外マスクの拡張ピクセル数（リアルタイム再検出）")
+    parser.add_argument("--mask-save", help="生成した除外マスク画像の保存先（リアルタイム再検出）")
     parser.add_argument("--composite", action="store_true",
                        help="合成画像を作成")
     parser.add_argument("--no-json", action="store_true",
@@ -1155,6 +1185,10 @@ def main():
             sensitivity=args.sensitivity,
             extract_clips=args.extract_clips,
             exclude_bottom_ratio=args.exclude_bottom,
+            mask_image=args.mask_image.strip() if args.mask_image else None,
+            mask_from_day=args.mask_from_day.strip() if args.mask_from_day else None,
+            mask_dilate=args.mask_dilate,
+            mask_save=args.mask_save.strip() if args.mask_save else None,
         )
         return
 
