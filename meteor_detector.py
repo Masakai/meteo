@@ -30,6 +30,7 @@ from datetime import datetime, timedelta
 
 VERSION = "1.4.0"
 from astro_utils import get_detection_window, is_detection_active
+from meteor_detector_common import calculate_linearity, calculate_confidence, open_video_writer
 
 
 @dataclass
@@ -372,12 +373,12 @@ class MeteorDetector:
             return
 
         # 直線性を評価（線形回帰の決定係数）
-        linearity = self._calculate_linearity(xs, ys)
+        linearity = calculate_linearity(xs, ys)
         if linearity < self.params.min_linearity:
             return
 
         # 信頼度を計算
-        confidence = self._calculate_confidence(length, speed, linearity, max(brightness), duration)
+        confidence = calculate_confidence(length, speed, linearity, max(brightness), duration)
 
         # 流星候補として登録
         meteor = MeteorCandidate(
@@ -390,56 +391,6 @@ class MeteorDetector:
             confidence=confidence,
         )
         self.detected_meteors.append(meteor)
-
-    def _calculate_linearity(self, xs: List[int], ys: List[int]) -> float:
-        """直線性を計算（0-1、1が完全な直線）"""
-        if len(xs) < 3:
-            return 1.0
-
-        xs = np.array(xs)
-        ys = np.array(ys)
-
-        # 主成分分析で直線性を評価
-        points = np.column_stack([xs, ys])
-        centroid = np.mean(points, axis=0)
-        centered = points - centroid
-
-        # 共分散行列の固有値
-        cov = np.cov(centered.T)
-        eigenvalues = np.linalg.eigvalsh(cov)
-        eigenvalues = np.sort(eigenvalues)[::-1]
-
-        if eigenvalues[0] == 0:
-            return 0.0
-
-        # 第一固有値が支配的なほど直線的
-        linearity = eigenvalues[0] / (eigenvalues[0] + eigenvalues[1] + 1e-10)
-
-        return linearity
-
-    def _calculate_confidence(self, length: float, speed: float,
-                             linearity: float, brightness: float,
-                             duration: int = 1) -> float:
-        """信頼度を計算（0-1）"""
-        # 各特徴をスコア化
-        length_score = min(1.0, length / 100)  # 100ピクセル以上で満点
-        speed_score = min(1.0, speed / 20)     # 20ピクセル/フレーム以上で満点
-        linearity_score = linearity
-        brightness_score = min(1.0, brightness / 255)
-
-        # 継続時間ボーナス（火球は長く続く）
-        duration_bonus = min(0.2, duration / 100 * 0.2)  # 最大0.2のボーナス
-
-        # 重み付き平均
-        confidence = (
-            length_score * 0.25 +
-            speed_score * 0.2 +
-            linearity_score * 0.25 +
-            brightness_score * 0.2 +
-            duration_bonus
-        )
-
-        return min(1.0, confidence)
 
     def finalize_all_tracks(self):
         """全てのアクティブトラックを終了"""
@@ -542,14 +493,7 @@ def process_video(
     # 出力動画の準備
     writer = None
     if output_path:
-        writer = None
-        for fourcc_name in ("avc1", "H264", "mp4v"):
-            fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
-            writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-            if writer.isOpened():
-                break
-            writer.release()
-            writer = None
+        writer = open_video_writer(output_path, fps, (width, height))
         if writer is None:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
             return
@@ -842,14 +786,7 @@ def extract_meteor_clips(
         end = min(total_frames - 1, meteor.end_frame + margin_after)
 
         output_path = Path(output_dir) / f"meteor_{i+1:03d}.mp4"
-        writer = None
-        for fourcc_name in ("avc1", "H264", "mp4v"):
-            fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
-            writer = cv2.VideoWriter(str(output_path), fourcc, fps, (width, height))
-            if writer.isOpened():
-                break
-            writer.release()
-            writer = None
+        writer = open_video_writer(output_path, fps, (width, height))
         if writer is None:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
             continue

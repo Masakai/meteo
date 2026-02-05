@@ -11,546 +11,23 @@ Licensed under the MIT License
 
 import argparse
 import cv2
-import numpy as np
-from dataclasses import dataclass
-from typing import List, Tuple, Optional, Dict
-from collections import deque
-from threading import Thread, Lock, Event
-from queue import Queue, Empty
-import json
-
-VERSION = "1.4.0"
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 import time
 import signal
 import sys
-
-
-@dataclass
-class MeteorEvent:
-    """検出された流星イベント"""
-    timestamp: datetime
-    start_time: float  # ストリーム開始からの秒数
-    end_time: float
-    start_point: Tuple[int, int]
-    end_point: Tuple[int, int]
-    peak_brightness: float
-    confidence: float
-    frames: List[Tuple[float, np.ndarray]]  # [(timestamp, frame), ...]
-
-    @property
-    def duration(self) -> float:
-        return self.end_time - self.start_time
-
-    @property
-    def length(self) -> float:
-        dx = self.end_point[0] - self.start_point[0]
-        dy = self.end_point[1] - self.start_point[1]
-        return np.sqrt(dx**2 + dy**2)
-
-    def to_dict(self) -> dict:
-        return {
-            "timestamp": self.timestamp.isoformat(),
-            "start_time": round(self.start_time, 3),
-            "end_time": round(self.end_time, 3),
-            "duration": round(self.duration, 3),
-            "start_point": self.start_point,
-            "end_point": self.end_point,
-            "length_pixels": round(self.length, 1),
-            "peak_brightness": round(self.peak_brightness, 1),
-            "confidence": round(self.confidence, 2),
-        }
-
-
-@dataclass
-class DetectionParams:
-    """検出パラメータ"""
-    diff_threshold: int = 30
-    min_brightness: int = 200
-    min_length: int = 20
-    max_length: int = 5000
-    min_duration: float = 0.1  # 秒
-    max_duration: float = 10.0  # 秒
-    min_speed: float = 50.0  # ピクセル/秒
-    min_linearity: float = 0.7
-    min_area: int = 5
-    max_area: int = 10000
-    max_gap_time: float = 0.2  # 秒
-    max_distance: float = 80
-    merge_max_gap_time: float = 0.7  # 秒
-    merge_max_distance: float = 80
-    merge_max_speed_ratio: float = 0.5
-    exclude_bottom_ratio: float = 1/16
-
-
-class RingBuffer:
-    """リングバッファ（フレーム保持用）"""
-
-    def __init__(self, max_seconds: float, fps: float = 30):
-        self.max_frames = int(max_seconds * fps)
-        self.buffer: deque = deque(maxlen=self.max_frames)
-        self.lock = Lock()
-
-    def add(self, timestamp: float, frame: np.ndarray):
-        with self.lock:
-            self.buffer.append((timestamp, frame.copy()))
-
-    def get_range(self, start_time: float, end_time: float) -> List[Tuple[float, np.ndarray]]:
-        """指定した時間範囲のフレームを取得"""
-        with self.lock:
-            return [(t, f.copy()) for t, f in self.buffer
-                    if start_time <= t <= end_time]
-
-    def get_all(self) -> List[Tuple[float, np.ndarray]]:
-        with self.lock:
-            return [(t, f.copy()) for t, f in self.buffer]
-
-
-class RTSPReader:
-    """RTSPストリーム読み込み（別スレッド）"""
-
-    def __init__(self, url: str, reconnect_delay: float = 5.0):
-        self.url = url
-        self.reconnect_delay = reconnect_delay
-        self.queue = Queue(maxsize=30)
-        self.stopped = Event()
-        self.connected = Event()
-        self.thread = None
-        self.fps = 30.0
-        self.width = 0
-        self.height = 0
-        self.start_time = None
-        self.lock = Lock()
-
-    def start(self):
-        self.thread = Thread(target=self._read_loop, daemon=True)
-        self.thread.start()
-        # 接続待ち
-        self.connected.wait(timeout=10)
-        return self
-
-    def _read_loop(self):
-        while not self.stopped.is_set():
-            cap = cv2.VideoCapture(self.url)
-
-            if not cap.isOpened():
-                print(f"接続失敗: {self.url}")
-                print(f"{self.reconnect_delay}秒後に再接続...")
-                time.sleep(self.reconnect_delay)
-                continue
-
-            # ストリーム情報を取得
-            with self.lock:
-                self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                self.fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-                if self.start_time is None:
-                    self.start_time = time.time()
-
-            print(f"接続成功: {self.width}x{self.height} @ {self.fps:.1f}fps")
-            self.connected.set()
-
-            consecutive_failures = 0
-            while not self.stopped.is_set():
-                ret, frame = cap.read()
-
-                if not ret:
-                    consecutive_failures += 1
-                    if consecutive_failures > 30:
-                        print("ストリーム切断を検出")
-                        break
-                    time.sleep(0.01)
-                    continue
-
-                consecutive_failures = 0
-                timestamp = time.time() - self.start_time
-
-                # キューが満杯なら古いフレームを破棄
-                if self.queue.full():
-                    try:
-                        self.queue.get_nowait()
-                    except Empty:
-                        pass
-
-                self.queue.put((timestamp, frame))
-
-            cap.release()
-            self.connected.clear()
-
-            if not self.stopped.is_set():
-                print(f"{self.reconnect_delay}秒後に再接続...")
-                time.sleep(self.reconnect_delay)
-
-    def read(self) -> Tuple[bool, float, Optional[np.ndarray]]:
-        if self.stopped.is_set():
-            return False, 0, None
-        try:
-            timestamp, frame = self.queue.get(timeout=1.0)
-            return True, timestamp, frame
-        except Empty:
-            return True, 0, None  # タイムアウトだが継続
-
-    def stop(self):
-        self.stopped.set()
-        if self.thread:
-            self.thread.join(timeout=2.0)
-
-    @property
-    def frame_size(self):
-        with self.lock:
-            return (self.width, self.height)
-
-
-class RealtimeMeteorDetector:
-    """リアルタイム流星検出器"""
-
-    def __init__(self, params: DetectionParams, fps: float = 30):
-        self.params = params
-        self.fps = fps
-        self.active_tracks: Dict[int, List[Tuple[float, int, int, float]]] = {}
-        self.next_track_id = 0
-        self.lock = Lock()
-
-    def detect_bright_objects(self, frame: np.ndarray, prev_frame: np.ndarray) -> List[dict]:
-        """明るい移動物体を検出"""
-        height = frame.shape[0]
-        max_y = int(height * (1 - self.params.exclude_bottom_ratio))
-
-        diff = cv2.absdiff(frame, prev_frame)
-        _, thresh = cv2.threshold(diff, self.params.diff_threshold, 255, cv2.THRESH_BINARY)
-        thresh[max_y:, :] = 0
-
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
-
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        objects = []
-        for contour in contours:
-            area = cv2.contourArea(contour)
-            if not (self.params.min_area <= area <= self.params.max_area):
-                continue
-
-            M = cv2.moments(contour)
-            if M["m00"] == 0:
-                continue
-            cx = int(M["m10"] / M["m00"])
-            cy = int(M["m01"] / M["m00"])
-
-            if cy >= max_y:
-                continue
-
-            mask = np.zeros(frame.shape, dtype=np.uint8)
-            cv2.drawContours(mask, [contour], -1, 255, -1)
-            brightness = cv2.mean(frame, mask=mask)[0]
-
-            if brightness >= self.params.min_brightness:
-                objects.append({
-                    "centroid": (cx, cy),
-                    "area": area,
-                    "brightness": brightness,
-                })
-
-        return objects
-
-    def track_objects(self, objects: List[dict], timestamp: float) -> List[MeteorEvent]:
-        """物体を追跡し、完了したトラックを流星イベントとして返す"""
-        completed_events = []
-        used_objects = set()
-
-        with self.lock:
-            # 既存トラックとのマッチング
-            tracks_to_remove = []
-            for track_id, track_points in self.active_tracks.items():
-                if not track_points:
-                    continue
-
-                last_time, last_x, last_y, _ = track_points[-1]
-                gap = timestamp - last_time
-
-                if gap > self.params.max_gap_time:
-                    tracks_to_remove.append(track_id)
-                    continue
-
-                best_match = None
-                best_dist = float('inf')
-
-                for i, obj in enumerate(objects):
-                    if i in used_objects:
-                        continue
-
-                    cx, cy = obj["centroid"]
-                    dist = np.sqrt((cx - last_x)**2 + (cy - last_y)**2)
-
-                    if len(track_points) >= 2:
-                        prev_time, prev_x, prev_y, _ = track_points[-2]
-                        dt = last_time - prev_time
-                        if dt > 0:
-                            vx = (last_x - prev_x) / dt
-                            vy = (last_y - prev_y) / dt
-                            pred_x = last_x + vx * gap
-                            pred_y = last_y + vy * gap
-                            pred_dist = np.sqrt((cx - pred_x)**2 + (cy - pred_y)**2)
-                            dist = min(dist, pred_dist)
-
-                    if dist < self.params.max_distance and dist < best_dist:
-                        best_dist = dist
-                        best_match = i
-
-                if best_match is not None:
-                    obj = objects[best_match]
-                    cx, cy = obj["centroid"]
-                    track_points.append((timestamp, cx, cy, obj["brightness"]))
-                    used_objects.add(best_match)
-
-            # 終了したトラックを処理
-            for track_id in tracks_to_remove:
-                event = self._finalize_track(track_id)
-                if event:
-                    completed_events.append(event)
-
-            # 新規トラック
-            for i, obj in enumerate(objects):
-                if i not in used_objects:
-                    cx, cy = obj["centroid"]
-                    self.active_tracks[self.next_track_id] = [
-                        (timestamp, cx, cy, obj["brightness"])
-                    ]
-                    self.next_track_id += 1
-
-        return completed_events
-
-    def _finalize_track(self, track_id: int) -> Optional[MeteorEvent]:
-        """トラックを終了して流星判定"""
-        if track_id not in self.active_tracks:
-            return None
-
-        track_points = self.active_tracks.pop(track_id)
-
-        times = [p[0] for p in track_points]
-        duration = max(times) - min(times)
-
-        if not (self.params.min_duration <= duration <= self.params.max_duration):
-            return None
-
-        xs = [p[1] for p in track_points]
-        ys = [p[2] for p in track_points]
-        brightness = [p[3] for p in track_points]
-
-        start_idx = times.index(min(times))
-        end_idx = times.index(max(times))
-        start_point = (xs[start_idx], ys[start_idx])
-        end_point = (xs[end_idx], ys[end_idx])
-
-        length = np.sqrt((end_point[0] - start_point[0])**2 +
-                        (end_point[1] - start_point[1])**2)
-
-        if not (self.params.min_length <= length <= self.params.max_length):
-            return None
-
-        speed = length / max(0.001, duration)
-        if speed < self.params.min_speed:
-            return None
-
-        linearity = self._calculate_linearity(xs, ys)
-        if linearity < self.params.min_linearity:
-            return None
-
-        confidence = self._calculate_confidence(length, speed, linearity, max(brightness), duration)
-
-        return MeteorEvent(
-            timestamp=datetime.now(),
-            start_time=min(times),
-            end_time=max(times),
-            start_point=start_point,
-            end_point=end_point,
-            peak_brightness=max(brightness),
-            confidence=confidence,
-            frames=[],  # 後でバッファから取得
-        )
-
-    def _calculate_linearity(self, xs: List[int], ys: List[int]) -> float:
-        if len(xs) < 3:
-            return 1.0
-
-        xs = np.array(xs)
-        ys = np.array(ys)
-        points = np.column_stack([xs, ys])
-        centroid = np.mean(points, axis=0)
-        centered = points - centroid
-
-        cov = np.cov(centered.T)
-        eigenvalues = np.linalg.eigvalsh(cov)
-        eigenvalues = np.sort(eigenvalues)[::-1]
-
-        if eigenvalues[0] == 0:
-            return 0.0
-
-        return eigenvalues[0] / (eigenvalues[0] + eigenvalues[1] + 1e-10)
-
-    def _calculate_confidence(self, length: float, speed: float,
-                             linearity: float, brightness: float,
-                             duration: float) -> float:
-        length_score = min(1.0, length / 100)
-        speed_score = min(1.0, speed / 500)
-        linearity_score = linearity
-        brightness_score = min(1.0, brightness / 255)
-        duration_bonus = min(0.2, duration * 0.1)
-
-        return min(1.0, (
-            length_score * 0.25 +
-            speed_score * 0.2 +
-            linearity_score * 0.25 +
-            brightness_score * 0.2 +
-            duration_bonus
-        ))
-
-    def finalize_all(self) -> List[MeteorEvent]:
-        """全てのアクティブトラックを終了"""
-        events = []
-        with self.lock:
-            for track_id in list(self.active_tracks.keys()):
-                event = self._finalize_track(track_id)
-                if event:
-                    events.append(event)
-        return events
-
-
-class EventMerger:
-    """近接イベントを結合して1イベント化"""
-
-    def __init__(self, params: DetectionParams):
-        self.params = params
-        self.pending: deque[MeteorEvent] = deque()
-
-    def add_event(self, event: MeteorEvent) -> List[MeteorEvent]:
-        """イベントを追加し、確定したイベントを返す"""
-        finalized = []
-
-        if self.pending and self._is_mergeable(self.pending[-1], event):
-            self.pending[-1] = self._merge(self.pending[-1], event)
-        else:
-            self.pending.append(event)
-
-        finalized.extend(self.flush_expired(event.start_time))
-        return finalized
-
-    def flush_expired(self, current_time: float) -> List[MeteorEvent]:
-        """時間窓を超えたイベントを確定"""
-        finalized = []
-        cutoff = current_time - self.params.merge_max_gap_time
-        while self.pending and self.pending[0].end_time < cutoff:
-            finalized.append(self.pending.popleft())
-        return finalized
-
-    def flush_all(self) -> List[MeteorEvent]:
-        finalized = list(self.pending)
-        self.pending.clear()
-        return finalized
-
-    def _is_mergeable(self, prev: MeteorEvent, new: MeteorEvent) -> bool:
-        gap = new.start_time - prev.end_time
-        if gap < 0 or gap > self.params.merge_max_gap_time:
-            return False
-
-        dist = np.hypot(
-            new.start_point[0] - prev.end_point[0],
-            new.start_point[1] - prev.end_point[1],
-        )
-        if dist > self.params.merge_max_distance:
-            return False
-
-        prev_speed = prev.length / max(prev.duration, 0.001)
-        new_speed = new.length / max(new.duration, 0.001)
-        max_speed = max(prev_speed, new_speed, 0.001)
-        speed_ratio = abs(prev_speed - new_speed) / max_speed
-        return speed_ratio <= self.params.merge_max_speed_ratio
-
-    def _merge(self, prev: MeteorEvent, new: MeteorEvent) -> MeteorEvent:
-        return MeteorEvent(
-            timestamp=prev.timestamp,
-            start_time=prev.start_time,
-            end_time=new.end_time,
-            start_point=prev.start_point,
-            end_point=new.end_point,
-            peak_brightness=max(prev.peak_brightness, new.peak_brightness),
-            confidence=max(prev.confidence, new.confidence),
-            frames=[],
-        )
-
-
-def save_meteor_event(
-    event: MeteorEvent,
-    ring_buffer: RingBuffer,
-    output_dir: Path,
-    margin: float = 2.0,
-    fps: float = 30,
-):
-    """流星イベントを保存"""
-    # フレームを取得
-    start = max(0, event.start_time - margin)
-    end = event.end_time + margin
-    frames = ring_buffer.get_range(start, end)
-
-    if not frames:
-        print(f"  警告: フレームが取得できませんでした")
-        return
-
-    # タイムスタンプからファイル名を生成
-    ts = event.timestamp.strftime("%Y%m%d_%H%M%S")
-    base_name = f"meteor_{ts}"
-
-    # クリップを保存
-    height, width = frames[0][1].shape[:2]
-    clip_path = output_dir / f"{base_name}.mp4"
-    writer = None
-    for fourcc_name in ("avc1", "H264", "mp4v"):
-        fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
-        writer = cv2.VideoWriter(str(clip_path), fourcc, fps, (width, height))
-        if writer.isOpened():
-            break
-        writer.release()
-        writer = None
-    if writer is None:
-        print("[WARN] 動画エンコーダの初期化に失敗しました")
-        return
-
-    for _, frame in frames:
-        writer.write(frame)
-    writer.release()
-
-    # ピークフレームを保存（合成）
-    peak_time = (event.start_time + event.end_time) / 2
-    event_frames = ring_buffer.get_range(event.start_time, event.end_time)
-
-    if event_frames:
-        # 比較明合成
-        composite = event_frames[0][1].astype(np.float32)
-        for _, f in event_frames[1:]:
-            composite = np.maximum(composite, f.astype(np.float32))
-        composite = np.clip(composite, 0, 255).astype(np.uint8)
-
-        # マーク付き
-        marked = composite.copy()
-        cv2.line(marked, event.start_point, event.end_point, (0, 255, 255), 2, cv2.LINE_AA)
-        cv2.circle(marked, event.start_point, 6, (0, 255, 0), 2)
-        cv2.circle(marked, event.end_point, 6, (0, 0, 255), 2)
-
-        info_text = f"{event.timestamp.strftime('%H:%M:%S')} | Conf: {event.confidence:.0%}"
-        cv2.putText(marked, info_text, (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-        cv2.imwrite(str(output_dir / f"{base_name}_composite.jpg"), marked)
-        cv2.imwrite(str(output_dir / f"{base_name}_composite_original.jpg"), composite)
-
-    # JSONログ
-    log_path = output_dir / "detections.jsonl"
-    with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
-
-    print(f"  保存: {clip_path.name}")
+from threading import Event
+
+from meteor_detector_realtime import (
+    DetectionParams,
+    EventMerger,
+    RTSPReader,
+    RealtimeMeteorDetector,
+    RingBuffer,
+    save_meteor_event,
+)
+
+VERSION = "1.4.0"
 
 
 def process_rtsp_stream(
@@ -564,6 +41,8 @@ def process_rtsp_stream(
 ):
     """RTSPストリームを処理"""
     params = params or DetectionParams()
+    params.max_gap_time = 0.2
+    params.merge_max_gap_time = 0.7
 
     # 感度プリセット
     if sensitivity == "low":
@@ -582,6 +61,8 @@ def process_rtsp_stream(
         params.min_speed = 20.0
         params.min_linearity = 0.6
 
+    params.min_brightness_tracking = params.min_brightness
+
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -593,7 +74,7 @@ def process_rtsp_stream(
     print()
 
     # ストリーム接続
-    reader = RTSPReader(url)
+    reader = RTSPReader(url, log_detail=True)
     print("接続中...")
     reader.start()
 
@@ -675,7 +156,18 @@ def process_rtsp_stream(
                         print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
                         print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
                         print(f"  信頼度: {merged_event.confidence:.0%}")
-                        save_meteor_event(merged_event, ring_buffer, output_path, fps=fps)
+                        overlay_text = f"{merged_event.timestamp.strftime('%H:%M:%S')} | Conf: {merged_event.confidence:.0%}"
+                        save_meteor_event(
+                            merged_event,
+                            ring_buffer,
+                            output_path,
+                            fps=fps,
+                            extract_clips=True,
+                            clip_margin_before=2.0,
+                            clip_margin_after=2.0,
+                            composite_after=0.0,
+                            overlay_text=overlay_text,
+                        )
 
                 expired_events = merger.flush_expired(timestamp)
                 for expired_event in expired_events:
@@ -683,7 +175,18 @@ def process_rtsp_stream(
                     print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
                     print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
                     print(f"  信頼度: {expired_event.confidence:.0%}")
-                    save_meteor_event(expired_event, ring_buffer, output_path, fps=fps)
+                    overlay_text = f"{expired_event.timestamp.strftime('%H:%M:%S')} | Conf: {expired_event.confidence:.0%}"
+                    save_meteor_event(
+                        expired_event,
+                        ring_buffer,
+                        output_path,
+                        fps=fps,
+                        extract_clips=True,
+                        clip_margin_before=2.0,
+                        clip_margin_after=2.0,
+                        composite_after=0.0,
+                        overlay_text=overlay_text,
+                    )
 
                 # プレビュー
                 if show_preview:
