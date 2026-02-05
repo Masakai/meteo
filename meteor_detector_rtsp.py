@@ -27,7 +27,7 @@ from meteor_detector_realtime import (
     save_meteor_event,
 )
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 
 def process_rtsp_stream(
@@ -301,7 +301,7 @@ def main():
 
   検出された流星ごとに以下のファイルが自動保存されます:
 
-  meteor_YYYYMMDD_HHMMSS.mp4
+  meteor_YYYYMMDD_HHMMSS.mov
       流星が写っているクリップ動画（前後2秒のマージン含む）
       マーキングなしの元映像
 

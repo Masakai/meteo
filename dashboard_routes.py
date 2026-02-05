@@ -119,7 +119,17 @@ def handle_detections(handler):
                                 if timestamp_str:
                                     dt = datetime.fromisoformat(timestamp_str)
                                     base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-                                    mp4_path = f"{cam_dir.name}/{base_filename}.mp4"
+                                    clip_ext = None
+                                    if (cam_dir / f"{base_filename}.mov").exists():
+                                        clip_ext = ".mov"
+                                    elif (cam_dir / f"{base_filename}.mp4").exists():
+                                        clip_ext = ".mp4"
+
+                                    mp4_path = (
+                                        f"{cam_dir.name}/{base_filename}{clip_ext}"
+                                        if clip_ext
+                                        else ""
+                                    )
                                     composite_path = f"{cam_dir.name}/{base_filename}_composite.jpg"
                                     composite_orig_path = f"{cam_dir.name}/{base_filename}_composite_original.jpg"
                                 else:
@@ -186,7 +196,7 @@ def handle_image(handler):
             if image_path.exists() and image_path.is_file():
                 file_size = image_path.stat().st_size
 
-                if filename.endswith(".mp4"):
+                if filename.endswith(".mov") or filename.endswith(".mp4"):
                     range_header = handler.headers.get("Range")
 
                     if range_header:
@@ -207,7 +217,12 @@ def handle_image(handler):
                             length = end - start + 1
 
                             handler.send_response(206)
-                            handler.send_header("Content-Type", "video/mp4")
+                            content_type = (
+                                "video/quicktime"
+                                if filename.endswith(".mov")
+                                else "video/mp4"
+                            )
+                            handler.send_header("Content-Type", content_type)
                             handler.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
                             handler.send_header("Content-Length", str(length))
                             handler.send_header("Accept-Ranges", "bytes")
@@ -221,7 +236,12 @@ def handle_image(handler):
                         except Exception as e:
                             print(f"Range request error: {e}")
                             handler.send_response(200)
-                            handler.send_header("Content-Type", "video/mp4")
+                            content_type = (
+                                "video/quicktime"
+                                if filename.endswith(".mov")
+                                else "video/mp4"
+                            )
+                            handler.send_header("Content-Type", content_type)
                             handler.send_header("Content-Length", str(file_size))
                             handler.send_header("Accept-Ranges", "bytes")
                             handler.end_headers()
@@ -229,7 +249,12 @@ def handle_image(handler):
                                 handler.wfile.write(f.read())
                     else:
                         handler.send_response(200)
-                        handler.send_header("Content-Type", "video/mp4")
+                        content_type = (
+                            "video/quicktime"
+                            if filename.endswith(".mov")
+                            else "video/mp4"
+                        )
+                        handler.send_header("Content-Type", content_type)
                         handler.send_header("Content-Length", str(file_size))
                         handler.send_header("Accept-Ranges", "bytes")
                         handler.send_header("Cache-Control", "no-cache")
@@ -307,6 +332,7 @@ def handle_delete_detection(handler):
             cam_dir = Path(DETECTIONS_DIR) / camera_name
 
             files_to_delete = [
+                cam_dir / f"{base_filename}.mov",
                 cam_dir / f"{base_filename}.mp4",
                 cam_dir / f"{base_filename}_composite.jpg",
                 cam_dir / f"{base_filename}_composite_original.jpg",

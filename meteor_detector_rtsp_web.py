@@ -37,7 +37,7 @@ from meteor_detector_realtime import (
     save_meteor_event,
 )
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -894,9 +894,9 @@ def main():
     parser.add_argument("--web-port", type=int, default=0, help="Webプレビューポート (0=無効)")
     parser.add_argument("--camera-name", default="camera", help="カメラ名")
     parser.add_argument("--extract-clips", action="store_true", default=True,
-                        help="流星検出時にMP4クリップを保存 (デフォルト: 有効)")
+                        help="流星検出時に動画クリップを保存 (デフォルト: 有効)")
     parser.add_argument("--no-clips", action="store_true",
-                        help="MP4クリップを保存しない（コンポジット画像のみ）")
+                        help="動画クリップを保存しない（コンポジット画像のみ）")
     parser.add_argument("--mask-image", help="作成済みの除外マスク画像を使用（優先）")
     parser.add_argument("--mask-from-day", help="昼間画像から検出除外マスクを生成（空以外を除外）")
     parser.add_argument("--mask-dilate", type=int, default=20, help="除外マスクの拡張ピクセル数")

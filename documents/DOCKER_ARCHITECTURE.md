@@ -174,7 +174,7 @@ graph TB
 | `SCALE` | `0.5` | 処理スケール (0.0-1.0) |
 | `BUFFER` | `15` | リングバッファ秒数 |
 | `EXCLUDE_BOTTOM` | `0.0625` | 画面下部除外率 (1/16) |
-| `EXTRACT_CLIPS` | `true` | MP4クリップ保存の有効化 |
+| `EXTRACT_CLIPS` | `true` | クリップ動画保存の有効化 |
 | `LATITUDE` | `35.6762` | 観測地の緯度 |
 | `LONGITUDE` | `139.6503` | 観測地の経度 |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
@@ -308,7 +308,7 @@ graph TB
 ./detections/
   ├── camera1_10_0_1_25/
   │   ├── detections.jsonl
-  │   ├── meteor_20260202_065533.mp4
+  │   ├── meteor_20260202_065533.mov
   │   ├── meteor_20260202_065533_composite.jpg
   │   └── meteor_20260202_065533_composite_original.jpg
   ├── camera2_10_0_1_3/
@@ -534,7 +534,7 @@ ffmpeg -i "${RTSP_URL}" -frames:v 1 test.jpg
 
 ```bash
 # 検出結果のクリーンアップ
-rm -rf ./detections/*/meteor_*.mp4  # MP4のみ削除
+rm -rf ./detections/*/meteor_*.mov ./detections/*/meteor_*.mp4  # 動画のみ削除
 
 # Dockerのクリーンアップ
 docker system prune -a --volumes
@@ -686,7 +686,7 @@ docker compose ps
 | `--scale` | `0.5` | 処理スケール (0.0-1.0) |
 | `--buffer` | `15` | リングバッファ秒数 |
 | `--exclude-bottom` | `0.0625` | 画面下部除外率 (1/16) |
-| `--extract-clips` | `true` | MP4クリップ保存 |
+| `--extract-clips` | `true` | クリップ動画保存 |
 | `--base-port` | `8080` | ベースポート番号 |
 | `--latitude` | `35.3606` | 観測地の緯度（富士山頂） |
 | `--longitude` | `138.7274` | 観測地の経度（富士山頂） |

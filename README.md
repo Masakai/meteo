@@ -126,7 +126,7 @@ RTSP Web版では `--buffer` は上限値として扱われ、検出前後1秒 +
 
 #### クリップ動画の保存
 
-検出した流星のクリップ動画（MP4）を保存するかどうかを制御できます：
+検出した流星のクリップ動画（MOV/H.264）を保存するかどうかを制御できます：
 
 ```bash
 # クリップ動画を保存（デフォルト）
@@ -137,6 +137,14 @@ python meteor_detector_rtsp_web.py rtsp://... --no-clips
 ```
 
 ストレージ容量を節約したい場合は `--no-clips` を使用してください。
+
+### 4. Web版と同じ検出ロジックでファイル再検証
+
+```bash
+python meteor_detector.py input.mp4 --realtime
+```
+
+`--realtime` を付けると Web版と同じ検出ロジックを使って再検出します。
 
 ### 3. Docker Composeで複数カメラを監視
 
@@ -367,13 +375,13 @@ input.meteors.json   # 検出結果のJSON
 
 ```
 detections/camera1/
-├── meteor_20240101_123456.mp4              # 流星イベントの動画クリップ（--extract-clips時）
+├── meteor_20240101_123456.mov              # 流星イベントの動画クリップ（--extract-clips時）
 ├── meteor_20240101_123456_composite.jpg    # 比較明合成（マーク付き）
 ├── meteor_20240101_123456_composite_original.jpg
 └── detections.jsonl                        # 検出ログ（JSONL形式）
 ```
 
-`--no-clips` を指定した場合、MP4クリップは生成されません（コンポジット画像とログのみ）。
+`--no-clips` を指定した場合、クリップ動画は生成されません（コンポジット画像とログのみ）。
 
 ## 検出アルゴリズム
 

@@ -28,9 +28,16 @@ from queue import Queue
 import time
 from datetime import datetime, timedelta
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 from astro_utils import get_detection_window, is_detection_active
 from meteor_detector_common import calculate_linearity, calculate_confidence, open_video_writer
+from meteor_detector_realtime import (
+    DetectionParams as RealtimeDetectionParams,
+    EventMerger,
+    RealtimeMeteorDetector,
+    RingBuffer,
+    save_meteor_event,
+)
 
 
 @dataclass
@@ -785,7 +792,7 @@ def extract_meteor_clips(
         start = max(0, meteor.start_frame - margin_before)
         end = min(total_frames - 1, meteor.end_frame + margin_after)
 
-        output_path = Path(output_dir) / f"meteor_{i+1:03d}.mp4"
+        output_path = Path(output_dir) / f"meteor_{i+1:03d}.mov"
         writer = open_video_writer(output_path, fps, (width, height))
         if writer is None:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
@@ -842,19 +849,164 @@ def create_composite_image(
 
     cap.release()
 
-    # 保存
-    composite = np.clip(composite, 0, 255).astype(np.uint8)
 
-    # 流星の軌跡を描画
-    for meteor in meteors:
-        cv2.line(composite, meteor.start_point, meteor.end_point,
-                (0, 255, 255), 2)
-        cv2.putText(composite, f"{meteor.confidence:.0%}",
-                   (meteor.start_point[0] + 10, meteor.start_point[1]),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+def process_video_realtime(
+    input_path: str,
+    *,
+    output_dir: str = "meteor_detections",
+    params: RealtimeDetectionParams | None = None,
+    process_scale: float = 0.5,
+    buffer_seconds: float = 15.0,
+    sensitivity: str = "medium",
+    extract_clips: bool = True,
+    exclude_bottom_ratio: float = 1 / 16,
+) -> None:
+    """リアルタイム検出ロジックでファイルを再検出（Web版と同等の再現用）"""
+    params = params or RealtimeDetectionParams()
+    params.exclude_bottom_ratio = exclude_bottom_ratio
 
-    cv2.imwrite(output_path, composite)
-    print(f"合成画像を保存: {output_path}")
+    if sensitivity == "low":
+        params.diff_threshold = 40
+        params.min_brightness = 220
+    elif sensitivity == "high":
+        params.diff_threshold = 20
+        params.min_brightness = 180
+    elif sensitivity == "fireball":
+        params.diff_threshold = 15
+        params.min_brightness = 150
+        params.max_duration = 20.0
+        params.min_speed = 20.0
+        params.min_linearity = 0.6
+
+    params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+
+    required_buffer = params.max_duration + 2.0
+    effective_buffer_seconds = min(buffer_seconds, required_buffer)
+    if effective_buffer_seconds != buffer_seconds:
+        print(f"バッファ秒数を{effective_buffer_seconds:.1f}秒に調整（検出前後1秒 + 最大検出時間）")
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        print(f"[ERROR] 動画を開けません: {input_path}")
+        return
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    print(f"入力動画: {input_path}")
+    print(f"解像度: {width}x{height}, fps: {fps:.2f}")
+    print(f"出力先: {output_path}")
+    print("検出開始 (リアルタイム検出ロジック)")
+    print("-" * 50)
+
+    ring_buffer = RingBuffer(effective_buffer_seconds, fps=fps)
+    detector = RealtimeMeteorDetector(params, fps)
+    merger = EventMerger(params)
+
+    prev_gray = None
+    frame_count = 0
+    detection_count = 0
+
+    scale_factor = 1.0 / process_scale if process_scale != 0 else 1.0
+    proc_width = int(width * process_scale)
+    proc_height = int(height * process_scale)
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        timestamp = frame_count / fps
+        ring_buffer.add(timestamp, frame)
+
+        if process_scale != 1.0:
+            proc_frame = cv2.resize(frame, (proc_width, proc_height), interpolation=cv2.INTER_AREA)
+        else:
+            proc_frame = frame
+
+        gray = cv2.cvtColor(proc_frame, cv2.COLOR_BGR2GRAY)
+
+        if prev_gray is not None:
+            tracking_mode = len(detector.active_tracks) > 0
+            objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
+
+            if process_scale != 1.0:
+                for obj in objects:
+                    cx, cy = obj["centroid"]
+                    obj["centroid"] = (int(cx * scale_factor), int(cy * scale_factor))
+
+            events = detector.track_objects(objects, timestamp)
+            for event in events:
+                merged_events = merger.add_event(event)
+                for merged_event in merged_events:
+                    detection_count += 1
+                    print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                    print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
+                    save_meteor_event(
+                        merged_event,
+                        ring_buffer,
+                        output_path,
+                        fps=fps,
+                        extract_clips=extract_clips,
+                        clip_margin_before=1.0,
+                        clip_margin_after=1.0,
+                        composite_after=1.0,
+                    )
+
+            expired_events = merger.flush_expired(timestamp)
+            for expired_event in expired_events:
+                detection_count += 1
+                print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
+                save_meteor_event(
+                    expired_event,
+                    ring_buffer,
+                    output_path,
+                    fps=fps,
+                    extract_clips=extract_clips,
+                    clip_margin_before=1.0,
+                    clip_margin_after=1.0,
+                    composite_after=1.0,
+                )
+
+        prev_gray = gray.copy()
+        frame_count += 1
+
+    # 終了処理
+    for event in detector.finalize_all():
+        merged_events = merger.add_event(event)
+        for merged_event in merged_events:
+            detection_count += 1
+            save_meteor_event(
+                merged_event,
+                ring_buffer,
+                output_path,
+                fps=fps,
+                extract_clips=extract_clips,
+                clip_margin_before=1.0,
+                clip_margin_after=1.0,
+                composite_after=1.0,
+            )
+
+    for event in merger.flush_all():
+        detection_count += 1
+        save_meteor_event(
+            event,
+            ring_buffer,
+            output_path,
+            fps=fps,
+            extract_clips=extract_clips,
+            clip_margin_before=1.0,
+            clip_margin_after=1.0,
+            composite_after=1.0,
+        )
+
+    cap.release()
+    print(f"\n終了 - 検出数: {detection_count}個")
 
 
 def main():
@@ -904,8 +1056,16 @@ def main():
                        help="プレビューを表示")
     parser.add_argument("--sensitivity", choices=["low", "medium", "high", "fireball"],
                        default="medium", help="検出感度 (default: medium, fireball=火球検出モード)")
-    parser.add_argument("--extract-clips", action="store_true",
-                       help="流星クリップを切り出して保存")
+    parser.add_argument("--extract-clips", dest="extract_clips", action="store_true", default=True,
+                       help="流星クリップを切り出して保存 (デフォルト: 有効)")
+    parser.add_argument("--no-clips", dest="extract_clips", action="store_false",
+                       help="流星クリップを保存しない")
+    parser.add_argument("--realtime", action="store_true",
+                       help="Web版と同じリアルタイム検出ロジックで再検出する")
+    parser.add_argument("--output-dir", default="meteor_detections",
+                       help="リアルタイム再検出時の出力ディレクトリ (default: meteor_detections)")
+    parser.add_argument("--buffer", type=float, default=15.0,
+                       help="リアルタイム再検出時のバッファ秒数 (default: 15.0)")
     parser.add_argument("--composite", action="store_true",
                        help="合成画像を作成")
     parser.add_argument("--no-json", action="store_true",
@@ -918,8 +1078,8 @@ def main():
                        help="下部の除外範囲（0-1、デフォルト: 1/16）")
 
     # 高速化オプション
-    parser.add_argument("--scale", type=float, default=1.0,
-                       help="処理解像度スケール（0.5で半分、高速化、デフォルト: 1.0）")
+    parser.add_argument("--scale", type=float, default=0.5,
+                       help="処理解像度スケール（0.5で半分、高速化、デフォルト: 0.5）")
     parser.add_argument("--skip", type=int, default=1,
                        help="フレームスキップ（2で1フレームおき、高速化、デフォルト: 1）")
     parser.add_argument("--fast", action="store_true",
@@ -986,6 +1146,18 @@ def main():
         frame_skip = 2
 
     # 処理実行
+    if args.realtime:
+        process_video_realtime(
+            args.input,
+            output_dir=args.output_dir,
+            process_scale=process_scale,
+            buffer_seconds=args.buffer,
+            sensitivity=args.sensitivity,
+            extract_clips=args.extract_clips,
+            exclude_bottom_ratio=args.exclude_bottom,
+        )
+        return
+
     meteors = process_video(
         args.input,
         output_path=args.output,

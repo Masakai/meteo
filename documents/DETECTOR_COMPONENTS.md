@@ -423,7 +423,7 @@ flowchart TD
     Track["track_objects()"]
 
     CheckEvent{"MeteorEvent<br/>発生?"}
-    SaveEvent["save_meteor_event()<br/>- MP4動画(オプション)<br/>- コンポジット画像<br/>- JSONL追記"]
+    SaveEvent["save_meteor_event()<br/>- 動画(オプション)<br/>- コンポジット画像<br/>- JSONL追記"]
 
     UpdatePreview["プレビューフレーム生成<br/>current_frame更新"]
 
@@ -584,7 +584,7 @@ sequenceDiagram
         Detector-->>Worker: MeteorEvent
         Worker->>Buffer: get_range(start-1s, end+1s)
         Buffer-->>Worker: frames[]
-        Worker->>Storage: MP4 + JPEG + JSONL保存
+        Worker->>Storage: 動画 + JPEG + JSONL保存
     end
 
     Worker->>Worker: プレビュー生成
@@ -611,7 +611,7 @@ graph TD
     subgraph "save_meteor_event()"
         GetFrames["RingBuffer.get_range<br/>(start-1s, end+1s)"]
 
-        Video["MP4動画<br/>meteor_YYYYMMDD_HHMMSS.mp4"]
+        Video["MOV動画<br/>meteor_YYYYMMDD_HHMMSS.mov"]
         Composite["コンポジット画像<br/>meteor_YYYYMMDD_HHMMSS_composite.jpg"]
         Original["オリジナル合成<br/>meteor_YYYYMMDD_HHMMSS_composite_original.jpg"]
         JSONL["検出ログ<br/>detections.jsonl"]
@@ -654,7 +654,7 @@ cv2.circle(composite, end_point, 6, (0, 0, 255), 2)    # 終了点（赤）
 | `LATITUDE` | `35.3606` | 観測地の緯度（富士山頂） |
 | `LONGITUDE` | `138.7274` | 観測地の経度（富士山頂） |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン |
-| `EXTRACT_CLIPS` | `true` | MP4クリップ保存の有効化 |
+| `EXTRACT_CLIPS` | `true` | クリップ動画保存の有効化 |
 
 ---
 

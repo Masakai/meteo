@@ -485,7 +485,7 @@ def save_meteor_event(
 
     clip_path = None
     if extract_clips:
-        clip_path = output_dir / f"{base_name}.mp4"
+        clip_path = output_dir / f"{base_name}.mov"
         writer = open_video_writer(clip_path, fps, (width, height))
         if writer is None:
             print("[WARN] 動画エンコーダの初期化に失敗しました")

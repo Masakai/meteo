@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-02-05
+
+### Added
+- `meteor_detector.py` に `--realtime` を追加し、Web版と同じ検出ロジックでファイル再検出が可能に
+
+### Changed
+- クリップ動画の拡張子を `.mov` に変更（H.264互換を優先）
+- ダッシュボードの稼働時間表示をサーバ起動時刻基準に変更
+- ダッシュボードの動画配信を `.mov` / `.mp4` 両対応に拡張
+
 ## [1.5.0] - 2026-02-05
 
 ### Added

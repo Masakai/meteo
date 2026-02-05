@@ -136,7 +136,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
       "camera": "camera1_10_0_1_25",
       "confidence": "87%",
       "image": "camera1_10_0_1_25/meteor_20260202_065533_composite.jpg",
-      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mp4",
+      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mov",
       "composite_original": "camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg"
     },
     {
@@ -144,7 +144,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
       "camera": "camera2_10_0_1_3",
       "confidence": "92%",
       "image": "camera2_10_0_1_3/meteor_20260202_053218_composite.jpg",
-      "mp4": "camera2_10_0_1_3/meteor_20260202_053218.mp4",
+      "mp4": "camera2_10_0_1_3/meteor_20260202_053218.mov",
       "composite_original": "camera2_10_0_1_3/meteor_20260202_053218_composite_original.jpg"
     }
   ]
@@ -161,7 +161,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
 | `recent[].camera` | string | カメラ名 |
 | `recent[].confidence` | string | 信頼度（パーセント表示） |
 | `recent[].image` | string | 画像パス |
-| `recent[].mp4` | string | MP4パス |
+| `recent[].mp4` | string | 動画パス（.mov/.mp4） |
 | `recent[].composite_original` | string | 元画像の比較明合成パス |
 
 **使用例**:
@@ -251,7 +251,7 @@ curl -O "http://localhost:8080/image/camera1_10_0_1_25/meteor_20260202_065533_co
 
 ### DELETE /detection/{camera}/{timestamp}
 
-**説明**: 検出結果を削除（MP4、画像、JSONLエントリ）
+**説明**: 検出結果を削除（動画、画像、JSONLエントリ）
 
 **URLパラメータ**:
 
@@ -269,7 +269,7 @@ curl -O "http://localhost:8080/image/camera1_10_0_1_25/meteor_20260202_065533_co
 {
   "success": true,
   "deleted_files": [
-    "meteor_20260202_065533.mp4",
+    "meteor_20260202_065533.mov",
     "meteor_20260202_065533_composite.jpg",
     "meteor_20260202_065533_composite_original.jpg"
   ],
@@ -441,7 +441,7 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.sensitivity` | string | 感度プリセット |
 | `settings.scale` | float | 処理スケール |
 | `settings.buffer` | float | バッファ秒数 |
-| `settings.extract_clips` | boolean | MP4保存の有効/無効 |
+| `settings.extract_clips` | boolean | 動画保存の有効/無効 |
 | `settings.exclude_bottom` | float | 画面下部除外率 |
 | `settings.mask_image` | string | マスク画像（優先） |
 | `settings.mask_from_day` | string | 昼間画像から生成するマスク |

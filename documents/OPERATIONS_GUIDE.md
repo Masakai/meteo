@@ -245,7 +245,7 @@ meteor-dashboard  2.5%     78.3MiB / 8GiB       0.95%
 # 流星検出
 [06:55:33] 流星検出 #1
   長さ: 135.6px, 時間: 0.44秒
-  保存: meteor_20260202_065533.mp4
+  保存: meteor_20260202_065533.mov
 
 # 警告
 接続失敗: rtsp://...
@@ -461,13 +461,13 @@ curl http://localhost:8080/detections | jq
 
 | 項目 | サイズ（1件あたり） |
 |-----|-------------------|
-| MP4動画（4秒@30fps） | 約2-5MB |
+| クリップ動画（4秒@30fps） | 約2-5MB |
 | コンポジット画像 | 約200-500KB |
 | JSON行 | 約200B |
 
 **1日の見積もり**（検出数10件/日の場合）:
-- MP4あり: 約30-50MB/日
-- MP4なし: 約2-5MB/日
+- クリップあり: 約30-50MB/日
+- クリップなし: 約2-5MB/日
 
 ### 容量確認
 
@@ -528,7 +528,8 @@ sudo systemctl start meteor-cleanup.timer
 # 7日以上前のファイルを削除（対話型）
 ./meteor-docker.sh clean
 
-# MP4のみ削除（コンポジット画像は残す）
+# クリップ動画のみ削除（コンポジット画像は残す）
+find ./detections -name "*.mov" -mtime +7 -delete
 find ./detections -name "*.mp4" -mtime +7 -delete
 
 # 特定カメラのみ削除
@@ -679,7 +680,7 @@ docker system df
 # 2. 未使用Dockerリソースを削除
 ./meteor-docker.sh cleanup
 
-# 3. MP4を無効化（設定変更）
+# 3. クリップ動画を無効化（設定変更）
 # docker-compose.ymlで EXTRACT_CLIPS=false
 
 # 4. より積極的なクリーンアップ
@@ -887,6 +888,7 @@ docker compose logs --tail=1000 > logs-$(date +%Y%m%d).txt
 ./meteor-docker.sh cleanup
 
 # 検出統計の確認
+find ./detections -name "*.mov" | wc -l
 find ./detections -name "*.mp4" | wc -l
 ```
 

@@ -24,7 +24,7 @@ try:
 except Exception:
     build_exclusion_mask = None
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 
 def parse_rtsp_url(url: str) -> dict:

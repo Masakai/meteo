@@ -830,7 +830,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             document.getElementById('modal-info').innerHTML =
                 `${{time}} | ${{camera}} | 信頼度: ${{confidence}}`;
             downloadsEl.innerHTML =
-                `<a href="/image/${{encodeURI(videoPath)}}" download>MP4をダウンロード</a>`;
+                `<a href="/image/${{encodeURI(videoPath)}}" download>動画をダウンロード</a>`;
             document.getElementById('image-modal').classList.add('active');
         }}
 
@@ -958,7 +958,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                                         <div>信頼度: ${{d.confidence}}</div>
                                         <div class="detection-actions">
                                             <div class="detection-links">
-                                                <span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">MP4</span>
+                                                <span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">VIDEO</span>
                                                 <span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">合成</span>
                                                 <span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>
                                             </div>

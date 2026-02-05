@@ -40,7 +40,7 @@ docker-compose.ymlで設定される環境変数:
 | `SCALE` | `0.5` | 処理スケール | `0.25` ~ `1.0` |
 | `BUFFER` | `15` | リングバッファ秒数（RTSP Webは検出前後1秒+最大検出時間に上限調整） | `10` ~ `30` |
 | `EXCLUDE_BOTTOM` | `0.0625` | 画面下部除外率 | `0.0` ~ `0.25` |
-| `EXTRACT_CLIPS` | `true` | MP4クリップ保存 | `true` / `false` |
+| `EXTRACT_CLIPS` | `true` | クリップ動画保存 | `true` / `false` |
 | `LATITUDE` | `35.3606` | 観測地の緯度 | `35.6762`（東京） |
 | `LONGITUDE` | `138.7274` | 観測地の経度 | `139.6503`（東京） |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 | `UTC` / `Europe/London` |
@@ -576,7 +576,7 @@ environment:
   - SENSITIVITY=medium
   - SCALE=0.25
   - BUFFER=10
-  - EXTRACT_CLIPS=false  # MP4を保存しない
+  - EXTRACT_CLIPS=false  # クリップ動画を保存しない
   - ENABLE_TIME_WINDOW=true
 ```
 
@@ -705,6 +705,7 @@ python generate_compose.py --buffer 10
 
 ```bash
 # 1週間運用後の統計
+find ./detections -name "*.mov" | wc -l
 find ./detections -name "*.mp4" | wc -l
 
 # 誤検出率を計算
@@ -827,7 +828,7 @@ python generate_compose.py --scale 0.25
 
 **対策**:
 ```bash
-# MP4保存を無効化
+# クリップ動画保存を無効化
 # docker-compose.ymlで EXTRACT_CLIPS=false
 
 # バッファを減らす
