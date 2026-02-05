@@ -1232,6 +1232,9 @@ def process_rtsp_stream(
         params.min_speed = 20.0
         params.min_linearity = 0.6
 
+    # 追跡中は検出閾値より低めにして追跡継続を優先
+    params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
