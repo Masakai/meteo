@@ -554,10 +554,6 @@ def process_video(
             print("[WARN] 動画エンコーダの初期化に失敗しました")
             return
 
-    # フレームバッファ（流星画像保存用）
-    frame_buffer: Dict[int, np.ndarray] = {}
-    buffer_size = params.max_duration + params.max_gap_frames + 10
-
     # 前フレーム
     prev_gray = None
     frame_num = 0
@@ -671,14 +667,6 @@ def process_video(
                     key = cv2.waitKey(1) & 0xFF
                     if key == ord('q'):
                         break
-
-        # フレームをバッファに保存（画像出力用）
-        if save_images:
-            frame_buffer[frame_num] = frame.copy()
-            # 古いフレームを削除
-            old_frames = [f for f in frame_buffer.keys() if f < frame_num - buffer_size]
-            for f in old_frames:
-                del frame_buffer[f]
 
         prev_gray = gray.copy()
         if not use_threading:
