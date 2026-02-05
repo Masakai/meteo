@@ -596,7 +596,14 @@ def process_video(
         if prev_gray is not None:
             # 天文薄暮期間のチェック（有効な場合のみ）
             if enable_time_window:
-                is_active, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
+                if detection_start is None or detection_end is None:
+                    is_active, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
+                else:
+                    now = datetime.now(detection_start.tzinfo)
+                    if now > detection_end:
+                        is_active, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
+                    else:
+                        is_active = detection_start <= now <= detection_end
 
             # 検出処理（検出期間内の場合のみ）
             if is_active:

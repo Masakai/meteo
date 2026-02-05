@@ -1082,10 +1082,12 @@ def detection_thread_worker(
     prev_gray = None
     frame_count = 0
 
-    # 天文薄暮期間のチェック間隔（秒）
-    last_time_check = 0
-    time_check_interval = 60  # 1分ごとにチェック
+    # 天文薄暮期間のチェック（ウィンドウ終了後に再計算）
     is_detection_time = True  # デフォルトは有効
+    detection_start = None
+    detection_end = None
+    if enable_time_window and is_detection_active:
+        is_detection_time, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
 
     while not stop_flag.is_set():
         ret, timestamp, frame = reader.read()
@@ -1107,10 +1109,15 @@ def detection_thread_worker(
         gray = cv2.cvtColor(proc_frame, cv2.COLOR_BGR2GRAY)
 
         # 天文薄暮期間のチェック（定期的に）
-        current_time = time.time()
-        if enable_time_window and is_detection_active and (current_time - last_time_check) > time_check_interval:
-            is_detection_time, _, _ = is_detection_active(latitude, longitude, timezone)
-            last_time_check = current_time
+        if enable_time_window and is_detection_active:
+            if detection_start is None or detection_end is None:
+                is_detection_time, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
+            else:
+                now = datetime.now(detection_start.tzinfo)
+                if now > detection_end:
+                    is_detection_time, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
+                else:
+                    is_detection_time = detection_start <= now <= detection_end
 
         if prev_gray is not None:
             # 検出期間内の場合のみ検出処理を実行
