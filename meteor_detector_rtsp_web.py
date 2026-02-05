@@ -959,7 +959,7 @@ def build_exclusion_mask_from_frame(
 def save_meteor_event(event, ring_buffer, output_dir, fps=30, extract_clips=True):
     """流星イベントを保存"""
     start = max(0, event.start_time - 1.0)
-    end = event.end_time + 2.0
+    end = event.end_time + 1.0
     frames = ring_buffer.get_range(start, end)
 
     if not frames:
@@ -1214,18 +1214,6 @@ def process_rtsp_stream(
     params = params or DetectionParams()
     camera_name = cam_name
 
-    # 設定情報を更新（ダッシュボード表示用）
-    current_settings.update({
-        "sensitivity": sensitivity,
-        "scale": process_scale,
-        "buffer": buffer_seconds,
-        "extract_clips": extract_clips,
-        "exclude_bottom": params.exclude_bottom_ratio,
-        "mask_image": mask_image or "",
-        "mask_from_day": mask_from_day or "",
-        "mask_dilate": mask_dilate,
-    })
-
     if sensitivity == "low":
         params.diff_threshold = 40
         params.min_brightness = 220
@@ -1241,6 +1229,23 @@ def process_rtsp_stream(
 
     # 追跡中は検出閾値より低めにして追跡継続を優先
     params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+
+    required_buffer = params.max_duration + 2.0
+    effective_buffer_seconds = min(buffer_seconds, required_buffer)
+    if effective_buffer_seconds != buffer_seconds:
+        print(f"バッファ秒数を{effective_buffer_seconds:.1f}秒に調整（検出前後1秒 + 最大検出時間）")
+
+    # 設定情報を更新（ダッシュボード表示用）
+    current_settings.update({
+        "sensitivity": sensitivity,
+        "scale": process_scale,
+        "buffer": effective_buffer_seconds,
+        "extract_clips": extract_clips,
+        "exclude_bottom": params.exclude_bottom_ratio,
+        "mask_image": mask_image or "",
+        "mask_from_day": mask_from_day or "",
+        "mask_dilate": mask_dilate,
+    })
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -1297,7 +1302,7 @@ def process_rtsp_stream(
     # 検出処理を別スレッドで実行
     detection_thread = Thread(
         target=detection_thread_worker,
-        args=(reader, params, process_scale, buffer_seconds, fps, output_path, extract_clips, stop_flag),
+        args=(reader, params, process_scale, effective_buffer_seconds, fps, output_path, extract_clips, stop_flag),
         kwargs={
             'mask_image': mask_image,
             'mask_from_day': mask_from_day,
