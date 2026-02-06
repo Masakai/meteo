@@ -24,6 +24,7 @@ import time
 import signal
 import sys
 import os
+import subprocess
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
 from urllib.parse import urlparse, parse_qs
@@ -37,7 +38,7 @@ from meteor_detector_realtime import (
     save_meteor_event,
 )
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -68,7 +69,63 @@ current_settings = {
     "buffer": 15.0,
     "extract_clips": True,
     "exclude_bottom": 0.0625,
+    "fb_normalize": False,
 }
+
+
+def fb_normalize_clip(
+    clip_path: Path,
+    *,
+    overwrite: bool = True,
+    delete_source: bool = False,
+) -> Optional[Path]:
+    if clip_path is None:
+        return None
+    out_path = clip_path.with_suffix(".mp4")
+    if out_path.exists() and not overwrite:
+        return None
+
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y" if overwrite else "-n",
+        "-i",
+        str(clip_path),
+        "-c:v",
+        "libx264",
+        "-profile:v",
+        "baseline",
+        "-level",
+        "3.1",
+        "-pix_fmt",
+        "yuv420p",
+        "-r",
+        "30",
+        "-g",
+        "60",
+        "-keyint_min",
+        "60",
+        "-sc_threshold",
+        "0",
+        "-tag:v",
+        "avc1",
+        "-an",
+        "-movflags",
+        "+faststart",
+        str(out_path),
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        sys.stderr.write(result.stderr)
+        return None
+    if delete_source:
+        try:
+            clip_path.unlink()
+        except Exception:
+            print(f"[WARN] 元MOV削除に失敗: {clip_path}")
+    return out_path
 
 
 class MJPEGHandler(BaseHTTPRequestHandler):
@@ -544,6 +601,8 @@ def detection_thread_worker(
     latitude=35.3606,
     longitude=138.7274,
     timezone="Asia/Tokyo",
+    fb_normalize=False,
+    fb_delete_mov=False,
 ):
     """検出処理を行うワーカースレッド"""
     global current_frame, detection_count, last_frame_time, is_detecting_now
@@ -654,7 +713,7 @@ def detection_thread_worker(
                     detection_count += 1
                     print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
                     print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
-                    save_meteor_event(
+                    clip_path = save_meteor_event(
                         merged_event,
                         ring_buffer,
                         output_path,
@@ -664,13 +723,15 @@ def detection_thread_worker(
                         clip_margin_after=1.0,
                         composite_after=1.0,
                     )
+                    if fb_normalize and clip_path is not None:
+                        fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
             expired_events = merger.flush_expired(timestamp)
             for expired_event in expired_events:
                 detection_count += 1
                 print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
                 print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
-                save_meteor_event(
+                clip_path = save_meteor_event(
                     expired_event,
                     ring_buffer,
                     output_path,
@@ -680,6 +741,8 @@ def detection_thread_worker(
                     clip_margin_after=1.0,
                     composite_after=1.0,
                 )
+                if fb_normalize and clip_path is not None:
+                    fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
             # プレビュー用フレーム生成
             display = frame.copy()
@@ -716,7 +779,7 @@ def detection_thread_worker(
         merged_events = merger.add_event(event)
         for merged_event in merged_events:
             detection_count += 1
-            save_meteor_event(
+            clip_path = save_meteor_event(
                 merged_event,
                 ring_buffer,
                 output_path,
@@ -726,10 +789,12 @@ def detection_thread_worker(
                 clip_margin_after=1.0,
                 composite_after=1.0,
             )
+            if fb_normalize and clip_path is not None:
+                fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
     for event in merger.flush_all():
         detection_count += 1
-        save_meteor_event(
+        clip_path = save_meteor_event(
             event,
             ring_buffer,
             output_path,
@@ -739,6 +804,8 @@ def detection_thread_worker(
             clip_margin_after=1.0,
             composite_after=1.0,
         )
+        if fb_normalize and clip_path is not None:
+            fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
 
 def process_rtsp_stream(
@@ -755,6 +822,8 @@ def process_rtsp_stream(
     mask_from_day: Optional[str] = None,
     mask_dilate: int = 5,
     mask_save: Optional[str] = None,
+    fb_normalize: bool = False,
+    fb_delete_mov: bool = False,
 ):
     global current_frame, detection_count, start_time_global, camera_name, current_settings
 
@@ -789,6 +858,7 @@ def process_rtsp_stream(
         "buffer": effective_buffer_seconds,
         "extract_clips": extract_clips,
         "exclude_bottom": params.exclude_bottom_ratio,
+        "fb_normalize": fb_normalize,
         "mask_image": mask_image or "",
         "mask_from_day": mask_from_day or "",
         "mask_dilate": mask_dilate,
@@ -859,6 +929,8 @@ def process_rtsp_stream(
             'latitude': latitude,
             'longitude': longitude,
             'timezone': timezone,
+            'fb_normalize': fb_normalize,
+            'fb_delete_mov': fb_delete_mov,
         },
         daemon=False,
     )
@@ -901,6 +973,10 @@ def main():
     parser.add_argument("--mask-from-day", help="昼間画像から検出除外マスクを生成（空以外を除外）")
     parser.add_argument("--mask-dilate", type=int, default=20, help="除外マスクの拡張ピクセル数")
     parser.add_argument("--mask-save", help="生成した除外マスク画像の保存先")
+    parser.add_argument("--fb-normalize", action="store_true",
+                        help="Facebook向けにH.264 MP4へ正規化")
+    parser.add_argument("--fb-delete-mov", action="store_true",
+                        help="正規化後に元MOVを削除")
 
     args = parser.parse_args()
 
@@ -932,6 +1008,8 @@ def main():
         mask_from_day=mask_from_day,
         mask_dilate=args.mask_dilate,
         mask_save=mask_save,
+        fb_normalize=args.fb_normalize,
+        fb_delete_mov=args.fb_delete_mov,
     )
 
 

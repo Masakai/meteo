@@ -27,7 +27,7 @@ from meteor_detector_realtime import (
     save_meteor_event,
 )
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 
 
 def process_rtsp_stream(

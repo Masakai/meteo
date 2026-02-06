@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-02-06
+### Added
+- Facebook向けにH.264 MP4へ正規化するオプションを `meteor_detector_rtsp_web.py` に追加（`--fb-normalize` / `--fb-delete-mov`）。
+- `convert_detections_mp4_to_mov.py` をFacebook互換MP4出力に対応（H.264 baseline, 30fps, faststart）。
+
 ## [1.6.0] - 2026-02-05
 
 ### Added

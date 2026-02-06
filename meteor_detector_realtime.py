@@ -476,7 +476,7 @@ def save_meteor_event(
     frames = ring_buffer.get_range(start, end)
 
     if not frames:
-        return
+        return None
 
     ts = event.timestamp.strftime("%Y%m%d_%H%M%S")
     base_name = f"meteor_{ts}"
@@ -489,7 +489,7 @@ def save_meteor_event(
         writer = open_video_writer(clip_path, fps, (width, height))
         if writer is None:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
-            return
+            return None
 
         for _, frame in frames:
             writer.write(frame)
@@ -530,3 +530,4 @@ def save_meteor_event(
         print(f"  保存: {clip_path.name}")
     else:
         print(f"  保存: {base_name}_composite.jpg")
+    return clip_path
