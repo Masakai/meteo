@@ -23,6 +23,7 @@
 ├── meteor_detector_common.py       # 検出共通ユーティリティ
 ├── dashboard.py                    # 複数カメラのダッシュボード
 ├── generate_compose.py             # streamersからdocker-compose.ymlを自動生成
+├── convert_detections_mp4_to_mov.py  # 検出クリップのMP4/MOV変換
 ├── streamers                       # RTSPカメラURL一覧
 ├── docker-compose.yml              # Docker Compose設定
 ├── Dockerfile                      # 検出コンテナ用Dockerfile
@@ -138,7 +139,7 @@ python meteor_detector_rtsp_web.py rtsp://... --no-clips
 
 ストレージ容量を節約したい場合は `--no-clips` を使用してください。
 
-### 4. Web版と同じ検出ロジックでファイル再検証
+### 3. Web版と同じ検出ロジックでファイル再検証
 
 ```bash
 python meteor_detector.py input.mp4 --realtime
@@ -147,7 +148,26 @@ python meteor_detector.py input.mp4 --realtime
 `--realtime` を付けると Web版と同じ検出ロジックを使って再検出します。
 マスクを使う場合は `--mask-image` / `--mask-from-day` / `--mask-dilate` / `--mask-save` が利用できます。
 
-### 3. Docker Composeで複数カメラを監視
+### 4. 検出クリップの変換（MP4/MOV）
+
+検出結果のクリップを一括変換したい場合は `convert_detections_mp4_to_mov.py` を使います。
+`ffmpeg` が必要です。
+
+```bash
+# detections/ 配下の MP4 を MOV に変換
+python convert_detections_mp4_to_mov.py --mov
+
+# 出力先を指定（ディレクトリ構成は維持）
+python convert_detections_mp4_to_mov.py --mov --output ./output
+
+# 再エンコードせずにコンテナだけ変換
+python convert_detections_mp4_to_mov.py --mov --copy
+
+# 既存ファイルを上書き
+python convert_detections_mp4_to_mov.py --mov --overwrite
+```
+
+### 5. Docker Composeで複数カメラを監視
 
 #### streamersファイルの設定
 
@@ -164,6 +184,8 @@ rtsp://user:pass@10.0.1.11/live
 
 RTSP URLの末尾に `| 昼間画像パス` を付けると、`generate_compose.py` 実行時に
 除外マスクを生成してコンテナに同梱します（他PCへの展開が簡単になります）。
+なるべく雲のない青空の画像を使ってください。
+マスクを使うと、木の枝や電柱・建物の輪郭、地上の常灯（街灯など）、車のヘッドライトの建物への反射による誤検出を軽減できます。
 
 ```
 rtsp://user:pass@10.0.1.25/live | camera1.jpg
@@ -386,11 +408,12 @@ detections/camera1/
 
 ## 検出アルゴリズム
 
-1. **フレーム差分** - 前フレームとの差分から移動物体を検出
-2. **輝度フィルタ** - 明るい物体のみを抽出
-3. **物体追跡** - 時間的に近い物体を追跡
-4. **特徴判定** - 長さ、速度、直線性から流星を判定
-5. **信頼度計算** - 各特徴をスコア化して総合信頼度を算出
+1. **マスク適用** - 除外マスクで木や建物などの固定物体を検出対象から外す
+2. **フレーム差分** - 前フレームとの差分から移動物体を検出
+3. **輝度フィルタ** - 明るい物体のみを抽出
+4. **物体追跡** - 時間的に近い物体を追跡
+5. **特徴判定** - 長さ、速度、直線性から流星を判定
+6. **信頼度計算** - 各特徴をスコア化して総合信頼度を算出
 
 ## テスト
 
