@@ -121,6 +121,8 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
       - MASK_IMAGE={mask_env}
       - MASK_DILATE={settings.get('mask_dilate', '5')}
       - MASK_SAVE={settings.get('mask_save', '')}
+      - FB_NORMALIZE={settings.get('fb_normalize', 'true')}
+      - FB_DELETE_MOV={settings.get('fb_delete_mov', 'true')}
       - WEB_PORT=8080
     ports:
       - "{web_port}:8080"
@@ -307,6 +309,12 @@ streamersファイルの形式:
                        help="除外マスクの拡張ピクセル数 (default: 20)")
     parser.add_argument("--mask-save", default="",
                        help="生成マスク画像の保存先 (空で保存しない)")
+    parser.add_argument("--fb-normalize", default="true",
+                       choices=["true", "false"],
+                       help="Facebook向けにH.264 MP4へ正規化 (default: true)")
+    parser.add_argument("--fb-delete-mov", default="true",
+                       choices=["true", "false"],
+                       help="正規化後に元MOVを削除 (default: true)")
 
     args = parser.parse_args()
 
@@ -322,6 +330,8 @@ streamersファイルの形式:
         'mask_output_dir': args.mask_output_dir,
         'mask_dilate': args.mask_dilate,
         'mask_save': args.mask_save,
+        'fb_normalize': args.fb_normalize,
+        'fb_delete_mov': args.fb_delete_mov,
     }
 
     # 生成
