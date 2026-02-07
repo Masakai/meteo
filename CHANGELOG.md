@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-02-07
+### Changed
+- ダッシュボード「最近の検出」の操作行を2段構成（表示系 / 管理系）に整理し、誤タップしづらいレイアウトへ調整。
+- `VIDEO` / `合成` / `元画像` / ラベル選択 / `削除` のタップ領域を拡張し、押しやすさを改善。
+
 ## [1.11.0] - 2026-02-07
 ### Added
 - ダッシュボードでストリーム停止を検知した際に、対象カメラへ自動で再起動要求（`POST /camera_restart/{index}`）を送る自動復旧処理を追加。

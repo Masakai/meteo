@@ -324,11 +324,11 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
         .detection-group-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 10px;
         }}
         .detection-item {{
-            padding: 10px;
+            padding: 12px;
             background: #16213e;
             border-radius: 8px;
             font-size: 0.85em;
@@ -358,13 +358,23 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
         .detection-actions {{
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
             margin-top: 8px;
         }}
+        .detection-view-actions {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+            gap: 6px;
+        }}
+        .detection-manage-actions {{
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }}
         .detection-link {{
-            padding: 3px 8px;
+            padding: 7px 8px;
             background: #2a3f6f;
             border: 1px solid #00d4ff;
             color: #00d4ff;
@@ -373,6 +383,11 @@ def render_dashboard_html(cameras, version, server_start_time):
             font-size: 0.8em;
             cursor: pointer;
             transition: all 0.2s;
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
         }}
         .detection-link:hover {{
             background: #00d4ff;
@@ -382,11 +397,13 @@ def render_dashboard_html(cameras, version, server_start_time):
             background: #ff4444;
             border: none;
             color: white;
-            padding: 4px 8px;
+            padding: 7px 12px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 0.8em;
             transition: background 0.2s;
+            min-height: 34px;
+            white-space: nowrap;
         }}
         .delete-btn:hover {{
             background: #cc0000;
@@ -395,10 +412,13 @@ def render_dashboard_html(cameras, version, server_start_time):
             background: #1f324f;
             border: 1px solid #2a5a86;
             color: #d8ecff;
-            padding: 4px 6px;
+            padding: 7px 8px;
             border-radius: 4px;
             font-size: 0.8em;
             cursor: pointer;
+            min-height: 34px;
+            min-width: 0;
+            flex: 1;
         }}
         .label-select[data-label="false_positive"] {{
             border-color: #ff7f7f;
@@ -1180,18 +1200,20 @@ def render_dashboard_html(cameras, version, server_start_time):
                                         ${{thumb}}
                                         <div>信頼度: ${{d.confidence}}</div>
                                         <div class="detection-actions">
-                                            <div class="detection-links">
+                                            <div class="detection-view-actions">
                                                 <span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">VIDEO</span>
                                                 <span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">合成</span>
                                                 <span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>
                                             </div>
-                                            <select class="label-select" data-label="${{d.label || ''}}" onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', this)">
-                                                <option value="" ${{(d.label || '') === '' ? 'selected' : ''}}>未分類</option>
-                                                <option value="false_positive" ${{d.label === 'false_positive' ? 'selected' : ''}}>誤検出</option>
-                                                <option value="review" ${{d.label === 'review' ? 'selected' : ''}}>要確認</option>
-                                                <option value="confirmed" ${{d.label === 'confirmed' ? 'selected' : ''}}>真検出</option>
-                                            </select>
-                                            <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>
+                                            <div class="detection-manage-actions">
+                                                <select class="label-select" data-label="${{d.label || ''}}" onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', this)">
+                                                    <option value="" ${{(d.label || '') === '' ? 'selected' : ''}}>未分類</option>
+                                                    <option value="false_positive" ${{d.label === 'false_positive' ? 'selected' : ''}}>誤検出</option>
+                                                    <option value="review" ${{d.label === 'review' ? 'selected' : ''}}>要確認</option>
+                                                    <option value="confirmed" ${{d.label === 'confirmed' ? 'selected' : ''}}>真検出</option>
+                                                </select>
+                                                <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>
+                                            </div>
                                         </div>
                                     </div>
                                 `;
