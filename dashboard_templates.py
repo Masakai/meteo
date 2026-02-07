@@ -391,6 +391,27 @@ def render_dashboard_html(cameras, version, server_start_time):
         .delete-btn:hover {{
             background: #cc0000;
         }}
+        .label-select {{
+            background: #1f324f;
+            border: 1px solid #2a5a86;
+            color: #d8ecff;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }}
+        .label-select[data-label="false_positive"] {{
+            border-color: #ff7f7f;
+            color: #ffd0d0;
+        }}
+        .label-select[data-label="review"] {{
+            border-color: #f6d365;
+            color: #fff1bf;
+        }}
+        .label-select[data-label="confirmed"] {{
+            border-color: #6ddf94;
+            color: #d8ffe8;
+        }}
         .modal {{
             display: none;
             position: fixed;
@@ -992,6 +1013,32 @@ def render_dashboard_html(cameras, version, server_start_time):
             }});
         }}
 
+        function updateDetectionLabel(camera, time, selectEl) {{
+            const previous = selectEl.dataset.label || '';
+            const label = selectEl.value || '';
+            selectEl.dataset.label = label;
+            fetch('/detection_label', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/json'
+                }},
+                body: JSON.stringify({{ camera, time, label }})
+            }})
+            .then(r => r.json())
+            .then(data => {{
+                if (!data.success) {{
+                    throw new Error(data.error || 'update failed');
+                }}
+                selectEl.dataset.label = label;
+                lastDetectionsKey = '';
+            }})
+            .catch((err) => {{
+                alert('ラベル更新に失敗しました: ' + err.message);
+                selectEl.value = previous;
+                selectEl.dataset.label = previous;
+            }});
+        }}
+
         let lastDetectionsKey = '';
         let lastDetectionsMtime = 0;
         const detectionPollBaseDelay = 3000;
@@ -1016,7 +1063,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                     document.getElementById('total-detections').textContent = data.total;
                     if (data.recent.length > 0) {{
                         const detectionsKey = data.recent.map(d =>
-                            `${{d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}`
+                            `${{d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
                         ).join('||');
                         if (detectionsKey === lastDetectionsKey) {{
                             return;
@@ -1063,6 +1110,12 @@ def render_dashboard_html(cameras, version, server_start_time):
                                                 <span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">合成</span>
                                                 <span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>
                                             </div>
+                                            <select class="label-select" data-label="${{d.label || ''}}" onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', this)">
+                                                <option value="" ${{(d.label || '') === '' ? 'selected' : ''}}>未分類</option>
+                                                <option value="false_positive" ${{d.label === 'false_positive' ? 'selected' : ''}}>誤検出</option>
+                                                <option value="review" ${{d.label === 'review' ? 'selected' : ''}}>要確認</option>
+                                                <option value="confirmed" ${{d.label === 'confirmed' ? 'selected' : ''}}>真検出</option>
+                                            </select>
                                             <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>
                                         </div>
                                     </div>

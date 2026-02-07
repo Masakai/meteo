@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-02-07
+### Added
+- ダッシュボードの「最近の検出」にラベル分類機能を追加（`未分類` / `誤検出` / `要確認` / `真検出`）。
+- ラベル更新API `POST /detection_label` を追加。
+- ルートテストにラベルAPIおよび検出一覧へのラベル反映テストを追加。
+
+### Changed
+- 検出一覧API `GET /detections` が各検出に `label` を含むよう変更。
+- 更新検知API `GET /detections_mtime` がラベルファイル更新も監視するよう変更。
+- 検出削除時に対応ラベルを同時に削除するよう変更。
+
 ## [1.9.0] - 2026-02-07
 ### Added
 - `meteor_detector_rtsp_web.py` の `/stats` に `runtime_fps`（実効FPS）を追加。

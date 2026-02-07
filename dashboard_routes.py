@@ -15,6 +15,7 @@ from dashboard_templates import render_dashboard_html
 
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _SERVER_START_TIME = time()
+_LABELS_FILENAME = "detection_labels.json"
 
 
 def _parse_camera_index(path):
@@ -35,6 +36,37 @@ def _camera_url_for_proxy(raw_url, camera_index=None):
             netloc = f"{netloc}:{parsed.port}"
         return parsed._replace(netloc=netloc).geturl()
     return raw_url
+
+
+def _labels_path():
+    return Path(DETECTIONS_DIR) / _LABELS_FILENAME
+
+
+def _load_detection_labels():
+    path = _labels_path()
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_detection_labels(labels):
+    path = _labels_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(labels, f, ensure_ascii=False, sort_keys=True)
+    tmp_path.replace(path)
+
+
+def _detection_label_key(camera_name, detection_time):
+    return f"{camera_name}|{detection_time}"
 
 
 def handle_index(handler):
@@ -113,6 +145,8 @@ def handle_detections(handler):
     detections = []
     total = 0
 
+    labels = _load_detection_labels()
+
     try:
         for cam_dir in Path(DETECTIONS_DIR).iterdir():
             if cam_dir.is_dir():
@@ -145,14 +179,17 @@ def handle_detections(handler):
                                     composite_orig_path = ""
 
                                 total += 1
+                                display_time = timestamp_str[:19].replace("T", " ")
+                                label_key = _detection_label_key(cam_dir.name, display_time)
                                 detections.append(
                                     {
-                                        "time": timestamp_str[:19].replace("T", " "),
+                                        "time": display_time,
                                         "camera": cam_dir.name,
                                         "confidence": f"{d.get('confidence', 0):.0%}",
                                         "image": composite_path,
                                         "mp4": mp4_path,
                                         "composite_original": composite_orig_path,
+                                        "label": labels.get(label_key, ""),
                                     }
                                 )
                             except Exception:
@@ -186,6 +223,13 @@ def handle_detections_mtime(handler):
                     mtime = jsonl_file.stat().st_mtime
                     if mtime > latest_mtime:
                         latest_mtime = mtime
+    except Exception:
+        pass
+
+    try:
+        labels_mtime = _labels_path().stat().st_mtime
+        if labels_mtime > latest_mtime:
+            latest_mtime = labels_mtime
     except Exception:
         pass
 
@@ -370,6 +414,12 @@ def handle_delete_detection(handler):
 
                 temp_file.replace(jsonl_file)
 
+            labels = _load_detection_labels()
+            label_key = _detection_label_key(camera_name, timestamp_str)
+            if label_key in labels:
+                del labels[label_key]
+                _save_detection_labels(labels)
+
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
             handler.end_headers()
@@ -396,6 +446,48 @@ def handle_delete_detection(handler):
     handler.send_response(404)
     handler.end_headers()
     return True
+
+
+def handle_set_detection_label(handler):
+    if handler.path != "/detection_label":
+        return False
+
+    try:
+        length = int(handler.headers.get("Content-Length", "0"))
+        raw_body = handler.rfile.read(length)
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+
+        camera = str(payload.get("camera", "")).strip()
+        detection_time = str(payload.get("time", "")).strip()
+        label = str(payload.get("label", "")).strip()
+
+        allowed_labels = {"", "false_positive", "review", "confirmed"}
+        if label not in allowed_labels:
+            raise ValueError("invalid label")
+        if not camera or not detection_time:
+            raise ValueError("camera and time are required")
+
+        labels = _load_detection_labels()
+        key = _detection_label_key(camera, detection_time)
+        if label:
+            labels[key] = label
+        else:
+            labels.pop(key, None)
+        _save_detection_labels(labels)
+
+        handler.send_response(200)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(
+            json.dumps({"success": True, "camera": camera, "time": detection_time, "label": label}).encode("utf-8")
+        )
+        return True
+    except Exception as e:
+        handler.send_response(400)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
 
 
 def handle_camera_stream(handler):

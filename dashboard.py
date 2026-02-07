@@ -23,6 +23,7 @@ from dashboard_routes import (
     handle_camera_mask_image,
     handle_camera_stats,
     handle_camera_stream,
+    handle_set_detection_label,
     handle_image,
     handle_index,
 )
@@ -79,6 +80,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if self.path == '/detection_label':
+            handle_set_detection_label(self)
+            return
         if self.path.startswith('/camera_mask/'):
             handle_camera_mask(self)
             return

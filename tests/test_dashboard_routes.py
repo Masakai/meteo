@@ -1,5 +1,6 @@
 import dashboard_routes as dr
 import io
+import json
 
 
 class _DummyResponse:
@@ -17,11 +18,14 @@ class _DummyResponse:
 
 
 class _DummyHandler:
-    def __init__(self, path):
+    def __init__(self, path, body=b"", headers=None):
         self.path = path
-        self.headers = {}
+        self.headers = headers.copy() if headers else {}
+        if "Content-Length" not in self.headers:
+            self.headers["Content-Length"] = str(len(body))
         self.sent_headers = {}
         self.status = None
+        self.rfile = io.BytesIO(body)
         self.wfile = io.BytesIO()
 
     def send_response(self, code):
@@ -95,3 +99,38 @@ def test_handle_camera_snapshot_invalid_index(monkeypatch):
     handler = _DummyHandler("/camera_snapshot/99")
     assert dr.handle_camera_snapshot(handler) is True
     assert handler.status == 503
+
+
+def test_handle_set_detection_label_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    body = json.dumps(
+        {"camera": "camera1", "time": "2026-02-07 22:00:00", "label": "false_positive"}
+    ).encode("utf-8")
+    handler = _DummyHandler("/detection_label", body=body, headers={"Content-Type": "application/json"})
+
+    assert dr.handle_set_detection_label(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    saved = json.loads((tmp_path / "detection_labels.json").read_text(encoding="utf-8"))
+    assert saved["camera1|2026-02-07 22:00:00"] == "false_positive"
+
+
+def test_handle_detections_includes_label(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_dir = tmp_path / "camera1"
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    (cam_dir / "detections.jsonl").write_text(
+        json.dumps({"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}) + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "detection_labels.json").write_text(
+        json.dumps({"camera1|2026-02-07 22:00:00": "review"}),
+        encoding="utf-8",
+    )
+
+    handler = _DummyHandler("/detections")
+    assert dr.handle_detections(handler) is None
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["recent"][0]["label"] == "review"
