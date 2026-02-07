@@ -728,6 +728,78 @@ def render_dashboard_html(cameras, version, server_start_time):
         let totalDetections = 0;
         const cameraStatsTimers = [];
         const cameraStatsState = [];
+        const autoRecoveryState = [];
+        const AUTO_RESTART_RECOVERY_WAIT_MS = 20000;
+        const AUTO_RESTART_ALERT_COOLDOWN_MS = 120000;
+
+        function ensureAutoRecoveryState(i) {{
+            if (!autoRecoveryState[i]) {{
+                autoRecoveryState[i] = {{
+                    restartRequestedAt: 0,
+                    restartInFlight: false,
+                    alertShown: false,
+                    lastStreamAlive: null
+                }};
+            }}
+            return autoRecoveryState[i];
+        }}
+
+        function triggerAutoRestart(i, reason) {{
+            const cam = cameras[i];
+            if (!cam) return;
+            const state = ensureAutoRecoveryState(i);
+            if (state.restartInFlight) return;
+            const now = Date.now();
+            if (state.restartRequestedAt && (now - state.restartRequestedAt) < AUTO_RESTART_ALERT_COOLDOWN_MS) {{
+                return;
+            }}
+
+            state.restartInFlight = true;
+            fetch('/camera_restart/' + i, {{ method: 'POST' }})
+                .then(r => r.json())
+                .then(data => {{
+                    state.restartRequestedAt = Date.now();
+                    state.alertShown = false;
+                    if (!data || data.success !== true) {{
+                        console.warn('自動再起動要求に失敗:', cam.name, data);
+                    }} else {{
+                        console.warn('自動再起動要求:', cam.name, reason);
+                    }}
+                }})
+                .catch((err) => {{
+                    state.restartRequestedAt = Date.now();
+                    state.alertShown = false;
+                    console.warn('自動再起動要求でエラー:', cam.name, err);
+                }})
+                .finally(() => {{
+                    state.restartInFlight = false;
+                }});
+        }}
+
+        function evaluateAutoRecovery(i, streamAlive) {{
+            const state = ensureAutoRecoveryState(i);
+            if (streamAlive) {{
+                state.restartRequestedAt = 0;
+                state.restartInFlight = false;
+                state.alertShown = false;
+                state.lastStreamAlive = true;
+                return;
+            }}
+
+            if (state.lastStreamAlive !== false) {{
+                triggerAutoRestart(i, 'stream stopped');
+            }}
+            state.lastStreamAlive = false;
+
+            if (
+                state.restartRequestedAt > 0 &&
+                !state.alertShown &&
+                (Date.now() - state.restartRequestedAt) >= AUTO_RESTART_RECOVERY_WAIT_MS
+            ) {{
+                state.alertShown = true;
+                alert('カメラの電源が入っていないかハングアップしています');
+            }}
+        }}
 
         function scheduleCameraStats(i, delay) {{
             if (cameraStatsTimers[i]) {{
@@ -767,11 +839,13 @@ def render_dashboard_html(cameras, version, server_start_time):
                     cameraStatsState[i].delay = baseDelay;
                     document.getElementById('count' + i).textContent = data.detections;
                     renderCameraParams(i, data);
-                    if (data.stream_alive === false) {{
+                    const streamAlive = data.stream_alive !== false;
+                    if (!streamAlive) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status';
                     }}
+                    evaluateAutoRecovery(i, streamAlive);
                     if (data.is_detecting === true) {{
                         document.getElementById('detection' + i).className = 'detection-status detecting';
                     }} else {{
@@ -794,6 +868,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
                     document.getElementById('status' + i).className = 'camera-status offline';
                     document.getElementById('detection' + i).className = 'detection-status';
+                    evaluateAutoRecovery(i, false);
                 }})
                 .finally(() => {{
                     scheduleCameraStats(i, cameraStatsState[i].delay);

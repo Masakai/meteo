@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-02-07
+### Added
+- ダッシュボードでストリーム停止を検知した際に、対象カメラへ自動で再起動要求（`POST /camera_restart/{index}`）を送る自動復旧処理を追加。
+- 自動再起動後も復旧しない場合に「カメラの電源が入っていないかハングアップしています」とダイアログ表示する通知を追加。
+- ダッシュボードHTML生成テスト `tests/test_dashboard_templates.py` を追加。
+
 ## [1.10.0] - 2026-02-07
 ### Added
 - ダッシュボードの「最近の検出」にラベル分類機能を追加（`未分類` / `誤検出` / `要確認` / `真検出`）。
