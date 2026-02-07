@@ -483,11 +483,13 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
     "scale": 0.5,
     "buffer": 15.0,
     "extract_clips": true,
+    "source_fps": 20.0,
     "exclude_bottom": 0.0625,
     "mask_image": "/app/mask_image.png",
     "mask_from_day": "",
     "mask_dilate": 5
   },
+  "runtime_fps": 19.83,
   "stream_alive": true,
   "time_since_last_frame": 0.03,
   "is_detecting": true
@@ -506,10 +508,12 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.scale` | float | 処理スケール |
 | `settings.buffer` | float | バッファ秒数 |
 | `settings.extract_clips` | boolean | 動画保存の有効/無効 |
+| `settings.source_fps` | float | 接続時に取得した入力ストリームFPS |
 | `settings.exclude_bottom` | float | 画面下部除外率 |
 | `settings.mask_image` | string | マスク画像（優先） |
 | `settings.mask_from_day` | string | 昼間画像から生成するマスク |
 | `settings.mask_dilate` | integer | マスク拡張ピクセル数 |
+| `runtime_fps` | float | 直近フレームから算出した実効FPS |
 | `stream_alive` | boolean | ストリーム生存確認 |
 | `time_since_last_frame` | float | 最終フレームからの経過時間（秒） |
 | `is_detecting` | boolean | 現在検出処理中か |

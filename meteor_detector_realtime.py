@@ -21,6 +21,43 @@ import numpy as np
 from meteor_detector_common import calculate_linearity, calculate_confidence, open_video_writer
 
 
+def sanitize_fps(value: Optional[float], default: float = 30.0) -> float:
+    """FPS値を実用範囲に正規化"""
+    try:
+        fps = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not np.isfinite(fps):
+        return default
+    if fps < 1.0 or fps > 120.0:
+        return default
+    return fps
+
+
+def estimate_fps_from_frames(
+    frames: List[Tuple[float, np.ndarray]],
+    fallback_fps: float = 30.0,
+) -> float:
+    """フレーム時刻差の中央値から実効FPSを推定"""
+    if len(frames) < 2:
+        return sanitize_fps(fallback_fps, default=30.0)
+
+    deltas: List[float] = []
+    for idx in range(1, len(frames)):
+        dt = frames[idx][0] - frames[idx - 1][0]
+        if dt > 0:
+            deltas.append(dt)
+
+    if not deltas:
+        return sanitize_fps(fallback_fps, default=30.0)
+
+    median_dt = float(np.median(np.array(deltas, dtype=np.float64)))
+    if median_dt <= 0:
+        return sanitize_fps(fallback_fps, default=30.0)
+
+    return sanitize_fps(1.0 / median_dt, default=sanitize_fps(fallback_fps, default=30.0))
+
+
 @dataclass
 class MeteorEvent:
     """検出された流星イベント"""
@@ -137,7 +174,7 @@ class RTSPReader:
             with self.lock:
                 self.width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                self.fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                self.fps = sanitize_fps(cap.get(cv2.CAP_PROP_FPS), default=30.0)
                 if self.start_time is None:
                     self.start_time = time.time()
 
@@ -483,10 +520,12 @@ def save_meteor_event(
 
     height, width = frames[0][1].shape[:2]
 
+    clip_fps = estimate_fps_from_frames(frames, fallback_fps=fps)
+
     clip_path = None
     if extract_clips:
         clip_path = output_dir / f"{base_name}.mov"
-        writer = open_video_writer(clip_path, fps, (width, height))
+        writer = open_video_writer(clip_path, clip_fps, (width, height))
         if writer is None:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
             return None

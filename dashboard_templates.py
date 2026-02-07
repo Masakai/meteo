@@ -715,6 +715,22 @@ def render_dashboard_html(cameras, version, server_start_time):
             cameraStatsTimers[i] = setTimeout(() => updateCameraStats(i), delay);
         }}
 
+        function renderCameraParams(i, data) {{
+            const el = document.getElementById('params' + i);
+            if (!el || !data || !data.settings) return;
+            const s = data.settings;
+            const clipClass = s.extract_clips ? 'param-clip' : 'param-no-clip';
+            const clipText = s.extract_clips ? 'CLIP:ON' : 'CLIP:OFF';
+            const sourceFps = Number(s.source_fps || 0);
+            const runtimeFps = Number(data.runtime_fps || 0);
+            const fpsText = runtimeFps > 0 ? runtimeFps.toFixed(1) : (sourceFps > 0 ? sourceFps.toFixed(1) : '-');
+            el.innerHTML =
+                `<span class="param">${{s.sensitivity}}</span>` +
+                `<span class="param">x${{s.scale}}</span>` +
+                `<span class="param">FPS:${{fpsText}}</span>` +
+                `<span class="param ${{clipClass}}">${{clipText}}</span>`;
+        }}
+
         function updateCameraStats(i) {{
             const cam = cameras[i];
             if (!cam) return;
@@ -729,6 +745,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 .then(data => {{
                     cameraStatsState[i].delay = baseDelay;
                     document.getElementById('count' + i).textContent = data.detections;
+                    renderCameraParams(i, data);
                     if (data.stream_alive === false) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
                     }} else {{
@@ -763,22 +780,6 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         cameras.forEach((cam, i) => {{
-            // 設定情報の取得（初回のみ）
-            fetch('/camera_stats/' + i, {{ cache: 'no-store' }})
-                .then(r => r.json())
-                .then(data => {{
-                    if (data.settings) {{
-                        const s = data.settings;
-                        const clipClass = s.extract_clips ? 'param-clip' : 'param-no-clip';
-                        const clipText = s.extract_clips ? 'CLIP:ON' : 'CLIP:OFF';
-                        document.getElementById('params' + i).innerHTML =
-                            `<span class="param">${{s.sensitivity}}</span>` +
-                            `<span class="param">x${{s.scale}}</span>` +
-                            `<span class="param ${{clipClass}}">${{clipText}}</span>`;
-                    }}
-                }})
-                .catch(() => {{}});
-
             updateCameraStats(i);
         }});
 

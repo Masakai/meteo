@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-02-07
+### Added
+- `meteor_detector_rtsp_web.py` の `/stats` に `runtime_fps`（実効FPS）を追加。
+- ダッシュボードのカメラ情報に FPS 表示を追加（`runtime_fps` 優先、未計測時は `source_fps`）。
+- `tests/test_meteor_detector_realtime.py` を追加（FPS正規化/推定のテスト）。
+
+### Changed
+- クリップ保存FPSを固定値ではなく、フレーム時刻差から推定した実効FPSに変更。
+- Facebook正規化時の30fps固定を廃止し、入力クリップFPSに追従するよう変更。
+
+### Documentation
+- API/アーキテクチャ資料の `/stats` 仕様を `runtime_fps` / `settings.source_fps` に対応。
+
 ## [1.8.0] - 2026-02-07
 ### Added
 - ダッシュボードにカメラ単位の「再起動」ボタンを追加（`POST /camera_restart/{index}`）。

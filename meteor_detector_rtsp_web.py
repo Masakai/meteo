@@ -36,9 +36,10 @@ from meteor_detector_realtime import (
     RealtimeMeteorDetector,
     RingBuffer,
     save_meteor_event,
+    sanitize_fps,
 )
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -63,6 +64,7 @@ current_mask_save = None
 current_output_dir = None
 current_camera_name = ""
 current_stop_flag = None
+current_runtime_fps = 0.0
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -71,6 +73,7 @@ current_settings = {
     "extract_clips": True,
     "exclude_bottom": 0.0625,
     "fb_normalize": False,
+    "source_fps": 30.0,
 }
 
 
@@ -85,6 +88,39 @@ def fb_normalize_clip(
     out_path = clip_path.with_suffix(".mp4")
     if out_path.exists() and not overwrite:
         return None
+
+    fps = 30.0
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=avg_frame_rate",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(clip_path),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if probe.returncode == 0:
+            rate = probe.stdout.strip()
+            if "/" in rate:
+                num, den = rate.split("/", 1)
+                den_f = float(den)
+                if den_f != 0:
+                    fps = float(num) / den_f
+            elif rate:
+                fps = float(rate)
+    except Exception:
+        pass
+    fps = sanitize_fps(fps, default=30.0)
+    gop = max(1, int(round(fps * 2)))
 
     cmd = [
         "ffmpeg",
@@ -103,11 +139,11 @@ def fb_normalize_clip(
         "-pix_fmt",
         "yuv420p",
         "-r",
-        "30",
+        f"{fps:.3f}",
         "-g",
-        "60",
+        str(gop),
         "-keyint_min",
-        "60",
+        str(gop),
         "-sc_threshold",
         "0",
         "-tag:v",
@@ -402,6 +438,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "elapsed": round(elapsed, 1),
                 "camera": camera_name,
                 "settings": current_settings,
+                "runtime_fps": round(current_runtime_fps, 2),
                 "stream_alive": is_stream_alive,
                 "time_since_last_frame": round(time_since_last_frame, 1),
                 "is_detecting": is_detecting_now,
@@ -657,7 +694,7 @@ def detection_thread_worker(
     fb_delete_mov=False,
 ):
     """検出処理を行うワーカースレッド"""
-    global current_frame, detection_count, last_frame_time, is_detecting_now
+    global current_frame, detection_count, last_frame_time, is_detecting_now, current_runtime_fps
     global current_detector, current_proc_size, current_mask_dilate, current_mask_save
     global current_output_dir, current_camera_name
 
@@ -703,6 +740,7 @@ def detection_thread_worker(
 
     prev_gray = None
     frame_count = 0
+    recent_frame_times: List[float] = []
 
     # 天文薄暮期間のチェック（ウィンドウ終了後に再計算）
     is_detection_time = True  # デフォルトは有効
@@ -720,6 +758,13 @@ def detection_thread_worker(
 
         # ストリーム生存確認用の時刻を更新
         last_frame_time = time.time()
+        recent_frame_times.append(timestamp)
+        if len(recent_frame_times) > 30:
+            recent_frame_times.pop(0)
+        if len(recent_frame_times) >= 2:
+            dt = recent_frame_times[-1] - recent_frame_times[0]
+            if dt > 0:
+                current_runtime_fps = (len(recent_frame_times) - 1) / dt
 
         ring_buffer.add(timestamp, frame)
 
@@ -878,6 +923,7 @@ def process_rtsp_stream(
     fb_delete_mov: bool = False,
 ):
     global current_frame, detection_count, start_time_global, camera_name, current_settings
+    global current_runtime_fps
     global current_stop_flag
 
     params = params or DetectionParams()
@@ -912,6 +958,7 @@ def process_rtsp_stream(
         "extract_clips": extract_clips,
         "exclude_bottom": params.exclude_bottom_ratio,
         "fb_normalize": fb_normalize,
+        "source_fps": 30.0,
         "mask_image": mask_image or "",
         "mask_from_day": mask_from_day or "",
         "mask_dilate": mask_dilate,
@@ -941,7 +988,9 @@ def process_rtsp_stream(
         return
 
     width, height = reader.frame_size
-    fps = reader.fps
+    fps = sanitize_fps(reader.fps, default=30.0)
+
+    current_settings["source_fps"] = fps
 
     print(f"解像度: {width}x{height}")
     print("検出開始 (Ctrl+C で終了)")
@@ -949,6 +998,7 @@ def process_rtsp_stream(
 
     detection_count = 0
     start_time_global = time.time()
+    current_runtime_fps = 0.0
 
     stop_flag = Event()
     current_stop_flag = stop_flag
