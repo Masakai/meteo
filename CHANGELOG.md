@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-02-07
+### Added
+- ダッシュボードにカメラ単位の「再起動」ボタンを追加（`POST /camera_restart/{index}`）。
+- ダッシュボードにカメラ単位の「スナップショット保存」ボタンを追加（`GET /camera_snapshot/{index}`）。
+- カメラAPIに `GET /snapshot`（現在フレームJPEG取得）と `POST /restart`（再起動要求）を追加。
+
+### Changed
+- ダッシュボードHTTPサーバーに `do_POST` を追加し、カメラ操作系API（マスク更新/再起動）を正式サポート。
+
+### Documentation
+- API/アーキテクチャ/運用/READMEを新エンドポイントとUI操作に合わせて改版。
+
 ## [1.7.0] - 2026-02-06
 ### Added
 - Facebook向けにH.264 MP4へ正規化するオプションを `meteor_detector_rtsp_web.py` に追加（`--fb-normalize` / `--fb-delete-mov`）。

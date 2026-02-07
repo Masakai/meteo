@@ -17,6 +17,13 @@ _IN_DOCKER = os.path.exists("/.dockerenv")
 _SERVER_START_TIME = time()
 
 
+def _parse_camera_index(path):
+    camera_index = int(path.split("/")[-1])
+    if camera_index < 0 or camera_index >= len(CAMERAS):
+        raise ValueError(f"camera index out of range: {camera_index}")
+    return camera_index
+
+
 def _camera_url_for_proxy(raw_url, camera_index=None):
     parsed = urlparse(raw_url)
     hostname = parsed.hostname or ""
@@ -287,9 +294,7 @@ def handle_camera_stats(handler):
         return False
 
     try:
-        camera_index = int(handler.path.split("/")[-1])
-        if camera_index < 0 or camera_index >= len(CAMERAS):
-            raise ValueError("camera index out of range")
+        camera_index = _parse_camera_index(handler.path)
         cam = CAMERAS[camera_index]
         target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/stats"
         req = Request(target_url, headers={"Accept": "application/json"})
@@ -398,9 +403,7 @@ def handle_camera_stream(handler):
         return False
 
     try:
-        camera_index = int(handler.path.split("/")[-1])
-        if camera_index < 0 or camera_index >= len(CAMERAS):
-            raise ValueError("camera index out of range")
+        camera_index = _parse_camera_index(handler.path)
         cam = CAMERAS[camera_index]
         target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/stream"
         req = Request(target_url)
@@ -427,14 +430,49 @@ def handle_camera_stream(handler):
         return True
 
 
+def handle_camera_snapshot(handler):
+    if not handler.path.startswith("/camera_snapshot/"):
+        return False
+
+    parsed = urlparse(handler.path)
+    try:
+        camera_index = _parse_camera_index(parsed.path)
+        cam = CAMERAS[camera_index]
+        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/snapshot"
+        req = Request(target_url)
+        with urlopen(req, timeout=5) as response:
+            payload = response.read()
+
+        query = parse_qs(parsed.query)
+        should_download = query.get("download", ["0"])[0] in ("1", "true", "yes")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_name = "".join(c if c.isalnum() else "_" for c in cam["name"]).strip("_") or f"camera{camera_index+1}"
+        filename = f"snapshot_{safe_name}_{timestamp}.jpg"
+
+        handler.send_response(200)
+        handler.send_header("Content-type", "image/jpeg")
+        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        if should_download:
+            handler.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        handler.end_headers()
+        handler.wfile.write(payload)
+        return True
+    except (ValueError, URLError, TimeoutError):
+        handler.send_response(503)
+        handler.end_headers()
+        return True
+    except Exception:
+        handler.send_response(500)
+        handler.end_headers()
+        return True
+
+
 def handle_camera_mask(handler):
     if not handler.path.startswith("/camera_mask/"):
         return False
 
     try:
-        camera_index = int(handler.path.split("/")[-1])
-        if camera_index < 0 or camera_index >= len(CAMERAS):
-            raise ValueError("camera index out of range")
+        camera_index = _parse_camera_index(handler.path)
         cam = CAMERAS[camera_index]
         target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/update_mask"
         req = Request(target_url, method="POST")
@@ -455,15 +493,45 @@ def handle_camera_mask(handler):
         return True
 
 
+def handle_camera_restart(handler):
+    if not handler.path.startswith("/camera_restart/"):
+        return False
+
+    try:
+        camera_index = _parse_camera_index(handler.path)
+        cam = CAMERAS[camera_index]
+        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/restart"
+        req = Request(target_url, method="POST")
+        with urlopen(req, timeout=5) as response:
+            payload = response.read()
+
+        handler.send_response(202)
+        handler.send_header("Content-type", "application/json")
+        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        handler.end_headers()
+        handler.wfile.write(payload)
+        return True
+    except (ValueError, URLError, TimeoutError) as e:
+        handler.send_response(503)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+    except Exception as e:
+        handler.send_response(500)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+
+
 def handle_camera_mask_image(handler):
     if not handler.path.startswith("/camera_mask_image/"):
         return False
 
     parsed = urlparse(handler.path)
     try:
-        camera_index = int(parsed.path.split("/")[-1])
-        if camera_index < 0 or camera_index >= len(CAMERAS):
-            raise ValueError("camera index out of range")
+        camera_index = _parse_camera_index(parsed.path)
         cam = CAMERAS[camera_index]
         target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/mask"
         if parsed.query:

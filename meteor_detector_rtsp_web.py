@@ -38,7 +38,7 @@ from meteor_detector_realtime import (
     save_meteor_event,
 )
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -62,6 +62,7 @@ current_mask_dilate = 20
 current_mask_save = None
 current_output_dir = None
 current_camera_name = ""
+current_stop_flag = None
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -357,6 +358,32 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 except:
                     break
 
+        elif path == '/snapshot':
+            with current_frame_lock:
+                frame = None if current_frame is None else current_frame.copy()
+
+            if frame is None:
+                self.send_response(503)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "current frame not available"
+                }).encode())
+                return
+
+            ok, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            if not ok:
+                self.send_response(500)
+                self.end_headers()
+                return
+
+            self.send_response(200)
+            self.send_header('Content-type', 'image/jpeg')
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.end_headers()
+            self.wfile.write(jpeg.tobytes())
+
         elif path == '/stats':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -422,6 +449,31 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        if self.path == '/restart':
+            self.send_response(202)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            if current_stop_flag is None:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "restart is not available"
+                }).encode())
+                return
+
+            # レスポンス返却後に停止フラグを立てる
+            def _request_restart():
+                time.sleep(0.2)
+                current_stop_flag.set()
+
+            Thread(target=_request_restart, daemon=True).start()
+            self.wfile.write(json.dumps({
+                "success": True,
+                "message": "restart requested"
+            }).encode())
+            return
+
         if self.path == '/update_mask':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -826,6 +878,7 @@ def process_rtsp_stream(
     fb_delete_mov: bool = False,
 ):
     global current_frame, detection_count, start_time_global, camera_name, current_settings
+    global current_stop_flag
 
     params = params or DetectionParams()
     camera_name = cam_name
@@ -898,6 +951,7 @@ def process_rtsp_stream(
     start_time_global = time.time()
 
     stop_flag = Event()
+    current_stop_flag = stop_flag
 
     def signal_handler(sig, frame):
         print("\n終了中...")
@@ -950,6 +1004,7 @@ def process_rtsp_stream(
     reader.stop()
     if httpd:
         httpd.shutdown()
+    current_stop_flag = None
 
     print(f"\n終了 - 検出数: {detection_count}個")
 

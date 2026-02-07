@@ -243,8 +243,10 @@ sequenceDiagram
 |--------------|---------|------|-----------|
 | `/` | GET | プレビューHTML | `text/html` |
 | `/stream` | GET | MJPEGストリーム | `multipart/x-mixed-replace` |
+| `/snapshot` | GET | 現在フレームJPEG取得 | `image/jpeg` |
 | `/stats` | GET | 統計情報 | `application/json` |
 | `/update_mask` | POST | 現在フレームからマスク更新 | `application/json` |
+| `/restart` | POST | プロセス再起動要求 | `application/json` |
 
 #### /stats レスポンス例
 
@@ -276,6 +278,8 @@ sequenceDiagram
 | `/` | GET | ダッシュボードHTML | `text/html` |
 | `/detection_window` | GET | 検出時間帯取得 | `application/json` |
 | `/detections` | GET | 検出リスト取得 | `application/json` |
+| `/camera_snapshot/{index}` | GET | カメラスナップショット取得 | `image/jpeg` |
+| `/camera_restart/{index}` | POST | カメラ再起動要求 | `application/json` |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 | `image/jpeg` |
 | `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 | `application/json` |
 | `/changelog` | GET | CHANGELOG表示 | `text/plain` |

@@ -13,6 +13,8 @@ import socketserver
 from dashboard_config import CAMERAS, PORT
 from dashboard_routes import (
     handle_changelog,
+    handle_camera_snapshot,
+    handle_camera_restart,
     handle_delete_detection,
     handle_detection_window,
     handle_detections,
@@ -52,6 +54,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path.startswith('/camera_stream/'):
             handle_camera_stream(self)
             return
+        if self.path.startswith('/camera_snapshot/'):
+            handle_camera_snapshot(self)
+            return
         if self.path.startswith('/camera_mask/'):
             handle_camera_mask(self)
             return
@@ -68,6 +73,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         """DELETE リクエストを処理（検出結果の削除）"""
         if handle_delete_detection(self):
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
+    def do_POST(self):
+        if self.path.startswith('/camera_mask/'):
+            handle_camera_mask(self)
+            return
+        if self.path.startswith('/camera_restart/'):
+            handle_camera_restart(self)
             return
 
         self.send_response(404)

@@ -19,6 +19,8 @@ def render_dashboard_html(cameras, version, server_start_time):
                     </div>
                     <div class="camera-actions">
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
+                        <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
+                        <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="camera-video">
@@ -168,6 +170,40 @@ def render_dashboard_html(cameras, version, server_start_time):
             color: #0f1530;
         }}
         .mask-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .snapshot-btn {{
+            background: #1e3b37;
+            border: 1px solid #48d1bf;
+            color: #9ff7e9;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .snapshot-btn:hover {{
+            background: #48d1bf;
+            color: #0f1530;
+        }}
+        .snapshot-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .restart-btn {{
+            background: #3a2430;
+            border: 1px solid #ff7f7f;
+            color: #ffb3b3;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .restart-btn:hover {{
+            background: #ff6b6b;
+            color: #1a1a2e;
+        }}
+        .restart-btn:disabled {{
             opacity: 0.6;
             cursor: wait;
         }}
@@ -774,6 +810,70 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
+        function downloadSnapshot(i) {{
+            const cam = cameras[i];
+            if (!cam) return;
+            const btn = document.querySelectorAll('.snapshot-btn')[i];
+            if (!btn) return;
+
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+            fetch('/camera_snapshot/' + i + '?download=1&t=' + Date.now(), {{ cache: 'no-store' }})
+                .then(r => {{
+                    if (!r.ok) throw new Error('snapshot request failed');
+                    return r.blob();
+                }})
+                .then(blob => {{
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    const safeName = (cam.name || ('camera' + (i + 1))).replace(/[^a-zA-Z0-9_-]+/g, '_');
+                    const ts = new Date().toISOString().replace(/[-:]/g, '').replace(/\\..+/, '').replace('T', '_');
+                    a.href = url;
+                    a.download = `snapshot_${{safeName}}_${{ts}}.jpg`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    btn.textContent = '保存完了';
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = 'スナップショット保存';
+                        btn.disabled = false;
+                    }}, 1500);
+                }});
+        }}
+
+        function restartCamera(i) {{
+            const cam = cameras[i];
+            if (!cam) return;
+            if (!confirm(`カメラを再起動しますか?\n${{cam.name}}`)) {{
+                return;
+            }}
+            const btn = document.querySelectorAll('.restart-btn')[i];
+            if (!btn) return;
+            btn.disabled = true;
+            btn.textContent = '再起動中...';
+            fetch('/camera_restart/' + i, {{ method: 'POST' }})
+                .then(r => r.json())
+                .then(data => {{
+                    btn.textContent = data.success ? '再起動要求済み' : '失敗';
+                    document.getElementById('status' + i).className = 'camera-status offline';
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = '再起動';
+                        btn.disabled = false;
+                    }}, 3000);
+                }});
+        }}
+
         function setMaskOverlay(i, visible) {{
             const overlay = document.getElementById('mask' + i);
             const btn = document.getElementById('mask-btn' + i);
@@ -1011,8 +1111,11 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        // 定期的に検出一覧を更新
-        pollDetections();
+        // 初回表示時は検出時間帯に関係なく一覧を取得し、その後差分ポーリングへ移行
+        updateDetections()
+            .finally(() => {{
+                pollDetections();
+            }});
 
         // CHANGELOG表示
         function showChangelog() {{

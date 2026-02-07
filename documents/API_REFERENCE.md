@@ -35,6 +35,8 @@ Licensed under the MIT License
 | `/detection_window` | GET | 検出時間帯取得 |
 | `/detections` | GET | 検出一覧取得 |
 | `/detections_mtime` | GET | 検出ログ更新時刻取得 |
+| `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） |
+| `/camera_restart/{index}` | POST | カメラ再起動要求 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
 | `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 |
 | `/changelog` | GET | CHANGELOG表示 |
@@ -249,6 +251,66 @@ curl -O "http://localhost:8080/image/camera1_10_0_1_25/meteor_20260202_065533_co
 
 ---
 
+### GET /camera_snapshot/{index}
+
+**説明**: 指定カメラの現在フレームをJPEGで取得
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `index` | integer | カメラインデックス（0始まり） | `0` |
+
+**クエリパラメータ**:
+
+| パラメータ | 型 | 必須 | 説明 | 例 |
+|-----------|-----|------|------|-----|
+| `download` | string | No | `1/true/yes` で `Content-Disposition: attachment` を付与 | `1` |
+
+**レスポンス**:
+- Content-Type: `image/jpeg`
+- Status: 200 OK
+
+**使用例**:
+```bash
+# 画像を直接表示
+curl "http://localhost:8080/camera_snapshot/0" --output snapshot.jpg
+
+# ダウンロード用途（attachmentヘッダ付き）
+curl -OJ "http://localhost:8080/camera_snapshot/0?download=1"
+```
+
+---
+
+### POST /camera_restart/{index}
+
+**説明**: 指定カメラに再起動を要求（非同期）
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `index` | integer | カメラインデックス（0始まり） | `1` |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 202 Accepted
+
+**レスポンスボディ**:
+```json
+{
+  "success": true,
+  "message": "restart requested"
+}
+```
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/camera_restart/1" | jq
+```
+
+---
+
 ### DELETE /detection/{camera}/{timestamp}
 
 **説明**: 検出結果を削除（動画、画像、JSONLエントリ）
@@ -332,8 +394,10 @@ curl http://localhost:8080/changelog
 |--------------|---------|------|
 | `/` | GET | プレビューHTML |
 | `/stream` | GET | MJPEGストリーム |
+| `/snapshot` | GET | 現在フレームJPEG |
 | `/stats` | GET | 統計情報 |
 | `/update_mask` | POST | 現在フレームからマスク再生成 |
+| `/restart` | POST | プロセス再起動要求 |
 
 ---
 
@@ -481,6 +545,21 @@ setInterval(() => {
 
 ---
 
+### GET /snapshot
+
+**説明**: 現在フレームをJPEGで取得
+
+**レスポンス**:
+- Content-Type: `image/jpeg`
+- Status: 200 OK
+
+**使用例**:
+```bash
+curl "http://localhost:8081/snapshot" --output camera1_snapshot.jpg
+```
+
+---
+
 ### POST /update_mask
 
 **説明**: 現在フレームから除外マスクを再生成して即時反映（固定カメラ向け）
@@ -514,13 +593,36 @@ curl -X POST http://localhost:8081/update_mask | jq
 
 ---
 
+### POST /restart
+
+**説明**: カメラプロセスへ再起動を要求（Dockerの `restart: unless-stopped` 運用を想定）
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 202 Accepted
+
+**レスポンスボディ**:
+```json
+{
+  "success": true,
+  "message": "restart requested"
+}
+```
+
+**使用例**:
+```bash
+curl -X POST http://localhost:8081/restart | jq
+```
+
+---
+
 ## 共通仕様
 
 ### CORS（Cross-Origin Resource Sharing）
 
 **現在の設定**:
 ```python
-# /stats と /update_mask はCORS許可
+# /stats /update_mask /restart はCORS許可
 self.send_header('Access-Control-Allow-Origin', '*')
 ```
 
