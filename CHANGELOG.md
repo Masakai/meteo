@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.5] - 2026-02-08
+### Changed
+- ダッシュボードの検出時間帯計算で、ブラウザ位置情報の取得を廃止し、サーバー設定（`LATITUDE` / `LONGITUDE`）を常時使用するよう変更。
+
+### Documentation
+- README の検出時間帯説明を、ブラウザ位置情報ではなくサーバー設定座標を使用する内容へ更新。
+
 ## [1.11.4] - 2026-02-08
 ### Fixed
 - ダッシュボード「最近の検出」の分類ラジオボタン文言を、`流星` / `それ以外` に変更し、判定意図が直感的に分かるよう改善。

@@ -639,31 +639,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 hours > 0 ? hours + ':' + String(mins).padStart(2,'0') + 'h' : mins + 'm';
         }}, 1000);
 
-        // ブラウザから位置情報を取得
-        let userLocation = null;
-        const savedLocation = localStorage.getItem('userLocation');
-        if (savedLocation) {{
-            userLocation = JSON.parse(savedLocation);
-        }}
-
-        // 初回アクセス時に位置情報を取得
-        if (!userLocation && navigator.geolocation) {{
-            navigator.geolocation.getCurrentPosition(
-                (position) => {{
-                    userLocation = {{
-                        lat: position.coords.latitude,
-                        lon: position.coords.longitude
-                    }};
-                    localStorage.setItem('userLocation', JSON.stringify(userLocation));
-                    console.log('位置情報を取得しました:', userLocation);
-                    updateDetectionWindow();  // 位置情報取得後に更新
-                }},
-                (error) => {{
-                    console.warn('位置情報の取得に失敗しました:', error.message);
-                    updateDetectionWindow();  // デフォルト位置で更新
-                }}
-            );
-        }}
+        // ブラウザ位置情報は使用せず、サーバー設定の位置情報を常に利用する
 
         const detectionWindowState = {{
             enabled: false,
@@ -687,12 +663,7 @@ def render_dashboard_html(cameras, version, server_start_time):
 
         // 検出時間帯を取得・更新
         function updateDetectionWindow() {{
-            let url = '/detection_window';
-            if (userLocation) {{
-                url += '?lat=' + userLocation.lat + '&lon=' + userLocation.lon;
-            }}
-
-            fetch(url)
+            fetch('/detection_window')
                 .then(r => r.json())
                 .then(data => {{
                     detectionWindowState.enabled = data.enabled === true;

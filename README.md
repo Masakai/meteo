@@ -255,7 +255,7 @@ python3 generate_compose.py --enable-time-window true
 ```
 
 ダッシュボード（http://localhost:8080/）に検出時間帯が表示されます。
-ブラウザの位置情報を許可すると、現在地の座標で検出時間を自動計算します。
+検出時間の計算には、サーバー設定（`LATITUDE` / `LONGITUDE`）の座標を使用します。
 
 #### 起動と管理（3つの方法）
 
