@@ -9,6 +9,10 @@
 
 # Meteo ドキュメントサイト
 
+## サンプル画面
+
+<img src="assets/dashboard-sample.png" alt="Meteo ダッシュボードのサンプル画面" width="920">
+
 ## まず読む
 
 <div class="link-grid">
