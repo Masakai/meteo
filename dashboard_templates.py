@@ -982,33 +982,28 @@ def render_dashboard_html(cameras, version, server_start_time):
 
             btn.disabled = true;
             btn.textContent = '保存中...';
-            fetch('/camera_snapshot/' + i + '?download=1&t=' + Date.now(), {{ cache: 'no-store' }})
-                .then(r => {{
-                    if (!r.ok) throw new Error('snapshot request failed');
-                    return r.blob();
-                }})
-                .then(blob => {{
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    const safeName = (cam.name || ('camera' + (i + 1))).replace(/[^a-zA-Z0-9_-]+/g, '_');
-                    const ts = new Date().toISOString().replace(/[-:]/g, '').replace(/\\..+/, '').replace('T', '_');
-                    a.href = url;
-                    a.download = `snapshot_${{safeName}}_${{ts}}.jpg`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    btn.textContent = '保存完了';
-                }})
-                .catch(() => {{
-                    btn.textContent = '失敗';
-                }})
-                .finally(() => {{
-                    setTimeout(() => {{
-                        btn.textContent = 'スナップショット保存';
-                        btn.disabled = false;
-                    }}, 1500);
-                }});
+            try {{
+                const link = document.createElement('a');
+                link.href = '/camera_snapshot/' + i + '?download=1&t=' + Date.now();
+                link.setAttribute('download', '');
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                btn.textContent = '保存要求済み';
+            }} catch (_) {{
+                btn.textContent = '失敗';
+            }} finally {{
+                // 接続飽和を避けるため、必要なカメラだけ再接続する
+                const streamImg = document.getElementById('stream' + i);
+                if (streamImg && streamImg.style.display === 'none') {{
+                    scheduleStreamRetry(i, 300);
+                }}
+                setTimeout(() => {{
+                    btn.textContent = 'スナップショット保存';
+                    btn.disabled = false;
+                }}, 1500);
+            }}
         }}
 
         function restartCamera(i) {{
