@@ -1,0 +1,60 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Meteo Mascot - Meteor Camera Vanguard</title>
+  <desc id="desc">A cool mascot combining a meteor and a camera lens for Meteo project website branding.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="140" y1="120" x2="1040" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08121F"/>
+      <stop offset="1" stop-color="#0B2235"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(620 560) rotate(130) scale(330 270)">
+      <stop offset="0" stop-color="#8DE0FF"/>
+      <stop offset="0.58" stop-color="#2FA3D7"/>
+      <stop offset="1" stop-color="#134D77"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="452" y1="372" x2="786" y2="744" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D8F5FF"/>
+      <stop offset="1" stop-color="#4BB5EA"/>
+    </linearGradient>
+    <linearGradient id="tail" x1="220" y1="350" x2="560" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7FE6FF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#7FE6FF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="80" y="180" width="980" height="760" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="28" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="40" y="40" width="1120" height="1120" rx="220" fill="url(#bg)"/>
+
+  <g filter="url(#glow)">
+    <path d="M190 410C330 292 445 282 612 362L540 430C430 392 344 390 240 486L190 410Z" fill="url(#tail)"/>
+    <path d="M260 560C382 466 512 462 640 536L574 604C480 560 406 558 318 634L260 560Z" fill="url(#tail)" opacity="0.75"/>
+  </g>
+
+  <g transform="translate(150 90) rotate(-16 480 480)">
+    <path d="M430 250L790 390L628 808L260 670L430 250Z" fill="#0D314D"/>
+    <path d="M444 286L744 404L608 756L304 640L444 286Z" fill="#103E60"/>
+
+    <circle cx="520" cy="528" r="212" fill="#0B2C44"/>
+    <circle cx="520" cy="528" r="178" fill="url(#core)"/>
+    <circle cx="520" cy="528" r="144" stroke="url(#rim)" stroke-width="16"/>
+    <circle cx="520" cy="528" r="78" fill="#061521"/>
+    <circle cx="548" cy="500" r="30" fill="#B5EDFF" fill-opacity="0.92"/>
+
+    <path d="M322 568L392 532L410 578L346 612L322 568Z" fill="#C0F2FF"/>
+    <path d="M642 444L700 416L716 452L660 482L642 444Z" fill="#C0F2FF"/>
+
+    <path d="M730 330L844 302L804 408L730 330Z" fill="#49B7E9"/>
+    <path d="M272 700L184 770L198 652L272 700Z" fill="#49B7E9" opacity="0.82"/>
+  </g>
+
+  <path d="M875 174L905 246L983 255L922 309L941 386L875 344L809 386L828 309L767 255L845 246L875 174Z" fill="#8ADFFF"/>
+
+  <text x="600" y="1020" text-anchor="middle" fill="#D9F6FF" font-size="92" font-family="'Arial Black', 'Arial', sans-serif" letter-spacing="4">METEO</text>
+  <text x="600" y="1080" text-anchor="middle" fill="#7DCFF2" font-size="36" font-family="'Arial', sans-serif" letter-spacing="8">METEOR CAMERA VANGUARD</text>
+</svg>
