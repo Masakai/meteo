@@ -19,7 +19,8 @@ _LABELS_FILENAME = "detection_labels.json"
 
 
 def _parse_camera_index(path):
-    camera_index = int(path.split("/")[-1])
+    parsed_path = urlparse(path).path
+    camera_index = int(parsed_path.rstrip("/").split("/")[-1])
     if camera_index < 0 or camera_index >= len(CAMERAS):
         raise ValueError(f"camera index out of range: {camera_index}")
     return camera_index
@@ -506,7 +507,8 @@ def handle_camera_stream(handler):
         cam = CAMERAS[camera_index]
         target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/stream"
         req = Request(target_url)
-        with urlopen(req, timeout=5) as response:
+        # MJPEG は長時間接続のため、初期フレーム待ちに耐えられるようタイムアウトを長めにする
+        with urlopen(req, timeout=30) as response:
             content_type = response.headers.get("Content-Type", "multipart/x-mixed-replace")
             handler.send_response(200)
             handler.send_header("Content-type", content_type)
@@ -514,10 +516,11 @@ def handle_camera_stream(handler):
             handler.end_headers()
 
             while True:
-                chunk = response.read(1024 * 16)
+                chunk = response.read(1024 * 4)
                 if not chunk:
                     break
                 handler.wfile.write(chunk)
+                handler.wfile.flush()
         return True
     except (ValueError, URLError, TimeoutError) as e:
         handler.send_response(503)

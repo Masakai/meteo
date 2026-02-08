@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.6] - 2026-02-08
+### Fixed
+- ダッシュボードのライブプレビューが一度失敗すると復帰しない問題を修正し、ストリーム画像の自動再接続（指数バックオフ）を追加。
+- `camera_stream` プロキシのタイムアウトを調整し、MJPEG中継時の耐性を改善。
+- クエリ付きパス（例: `/camera_stream/0?t=...`）でカメラインデックス解析に失敗しないよう修正。
+
 ## [1.11.5] - 2026-02-08
 ### Changed
 - ダッシュボードの検出時間帯計算で、ブラウザ位置情報の取得を廃止し、サーバー設定（`LATITUDE` / `LONGITUDE`）を常時使用するよう変更。

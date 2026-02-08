@@ -24,8 +24,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="camera-video">
-                        <img src="/camera_stream/{i}" alt="{cam['name']}"
-                             onerror="this.style.display='none'; document.getElementById('error{i}').style.display='flex';">
+                        <img id="stream{i}" src="/camera_stream/{i}" alt="{cam['name']}"
+                             onerror="handleStreamError({i})"
+                             onload="handleStreamLoad({i})">
                         <img class="mask-overlay" id="mask{i}" data-src="/camera_mask_image/{i}" alt="mask"
                              onerror="this.style.display='none'; this.dataset.visible='';">
                         <div class="camera-error" id="error{i}">
@@ -729,9 +730,70 @@ def render_dashboard_html(cameras, version, server_start_time):
         let totalDetections = 0;
         const cameraStatsTimers = [];
         const cameraStatsState = [];
+        const streamRetryState = [];
         const autoRecoveryState = [];
         const AUTO_RESTART_RECOVERY_WAIT_MS = 20000;
         const AUTO_RESTART_ALERT_COOLDOWN_MS = 120000;
+        const STREAM_RETRY_MIN_MS = 2000;
+        const STREAM_RETRY_MAX_MS = 30000;
+
+        function ensureStreamRetryState(i) {{
+            if (!streamRetryState[i]) {{
+                streamRetryState[i] = {{
+                    delay: STREAM_RETRY_MIN_MS,
+                    timer: null
+                }};
+            }}
+            return streamRetryState[i];
+        }}
+
+        function clearStreamRetryTimer(i) {{
+            const state = ensureStreamRetryState(i);
+            if (state.timer) {{
+                clearTimeout(state.timer);
+                state.timer = null;
+            }}
+        }}
+
+        function scheduleStreamRetry(i, delay) {{
+            const state = ensureStreamRetryState(i);
+            clearStreamRetryTimer(i);
+            state.timer = setTimeout(() => {{
+                const img = document.getElementById('stream' + i);
+                if (!img) return;
+                img.src = '/camera_stream/' + i + '?t=' + Date.now();
+            }}, Math.max(0, delay));
+        }}
+
+        function handleStreamError(i) {{
+            const img = document.getElementById('stream' + i);
+            const errorEl = document.getElementById('error' + i);
+            if (img) {{
+                img.style.display = 'none';
+            }}
+            if (errorEl) {{
+                errorEl.style.display = 'flex';
+            }}
+
+            const state = ensureStreamRetryState(i);
+            scheduleStreamRetry(i, state.delay);
+            state.delay = Math.min(state.delay * 2, STREAM_RETRY_MAX_MS);
+        }}
+
+        function handleStreamLoad(i) {{
+            const img = document.getElementById('stream' + i);
+            const errorEl = document.getElementById('error' + i);
+            if (img) {{
+                img.style.display = '';
+            }}
+            if (errorEl) {{
+                errorEl.style.display = 'none';
+            }}
+
+            const state = ensureStreamRetryState(i);
+            state.delay = STREAM_RETRY_MIN_MS;
+            clearStreamRetryTimer(i);
+        }}
 
         function ensureAutoRecoveryState(i) {{
             if (!autoRecoveryState[i]) {{
@@ -845,6 +907,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                         document.getElementById('status' + i).className = 'camera-status offline';
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status';
+                        const streamImg = document.getElementById('stream' + i);
+                        if (streamImg && streamImg.style.display === 'none') {{
+                            scheduleStreamRetry(i, 0);
+                        }}
                     }}
                     evaluateAutoRecovery(i, streamAlive);
                     if (data.is_detecting === true) {{
