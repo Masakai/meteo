@@ -1,0 +1,26 @@
+site_name: Meteo Documentation
+site_description: 流星・雲検出システム Meteo の公式ドキュメント
+site_url: https://masakai.github.io/moeteo/
+repo_url: https://github.com/Masakai/meteo
+repo_name: Masakai/meteo
+
+docs_dir: documents
+site_dir: site
+
+theme:
+  name: mkdocs
+  language: ja
+
+nav:
+  - ホーム: index.md
+  - セットアップ: SETUP_GUIDE.md
+  - 設定ガイド: CONFIGURATION_GUIDE.md
+  - 運用ガイド: OPERATIONS_GUIDE.md
+  - API リファレンス: API_REFERENCE.md
+  - 検出感度チューニング: DETECTION_TUNING.md
+  - セキュリティ: SECURITY.md
+  - アーキテクチャ:
+      - 全体構成: ARCHITECTURE.md
+      - Docker 構成: DOCKER_ARCHITECTURE.md
+      - 検出コンポーネント: DETECTOR_COMPONENTS.md
+      - 天文計算モジュール: ASTRO_UTILS.md
