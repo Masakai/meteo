@@ -1,0 +1,27 @@
+<svg width="520" height="96" viewBox="0 0 520 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">METEO Logotype</title>
+  <defs>
+    <linearGradient id="meteor" x1="6" y1="22" x2="170" y2="76" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#96E6FF"/>
+      <stop offset="1" stop-color="#1EA1DB" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="word" x1="170" y1="18" x2="510" y2="86" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F0FBFF"/>
+      <stop offset="1" stop-color="#7CCEF2"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M10 34C58 10 99 11 151 28L132 44C95 33 67 33 32 48L10 34Z" fill="url(#meteor)"/>
+  <path d="M22 56C58 38 94 38 130 52L112 67C85 56 64 56 39 72L22 56Z" fill="url(#meteor)" opacity="0.8"/>
+
+  <circle cx="138" cy="48" r="24" fill="#0E2F4A"/>
+  <circle cx="138" cy="48" r="17" fill="#2EA7DE"/>
+  <circle cx="138" cy="48" r="10" fill="#081827"/>
+  <circle cx="143" cy="43" r="3.2" fill="#D2F6FF"/>
+
+  <path d="M179 72V24H195L218 56L242 24H258V72H241V48L221 72H214L195 48V72H179Z" fill="url(#word)"/>
+  <path d="M268 72V24H321V37H286V43H317V55H286V59H322V72H268Z" fill="url(#word)"/>
+  <path d="M331 72V24H349L372 56L395 24H413V72H396V48L376 72H369L349 48V72H331Z" fill="url(#word)"/>
+  <path d="M423 72V24H476V37H441V43H472V55H441V59H477V72H423Z" fill="url(#word)"/>
+  <path d="M488 72V24H510V72H488Z" fill="url(#word)"/>
+</svg>
