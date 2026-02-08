@@ -28,6 +28,41 @@ _detection_cache = {
 }
 _detection_monitor_stop = Event()
 _detection_monitor_thread = None
+_dashboard_cpu_lock = Lock()
+_dashboard_cpu = {
+    "cpu_percent": 0.0,
+    "last_wall": time(),
+    "last_cpu": 0.0,
+}
+
+
+def _process_cpu_time():
+    process_times = os.times()
+    return process_times.user + process_times.system
+
+
+def _sample_dashboard_cpu():
+    now_wall = time()
+    now_cpu = _process_cpu_time()
+    with _dashboard_cpu_lock:
+        prev_wall = _dashboard_cpu["last_wall"]
+        prev_cpu = _dashboard_cpu["last_cpu"]
+        if prev_wall is not None:
+            elapsed = now_wall - prev_wall
+            cpu_delta = now_cpu - prev_cpu
+            if elapsed > 0 and cpu_delta >= 0:
+                _dashboard_cpu["cpu_percent"] = max(0.0, (cpu_delta / elapsed) * 100.0)
+        _dashboard_cpu["last_wall"] = now_wall
+        _dashboard_cpu["last_cpu"] = now_cpu
+
+
+def get_dashboard_cpu_snapshot(refresh=True):
+    if refresh:
+        _sample_dashboard_cpu()
+    with _dashboard_cpu_lock:
+        return {
+            "cpu_percent": round(float(_dashboard_cpu["cpu_percent"]), 1),
+        }
 
 
 def _parse_camera_index(path):
@@ -204,6 +239,7 @@ def _detection_monitor_loop():
     while not _detection_monitor_stop.wait(_DETECTION_MONITOR_INTERVAL):
         try:
             _refresh_detection_cache(force=False)
+            _sample_dashboard_cpu()
         except Exception:
             pass
 
@@ -214,6 +250,10 @@ def start_detection_monitor():
         if _detection_monitor_thread and _detection_monitor_thread.is_alive():
             return
     _refresh_detection_cache(force=True)
+    with _dashboard_cpu_lock:
+        _dashboard_cpu["last_wall"] = time()
+        _dashboard_cpu["last_cpu"] = _process_cpu_time()
+        _dashboard_cpu["cpu_percent"] = 0.0
     _detection_monitor_stop.clear()
     thread = Thread(target=_detection_monitor_loop, name="detections-monitor", daemon=True)
     thread.start()
@@ -320,6 +360,20 @@ def handle_detections_mtime(handler):
 
     snapshot = get_detection_cache_snapshot()
     handler.wfile.write(json.dumps({"mtime": snapshot["mtime"]}).encode("utf-8"))
+    return True
+
+
+def handle_dashboard_stats(handler):
+    if handler.path != "/dashboard_stats":
+        return False
+
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.end_headers()
+
+    snapshot = get_dashboard_cpu_snapshot(refresh=True)
+    handler.wfile.write(json.dumps(snapshot).encode("utf-8"))
     return True
 
 

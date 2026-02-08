@@ -158,3 +158,12 @@ def test_handle_detections_normalizes_legacy_label(monkeypatch, tmp_path):
     assert dr.handle_detections(handler) is None
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["recent"][0]["label"] == "detected"
+
+
+def test_handle_dashboard_stats(monkeypatch):
+    monkeypatch.setattr(dr, "get_dashboard_cpu_snapshot", lambda refresh=True: {"cpu_percent": 12.3})
+    handler = _DummyHandler("/dashboard_stats")
+    assert dr.handle_dashboard_stats(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["cpu_percent"] == 12.3

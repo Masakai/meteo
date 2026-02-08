@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.12] - 2026-02-08
+### Added
+- ダッシュボード自身のCPU使用率を返す `GET /dashboard_stats` を追加。
+- ダッシュボード上部の統計バーに `Dashboard CPU` 表示を追加し、5秒ごとに更新するよう変更。
+
+### Changed
+- 監視スレッドでダッシュボードCPU使用率のサンプル更新を行うよう変更。
+- ルートテストに `GET /dashboard_stats` の検証を追加。
+
 ## [1.11.11] - 2026-02-08
 ### Added
 - ダッシュボードのカメラ操作行に「常時表示」チェックボックスを追加し、カメラごとにライブストリーム常時表示のON/OFFを選択可能に変更。

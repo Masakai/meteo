@@ -604,6 +604,10 @@ def render_dashboard_html(cameras, version, server_start_time):
             <div class="stat-label">カメラ数</div>
         </div>
         <div class="stat">
+            <div class="stat-value" id="dashboard-cpu">--</div>
+            <div class="stat-label">Dashboard CPU</div>
+        </div>
+        <div class="stat">
             <div class="stat-value" id="uptime">0:00</div>
             <div class="stat-label">稼働時間</div>
         </div>
@@ -662,6 +666,24 @@ def render_dashboard_html(cameras, version, server_start_time):
             document.getElementById('uptime').textContent =
                 hours > 0 ? hours + ':' + String(mins).padStart(2,'0') + 'h' : mins + 'm';
         }}, 1000);
+
+        function updateDashboardCpu() {{
+            fetch('/dashboard_stats', {{ cache: 'no-store' }})
+                .then(r => r.json())
+                .then(data => {{
+                    const cpu = Number(data.cpu_percent);
+                    if (!Number.isFinite(cpu)) {{
+                        document.getElementById('dashboard-cpu').textContent = '--';
+                        return;
+                    }}
+                    document.getElementById('dashboard-cpu').textContent = cpu.toFixed(1) + '%';
+                }})
+                .catch(() => {{
+                    document.getElementById('dashboard-cpu').textContent = '--';
+                }});
+        }}
+        updateDashboardCpu();
+        setInterval(updateDashboardCpu, 5000);
 
         // ブラウザ位置情報は使用せず、サーバー設定の位置情報を常に利用する
 
