@@ -1231,12 +1231,12 @@ def render_dashboard_html(cameras, version, server_start_time):
                                                     <label class="label-radio">
                                                         <input type="radio" name="${{radioName}}" value="detected" ${{normalizedLabel === 'detected' ? 'checked' : ''}}
                                                                onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', 'detected', this)">
-                                                        <span>検出</span>
+                                                        <span>流星</span>
                                                     </label>
                                                     <label class="label-radio">
                                                         <input type="radio" name="${{radioName}}" value="post_detected" ${{normalizedLabel === 'post_detected' ? 'checked' : ''}}
                                                                onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', 'post_detected', this)">
-                                                        <span>後検出</span>
+                                                        <span>それ以外</span>
                                                     </label>
                                                 </div>
                                                 <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>

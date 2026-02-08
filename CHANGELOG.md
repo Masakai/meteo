@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.4] - 2026-02-08
+### Fixed
+- ダッシュボード「最近の検出」の分類ラジオボタン文言を、`流星` / `それ以外` に変更し、判定意図が直感的に分かるよう改善。
+
 ## [1.11.3] - 2026-02-08
 ### Documentation
 - README 冒頭に、ATOM Cam 2（水平画角120度）前提での流星検出しきい値の直感的な換算目安（km / km/s）を追加。
