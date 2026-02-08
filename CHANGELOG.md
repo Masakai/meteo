@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.9] - 2026-02-08
+### Fixed
+- iPad Safari でダッシュボード再読み込み時に表示が途中で止まるように見える問題を改善。
+- 初期描画時のMJPEG同時接続を避けるため、ストリーム接続をページ初期化後の段階的開始へ変更。
+
 ## [1.11.8] - 2026-02-08
 ### Changed
 - ダッシュボードに検出情報キャッシュ監視スレッドを追加し、`detections.jsonl` とラベルの差分監視を常駐化。

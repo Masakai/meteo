@@ -24,7 +24,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="camera-video">
-                        <img id="stream{i}" src="/camera_stream/{i}" alt="{cam['name']}"
+                        <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-stream-src="/camera_stream/{i}" alt="{cam['name']}"
                              onerror="handleStreamError({i})"
                              onload="handleStreamLoad({i})">
                         <img class="mask-overlay" id="mask{i}" data-src="/camera_mask_image/{i}" alt="mask"
@@ -761,7 +761,8 @@ def render_dashboard_html(cameras, version, server_start_time):
             state.timer = setTimeout(() => {{
                 const img = document.getElementById('stream' + i);
                 if (!img) return;
-                img.src = '/camera_stream/' + i + '?t=' + Date.now();
+                const base = img.dataset.streamSrc || ('/camera_stream/' + i);
+                img.src = base + '?t=' + Date.now();
             }}, Math.max(0, delay));
         }}
 
@@ -793,6 +794,13 @@ def render_dashboard_html(cameras, version, server_start_time):
             const state = ensureStreamRetryState(i);
             state.delay = STREAM_RETRY_MIN_MS;
             clearStreamRetryTimer(i);
+        }}
+
+        function startCameraStreams() {{
+            // Safari での初期リロード詰まりを避けるため段階的に接続する
+            cameras.forEach((_, i) => {{
+                scheduleStreamRetry(i, i * 250);
+            }});
         }}
 
         function ensureAutoRecoveryState(i) {{
@@ -945,6 +953,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         cameras.forEach((cam, i) => {{
             updateCameraStats(i);
         }});
+        startCameraStreams();
 
         // マスク更新
         function updateMask(i) {{
