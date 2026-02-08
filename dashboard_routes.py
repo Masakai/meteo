@@ -69,6 +69,13 @@ def _detection_label_key(camera_name, detection_time):
     return f"{camera_name}|{detection_time}"
 
 
+def _normalize_detection_label(label):
+    value = str(label or "").strip()
+    if value == "post_detected":
+        return "post_detected"
+    return "detected"
+
+
 def handle_index(handler):
     handler.send_response(200)
     handler.send_header("Content-type", "text/html; charset=utf-8")
@@ -189,7 +196,7 @@ def handle_detections(handler):
                                         "image": composite_path,
                                         "mp4": mp4_path,
                                         "composite_original": composite_orig_path,
-                                        "label": labels.get(label_key, ""),
+                                        "label": _normalize_detection_label(labels.get(label_key, "")),
                                     }
                                 )
                             except Exception:
@@ -461,7 +468,7 @@ def handle_set_detection_label(handler):
         detection_time = str(payload.get("time", "")).strip()
         label = str(payload.get("label", "")).strip()
 
-        allowed_labels = {"", "false_positive", "review", "confirmed"}
+        allowed_labels = {"detected", "post_detected"}
         if label not in allowed_labels:
             raise ValueError("invalid label")
         if not camera or not detection_time:

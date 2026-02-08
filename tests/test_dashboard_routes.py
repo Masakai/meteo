@@ -104,7 +104,7 @@ def test_handle_camera_snapshot_invalid_index(monkeypatch):
 def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     body = json.dumps(
-        {"camera": "camera1", "time": "2026-02-07 22:00:00", "label": "false_positive"}
+        {"camera": "camera1", "time": "2026-02-07 22:00:00", "label": "post_detected"}
     ).encode("utf-8")
     handler = _DummyHandler("/detection_label", body=body, headers={"Content-Type": "application/json"})
 
@@ -113,10 +113,30 @@ def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["success"] is True
     saved = json.loads((tmp_path / "detection_labels.json").read_text(encoding="utf-8"))
-    assert saved["camera1|2026-02-07 22:00:00"] == "false_positive"
+    assert saved["camera1|2026-02-07 22:00:00"] == "post_detected"
 
 
 def test_handle_detections_includes_label(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_dir = tmp_path / "camera1"
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    (cam_dir / "detections.jsonl").write_text(
+        json.dumps({"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}) + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "detection_labels.json").write_text(
+        json.dumps({"camera1|2026-02-07 22:00:00": "post_detected"}),
+        encoding="utf-8",
+    )
+
+    handler = _DummyHandler("/detections")
+    assert dr.handle_detections(handler) is None
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["recent"][0]["label"] == "post_detected"
+
+
+def test_handle_detections_normalizes_legacy_label(monkeypatch, tmp_path):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"
     cam_dir.mkdir(parents=True, exist_ok=True)
@@ -131,6 +151,5 @@ def test_handle_detections_includes_label(monkeypatch, tmp_path):
 
     handler = _DummyHandler("/detections")
     assert dr.handle_detections(handler) is None
-    assert handler.status == 200
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
-    assert payload["recent"][0]["label"] == "review"
+    assert payload["recent"][0]["label"] == "detected"

@@ -408,29 +408,39 @@ def render_dashboard_html(cameras, version, server_start_time):
         .delete-btn:hover {{
             background: #cc0000;
         }}
-        .label-select {{
-            background: #1f324f;
-            border: 1px solid #2a5a86;
-            color: #d8ecff;
-            padding: 7px 8px;
-            border-radius: 4px;
-            font-size: 0.8em;
-            cursor: pointer;
-            min-height: 34px;
-            min-width: 0;
+        .label-radios {{
+            display: flex;
+            gap: 6px;
             flex: 1;
+            min-width: 0;
         }}
-        .label-select[data-label="false_positive"] {{
-            border-color: #ff7f7f;
-            color: #ffd0d0;
+        .label-radio {{
+            flex: 1;
+            position: relative;
+            cursor: pointer;
         }}
-        .label-select[data-label="review"] {{
-            border-color: #f6d365;
-            color: #fff1bf;
+        .label-radio input {{
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
         }}
-        .label-select[data-label="confirmed"] {{
+        .label-radio span {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 34px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border: 1px solid #2a5a86;
+            background: #1f324f;
+            color: #d8ecff;
+            font-size: 0.8em;
+            user-select: none;
+        }}
+        .label-radio input:checked + span {{
             border-color: #6ddf94;
             color: #d8ffe8;
+            background: #1d4632;
         }}
         .modal {{
             display: none;
@@ -1108,29 +1118,38 @@ def render_dashboard_html(cameras, version, server_start_time):
             }});
         }}
 
-        function updateDetectionLabel(camera, time, selectEl) {{
-            const previous = selectEl.dataset.label || '';
-            const label = selectEl.value || '';
-            selectEl.dataset.label = label;
+        function setDetectionLabelSelection(groupEl, label) {{
+            const normalized = label === 'post_detected' ? 'post_detected' : 'detected';
+            groupEl.dataset.label = normalized;
+            groupEl.querySelectorAll('input[type="radio"]').forEach((radio) => {{
+                radio.checked = radio.value === normalized;
+            }});
+        }}
+
+        function updateDetectionLabel(camera, time, label, radioEl) {{
+            const groupEl = radioEl.closest('.label-radios');
+            if (!groupEl) return;
+            const normalized = label === 'post_detected' ? 'post_detected' : 'detected';
+            const previous = groupEl.dataset.label || 'detected';
+            setDetectionLabelSelection(groupEl, normalized);
             fetch('/detection_label', {{
                 method: 'POST',
                 headers: {{
                     'Content-Type': 'application/json'
                 }},
-                body: JSON.stringify({{ camera, time, label }})
+                body: JSON.stringify({{ camera, time, label: normalized }})
             }})
             .then(r => r.json())
             .then(data => {{
                 if (!data.success) {{
                     throw new Error(data.error || 'update failed');
                 }}
-                selectEl.dataset.label = label;
+                setDetectionLabelSelection(groupEl, normalized);
                 lastDetectionsKey = '';
             }})
             .catch((err) => {{
                 alert('ラベル更新に失敗しました: ' + err.message);
-                selectEl.value = previous;
-                selectEl.dataset.label = previous;
+                setDetectionLabelSelection(groupEl, previous);
             }});
         }}
 
@@ -1190,10 +1209,12 @@ def render_dashboard_html(cameras, version, server_start_time):
                         }});
 
                         const html = cameraOrder.map(camera => {{
-                            const items = grouped[camera].map(d => {{
+                            const items = grouped[camera].map((d, idx) => {{
                                 const thumb = d.image
                                     ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{camera}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">`
                                     : '';
+                                const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
+                                const radioName = `label-${{d.camera}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
                                 return `
                                     <div class="detection-item">
                                         <div class="time">${{d.time}}</div>
@@ -1206,12 +1227,18 @@ def render_dashboard_html(cameras, version, server_start_time):
                                                 <span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>
                                             </div>
                                             <div class="detection-manage-actions">
-                                                <select class="label-select" data-label="${{d.label || ''}}" onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', this)">
-                                                    <option value="" ${{(d.label || '') === '' ? 'selected' : ''}}>未分類</option>
-                                                    <option value="false_positive" ${{d.label === 'false_positive' ? 'selected' : ''}}>誤検出</option>
-                                                    <option value="review" ${{d.label === 'review' ? 'selected' : ''}}>要確認</option>
-                                                    <option value="confirmed" ${{d.label === 'confirmed' ? 'selected' : ''}}>真検出</option>
-                                                </select>
+                                                <div class="label-radios" data-label="${{normalizedLabel}}">
+                                                    <label class="label-radio">
+                                                        <input type="radio" name="${{radioName}}" value="detected" ${{normalizedLabel === 'detected' ? 'checked' : ''}}
+                                                               onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', 'detected', this)">
+                                                        <span>検出</span>
+                                                    </label>
+                                                    <label class="label-radio">
+                                                        <input type="radio" name="${{radioName}}" value="post_detected" ${{normalizedLabel === 'post_detected' ? 'checked' : ''}}
+                                                               onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', 'post_detected', this)">
+                                                        <span>後検出</span>
+                                                    </label>
+                                                </div>
                                                 <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>
                                             </div>
                                         </div>

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-02-08
+### Changed
+- ダッシュボード「最近の検出」の認識分類UIをプルダウンからラジオボタンへ変更し、`検出` / `後検出` の2択に統一。
+- ラベルAPIの許可値を `detected` / `post_detected` のみへ整理し、既存の旧ラベル値は表示時に `detected` へ正規化。
+
 ## [1.11.1] - 2026-02-07
 ### Changed
 - ダッシュボード「最近の検出」の操作行を2段構成（表示系 / 管理系）に整理し、誤タップしづらいレイアウトへ調整。
