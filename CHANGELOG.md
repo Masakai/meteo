@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.3] - 2026-02-08
+### Documentation
+- README 冒頭に、ATOM Cam 2（水平画角120度）前提での流星検出しきい値の直感的な換算目安（km / km/s）を追加。
+- `documents/CONFIGURATION_GUIDE.md` に、`min_length=20px` / `min_speed=50px/s` を距離別（100/200/300km）で読み替える表を追加。
+
 ## [1.11.2] - 2026-02-08
 ### Changed
 - ダッシュボード「最近の検出」の認識分類UIをプルダウンからラジオボタンへ変更し、`検出` / `後検出` の2択に統一。
