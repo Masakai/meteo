@@ -1,13 +1,10 @@
+
+<img src="assets/mascot-meteo-cam.svg" alt="Meteo マスコット: Meteor Camera Vanguard" width="280">
+
 # Meteo ドキュメントサイト
 
 Meteo は、RTSP カメラ映像を対象にした流星・雲検出システムです。  
 このサイトでは、導入から運用、API、内部構造までを段階的に確認できます。
-
-## マスコット
-
-<img src="assets/mascot-meteo-cam.svg" alt="Meteo マスコット: Meteor Camera Vanguard" width="280">
-
-かっこいい印象の「流星 × カメラ」モチーフで、GitHub Pages のトップでも使えるベクター画像です。
 
 ## まず読む
 
