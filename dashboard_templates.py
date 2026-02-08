@@ -1196,7 +1196,7 @@ def render_dashboard_html(cameras, version, server_start_time):
 
         let lastDetectionsKey = '';
         let lastDetectionsMtime = 0;
-        const detectionPollBaseDelay = 3000;
+        const detectionPollBaseDelay = 5000;
         const detectionPollMaxDelay = 30000;
         const detectionWindowIdleDelay = 60000;
         let detectionPollDelay = detectionPollBaseDelay;

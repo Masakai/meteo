@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.10] - 2026-02-08
+### Changed
+- ダッシュボードの検出キャッシュ監視間隔（`DETECTION_MONITOR_INTERVAL`）のデフォルトを `0.5s` から `2.0s` に変更。
+- ダッシュボードの検出一覧ポーリング基準（`detectionPollBaseDelay`）を `3s` から `5s` に変更。
+
 ## [1.11.9] - 2026-02-08
 ### Fixed
 - iPad Safari でダッシュボード再読み込み時に表示が途中で止まるように見える問題を改善。

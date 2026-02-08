@@ -18,7 +18,7 @@ from dashboard_templates import render_dashboard_html
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _SERVER_START_TIME = time()
 _LABELS_FILENAME = "detection_labels.json"
-_DETECTION_MONITOR_INTERVAL = float(os.environ.get("DETECTION_MONITOR_INTERVAL", "0.5"))
+_DETECTION_MONITOR_INTERVAL = float(os.environ.get("DETECTION_MONITOR_INTERVAL", "2.0"))
 _detection_cache_lock = Lock()
 _detection_cache = {
     "detections_dir": "",
