@@ -18,6 +18,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                         </div>
                     </div>
                     <div class="camera-actions">
+                        <label class="stream-toggle-label" title="ON時は常時ライブ表示します">
+                            <input type="checkbox" id="stream-toggle{i}" checked onchange="toggleStreamEnabled({i}, this.checked)">
+                            <span>常時表示</span>
+                        </label>
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
                         <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
                         <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
@@ -132,6 +136,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         .camera-status.offline {{
             color: #ff4444;
         }}
+        .camera-status.paused {{
+            color: #888;
+        }}
         .detection-status {{
             color: #666;
             font-size: 0.8em;
@@ -156,6 +163,20 @@ def render_dashboard_html(cameras, version, server_start_time):
             display: flex;
             justify-content: flex-end;
             gap: 8px;
+        }}
+        .stream-toggle-label {{
+            margin-right: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #9bb1d8;
+            font-size: 0.78em;
+            cursor: pointer;
+            user-select: none;
+        }}
+        .stream-toggle-label input {{
+            accent-color: #00d4ff;
+            cursor: pointer;
         }}
         .mask-btn {{
             background: #2a3f6f;
@@ -630,6 +651,8 @@ def render_dashboard_html(cameras, version, server_start_time):
     <script>
         const cameras = {json.dumps(cameras)};
         const serverStartTime = {int(server_start_time * 1000)};
+        const streamPlaceholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+        const streamSelectionStorageKey = 'dashboard_stream_enabled_v1';
 
         // 稼働時間を更新
         setInterval(() => {{
@@ -731,6 +754,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         const cameraStatsTimers = [];
         const cameraStatsState = [];
         const streamRetryState = [];
+        const streamSelectionState = [];
         const autoRecoveryState = [];
         const AUTO_RESTART_RECOVERY_WAIT_MS = 20000;
         const AUTO_RESTART_ALERT_COOLDOWN_MS = 120000;
@@ -747,6 +771,82 @@ def render_dashboard_html(cameras, version, server_start_time):
             return streamRetryState[i];
         }}
 
+        function loadStreamSelection() {{
+            let saved = null;
+            try {{
+                saved = JSON.parse(localStorage.getItem(streamSelectionStorageKey) || 'null');
+            }} catch (_) {{
+                saved = null;
+            }}
+            cameras.forEach((_, i) => {{
+                const enabled = Array.isArray(saved) && typeof saved[i] === 'boolean' ? saved[i] : true;
+                streamSelectionState[i] = enabled;
+            }});
+        }}
+
+        function saveStreamSelection() {{
+            try {{
+                localStorage.setItem(streamSelectionStorageKey, JSON.stringify(streamSelectionState));
+            }} catch (_) {{
+                // localStorage が使えない環境では保存をスキップ
+            }}
+        }}
+
+        function isStreamEnabled(i) {{
+            return streamSelectionState[i] !== false;
+        }}
+
+        function setStreamErrorMessage(i, message) {{
+            const errorEl = document.getElementById('error' + i);
+            if (!errorEl) return;
+            const span = errorEl.querySelector('span');
+            if (span) {{
+                span.textContent = message;
+            }}
+        }}
+
+        function applyStreamToggleUI(i) {{
+            const checkbox = document.getElementById('stream-toggle' + i);
+            if (checkbox) {{
+                checkbox.checked = isStreamEnabled(i);
+            }}
+        }}
+
+        function setStreamEnabled(i, enabled, persist = true) {{
+            streamSelectionState[i] = enabled === true;
+            applyStreamToggleUI(i);
+            clearStreamRetryTimer(i);
+
+            const img = document.getElementById('stream' + i);
+            const errorEl = document.getElementById('error' + i);
+            const statusEl = document.getElementById('status' + i);
+            if (!img || !errorEl || !statusEl) {{
+                if (persist) saveStreamSelection();
+                return;
+            }}
+
+            if (isStreamEnabled(i)) {{
+                setStreamErrorMessage(i, '接続中...');
+                statusEl.className = 'camera-status';
+                scheduleStreamRetry(i, 0);
+            }} else {{
+                img.src = streamPlaceholderSrc;
+                img.style.display = 'none';
+                errorEl.style.display = 'flex';
+                setStreamErrorMessage(i, '常時表示オフ');
+                statusEl.className = 'camera-status paused';
+                evaluateAutoRecovery(i, true, false);
+            }}
+
+            if (persist) {{
+                saveStreamSelection();
+            }}
+        }}
+
+        function toggleStreamEnabled(i, enabled) {{
+            setStreamEnabled(i, enabled, true);
+        }}
+
         function clearStreamRetryTimer(i) {{
             const state = ensureStreamRetryState(i);
             if (state.timer) {{
@@ -756,9 +856,13 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function scheduleStreamRetry(i, delay) {{
+            if (!isStreamEnabled(i)) {{
+                return;
+            }}
             const state = ensureStreamRetryState(i);
             clearStreamRetryTimer(i);
             state.timer = setTimeout(() => {{
+                if (!isStreamEnabled(i)) return;
                 const img = document.getElementById('stream' + i);
                 if (!img) return;
                 const base = img.dataset.streamSrc || ('/camera_stream/' + i);
@@ -767,6 +871,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function handleStreamError(i) {{
+            if (!isStreamEnabled(i)) {{
+                return;
+            }}
             const img = document.getElementById('stream' + i);
             const errorEl = document.getElementById('error' + i);
             if (img) {{
@@ -775,6 +882,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             if (errorEl) {{
                 errorEl.style.display = 'flex';
             }}
+            setStreamErrorMessage(i, '接続エラー（再試行中）');
 
             const state = ensureStreamRetryState(i);
             scheduleStreamRetry(i, state.delay);
@@ -782,6 +890,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function handleStreamLoad(i) {{
+            if (!isStreamEnabled(i)) {{
+                return;
+            }}
             const img = document.getElementById('stream' + i);
             const errorEl = document.getElementById('error' + i);
             if (img) {{
@@ -799,7 +910,12 @@ def render_dashboard_html(cameras, version, server_start_time):
         function startCameraStreams() {{
             // Safari での初期リロード詰まりを避けるため段階的に接続する
             cameras.forEach((_, i) => {{
-                scheduleStreamRetry(i, i * 250);
+                applyStreamToggleUI(i);
+                if (isStreamEnabled(i)) {{
+                    scheduleStreamRetry(i, i * 250);
+                }} else {{
+                    setStreamEnabled(i, false, false);
+                }}
             }});
         }}
 
@@ -847,8 +963,15 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        function evaluateAutoRecovery(i, streamAlive) {{
+        function evaluateAutoRecovery(i, streamAlive, monitorEnabled = true) {{
             const state = ensureAutoRecoveryState(i);
+            if (!monitorEnabled) {{
+                state.restartRequestedAt = 0;
+                state.restartInFlight = false;
+                state.alertShown = false;
+                state.lastStreamAlive = null;
+                return;
+            }}
             if (streamAlive) {{
                 state.restartRequestedAt = 0;
                 state.restartInFlight = false;
@@ -910,8 +1033,11 @@ def render_dashboard_html(cameras, version, server_start_time):
                     cameraStatsState[i].delay = baseDelay;
                     document.getElementById('count' + i).textContent = data.detections;
                     renderCameraParams(i, data);
+                    const streamEnabled = isStreamEnabled(i);
                     const streamAlive = data.stream_alive !== false;
-                    if (!streamAlive) {{
+                    if (!streamEnabled) {{
+                        document.getElementById('status' + i).className = 'camera-status paused';
+                    }} else if (!streamAlive) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status';
@@ -920,7 +1046,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                             scheduleStreamRetry(i, 0);
                         }}
                     }}
-                    evaluateAutoRecovery(i, streamAlive);
+                    evaluateAutoRecovery(i, streamAlive, streamEnabled);
                     if (data.is_detecting === true) {{
                         document.getElementById('detection' + i).className = 'detection-status detecting';
                     }} else {{
@@ -941,15 +1067,20 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }})
                 .catch(() => {{
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
-                    document.getElementById('status' + i).className = 'camera-status offline';
+                    if (isStreamEnabled(i)) {{
+                        document.getElementById('status' + i).className = 'camera-status offline';
+                    }} else {{
+                        document.getElementById('status' + i).className = 'camera-status paused';
+                    }}
                     document.getElementById('detection' + i).className = 'detection-status';
-                    evaluateAutoRecovery(i, false);
+                    evaluateAutoRecovery(i, false, isStreamEnabled(i));
                 }})
                 .finally(() => {{
                     scheduleCameraStats(i, cameraStatsState[i].delay);
                 }});
         }}
 
+        loadStreamSelection();
         cameras.forEach((cam, i) => {{
             updateCameraStats(i);
         }});
