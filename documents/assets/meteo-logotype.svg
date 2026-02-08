@@ -1,11 +1,11 @@
-<svg width="520" height="96" viewBox="0 0 520 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+<svg width="620" height="96" viewBox="0 0 620 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title id="title">METEO Logotype</title>
   <defs>
     <linearGradient id="meteor" x1="6" y1="22" x2="170" y2="76" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#96E6FF"/>
       <stop offset="1" stop-color="#1EA1DB" stop-opacity="0"/>
     </linearGradient>
-    <linearGradient id="word" x1="170" y1="18" x2="510" y2="86" gradientUnits="userSpaceOnUse">
+    <linearGradient id="word" x1="178" y1="16" x2="602" y2="88" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#F0FBFF"/>
       <stop offset="1" stop-color="#7CCEF2"/>
     </linearGradient>
@@ -19,9 +19,5 @@
   <circle cx="138" cy="48" r="10" fill="#081827"/>
   <circle cx="143" cy="43" r="3.2" fill="#D2F6FF"/>
 
-  <path d="M179 72V24H195L218 56L242 24H258V72H241V48L221 72H214L195 48V72H179Z" fill="url(#word)"/>
-  <path d="M268 72V24H321V37H286V43H317V55H286V59H322V72H268Z" fill="url(#word)"/>
-  <path d="M331 37V24H414V37H381V72H364V37H331Z" fill="url(#word)"/>
-  <path d="M423 72V24H476V37H441V43H472V55H441V59H477V72H423Z" fill="url(#word)"/>
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M487 48C487 34.7452 497.745 24 511 24C524.255 24 535 34.7452 535 48C535 61.2548 524.255 72 511 72C497.745 72 487 61.2548 487 48ZM495 48C495 56.8366 502.163 64 511 64C519.837 64 527 56.8366 527 48C527 39.1634 519.837 32 511 32C502.163 32 495 39.1634 495 48Z" fill="url(#word)"/>
+  <text x="178" y="70" fill="url(#word)" font-family="'Orbitron', 'Exo 2', 'Arial Black', sans-serif" font-size="64" font-weight="800" letter-spacing="6">METEO</text>
 </svg>
