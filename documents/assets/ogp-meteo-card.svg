@@ -1,0 +1,50 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="60" x2="1080" y2="570" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#06101B"/>
+      <stop offset="1" stop-color="#0C2B42"/>
+    </linearGradient>
+    <linearGradient id="meteor" x1="174" y1="274" x2="536" y2="446" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9BE8FF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#9BE8FF" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="lensCore" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(420 322) rotate(127) scale(142 120)">
+      <stop offset="0" stop-color="#90E3FF"/>
+      <stop offset="0.56" stop-color="#289CD4"/>
+      <stop offset="1" stop-color="#103D62"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" rx="28" fill="url(#bg)"/>
+
+  <circle cx="1038" cy="122" r="3" fill="#9EDBFF"/>
+  <circle cx="1100" cy="78" r="2" fill="#9EDBFF"/>
+  <circle cx="989" cy="88" r="2" fill="#9EDBFF"/>
+  <circle cx="1082" cy="170" r="1.8" fill="#9EDBFF"/>
+
+  <path d="M178 294C276 216 358 209 474 264L424 316C352 292 296 292 224 346L178 294Z" fill="url(#meteor)"/>
+  <path d="M230 402C318 334 410 334 500 384L452 432C386 402 334 402 270 448L230 402Z" fill="url(#meteor)" opacity="0.8"/>
+
+  <g transform="translate(110 62) rotate(-10 300 255)">
+    <path d="M300 120L556 226L446 496L188 390L300 120Z" fill="#0C3551"/>
+    <path d="M312 150L518 236L426 462L218 378L312 150Z" fill="#114567"/>
+
+    <circle cx="356" cy="308" r="150" fill="#0A2D46"/>
+    <circle cx="356" cy="308" r="124" fill="url(#lensCore)"/>
+    <circle cx="356" cy="308" r="102" stroke="#7ED8FF" stroke-width="10"/>
+    <circle cx="356" cy="308" r="56" fill="#081724"/>
+    <circle cx="378" cy="286" r="20" fill="#B6EEFF"/>
+
+    <path d="M238 336L286 312L300 344L256 368L238 336Z" fill="#CAF5FF"/>
+    <path d="M444 252L484 232L496 258L458 278L444 252Z" fill="#CAF5FF"/>
+
+    <path d="M512 172L592 152L560 226L512 172Z" fill="#4BB9EB"/>
+  </g>
+
+  <text x="630" y="264" fill="#D8F5FF" font-size="78" font-family="'Arial Black', 'Arial', sans-serif" letter-spacing="2">METEO</text>
+  <text x="630" y="338" fill="#8ED5F3" font-size="42" font-family="'Arial', sans-serif" letter-spacing="3">METEOR DETECTION PLATFORM</text>
+  <text x="630" y="396" fill="#B5D8EA" font-size="28" font-family="'Arial', sans-serif">流星と空の観測を、リアルタイムで。</text>
+
+  <rect x="630" y="438" width="360" height="72" rx="14" fill="#0E3B5A"/>
+  <text x="810" y="485" text-anchor="middle" fill="#CFF2FF" font-size="30" font-family="'Arial Black', 'Arial', sans-serif" letter-spacing="1.5">masakai.github.io/meteo</text>
+</svg>

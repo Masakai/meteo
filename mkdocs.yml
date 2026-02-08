@@ -1,6 +1,6 @@
 site_name: Meteo Documentation
 site_description: 流星・雲検出システム Meteo の公式ドキュメント
-site_url: https://masakai.github.io/moeteo/
+site_url: https://masakai.github.io/meteo/
 repo_url: https://github.com/Masakai/meteo
 repo_name: Masakai/meteo
 
@@ -10,6 +10,7 @@ site_dir: site
 theme:
   name: mkdocs
   language: ja
+  custom_dir: overrides
 
 nav:
   - ホーム: index.md
