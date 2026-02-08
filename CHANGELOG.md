@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.14] - 2026-02-08
+### Fixed
+- ダッシュボード初期表示時のストリーム接続を `2秒` 間隔の段階接続に変更し、同時接続による表示途切れを抑制。
+
 ## [1.11.13] - 2026-02-08
 ### Fixed
 - ダッシュボードの `GET /camera_stream/{index}` プロキシで MJPEG 読み取りタイムアウトを `300s` に延長し、30秒ごとの切断を抑制。

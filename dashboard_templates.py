@@ -782,6 +782,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         const AUTO_RESTART_ALERT_COOLDOWN_MS = 120000;
         const STREAM_RETRY_MIN_MS = 2000;
         const STREAM_RETRY_MAX_MS = 30000;
+        const STREAM_INITIAL_STAGGER_MS = 2000;
 
         function ensureStreamRetryState(i) {{
             if (!streamRetryState[i]) {{
@@ -934,7 +935,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             cameras.forEach((_, i) => {{
                 applyStreamToggleUI(i);
                 if (isStreamEnabled(i)) {{
-                    scheduleStreamRetry(i, i * 250);
+                    scheduleStreamRetry(i, i * STREAM_INITIAL_STAGGER_MS);
                 }} else {{
                     setStreamEnabled(i, false, false);
                 }}
