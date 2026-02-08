@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.8] - 2026-02-08
+### Changed
+- ダッシュボードに検出情報キャッシュ監視スレッドを追加し、`detections.jsonl` とラベルの差分監視を常駐化。
+- `GET /detections` と `GET /detections_mtime` をキャッシュ参照に変更し、リクエストごとのファイル全走査を削減。
+- ダッシュボード起動・終了時に検出監視スレッドを開始/停止する制御を追加。
+
 ## [1.11.7] - 2026-02-08
 ### Fixed
 - ダッシュボードの「スナップショット保存」でストリーム表示や他API取得に影響が出る問題を修正。

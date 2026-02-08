@@ -5,6 +5,8 @@ from time import time
 import json
 import os
 from pathlib import Path
+from threading import Event, Lock, Thread
+import threading
 from urllib.parse import urlparse, parse_qs, unquote
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -16,6 +18,16 @@ from dashboard_templates import render_dashboard_html
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _SERVER_START_TIME = time()
 _LABELS_FILENAME = "detection_labels.json"
+_DETECTION_MONITOR_INTERVAL = float(os.environ.get("DETECTION_MONITOR_INTERVAL", "0.5"))
+_detection_cache_lock = Lock()
+_detection_cache = {
+    "detections_dir": "",
+    "mtime": 0.0,
+    "total": 0,
+    "recent": [],
+}
+_detection_monitor_stop = Event()
+_detection_monitor_thread = None
 
 
 def _parse_camera_index(path):
@@ -75,6 +87,148 @@ def _normalize_detection_label(label):
     if value == "post_detected":
         return "post_detected"
     return "detected"
+
+
+def _compute_latest_mtime():
+    latest_mtime = 0.0
+    detections_root = Path(DETECTIONS_DIR)
+    try:
+        for cam_dir in detections_root.iterdir():
+            if cam_dir.is_dir():
+                jsonl_file = cam_dir / "detections.jsonl"
+                if jsonl_file.exists():
+                    mtime = jsonl_file.stat().st_mtime
+                    if mtime > latest_mtime:
+                        latest_mtime = mtime
+    except Exception:
+        pass
+
+    try:
+        labels_mtime = _labels_path().stat().st_mtime
+        if labels_mtime > latest_mtime:
+            latest_mtime = labels_mtime
+    except Exception:
+        pass
+    return latest_mtime
+
+
+def _build_detections_payload():
+    detections = []
+    total = 0
+    labels = _load_detection_labels()
+
+    try:
+        for cam_dir in Path(DETECTIONS_DIR).iterdir():
+            if cam_dir.is_dir():
+                jsonl_file = cam_dir / "detections.jsonl"
+                if jsonl_file.exists():
+                    with open(jsonl_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            try:
+                                d = json.loads(line)
+                                timestamp_str = d.get("timestamp", "")
+                                if timestamp_str:
+                                    dt = datetime.fromisoformat(timestamp_str)
+                                    base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
+                                    clip_ext = None
+                                    if (cam_dir / f"{base_filename}.mov").exists():
+                                        clip_ext = ".mov"
+                                    elif (cam_dir / f"{base_filename}.mp4").exists():
+                                        clip_ext = ".mp4"
+
+                                    mp4_path = (
+                                        f"{cam_dir.name}/{base_filename}{clip_ext}"
+                                        if clip_ext
+                                        else ""
+                                    )
+                                    composite_path = f"{cam_dir.name}/{base_filename}_composite.jpg"
+                                    composite_orig_path = f"{cam_dir.name}/{base_filename}_composite_original.jpg"
+                                else:
+                                    mp4_path = ""
+                                    composite_path = ""
+                                    composite_orig_path = ""
+
+                                total += 1
+                                display_time = timestamp_str[:19].replace("T", " ")
+                                label_key = _detection_label_key(cam_dir.name, display_time)
+                                detections.append(
+                                    {
+                                        "time": display_time,
+                                        "camera": cam_dir.name,
+                                        "confidence": f"{d.get('confidence', 0):.0%}",
+                                        "image": composite_path,
+                                        "mp4": mp4_path,
+                                        "composite_original": composite_orig_path,
+                                        "label": _normalize_detection_label(labels.get(label_key, "")),
+                                    }
+                                )
+                            except Exception:
+                                pass
+    except Exception:
+        pass
+
+    detections.sort(key=lambda x: x["time"], reverse=True)
+    return {"total": total, "recent": detections}
+
+
+def _refresh_detection_cache(force=False):
+    latest_mtime = _compute_latest_mtime()
+    with _detection_cache_lock:
+        cache_dir = _detection_cache["detections_dir"]
+        cache_mtime = _detection_cache["mtime"]
+    current_dir = str(Path(DETECTIONS_DIR).resolve())
+
+    should_rebuild = force or cache_dir != current_dir or latest_mtime != cache_mtime
+    if not should_rebuild:
+        return
+
+    payload = _build_detections_payload()
+    with _detection_cache_lock:
+        _detection_cache["detections_dir"] = current_dir
+        _detection_cache["mtime"] = latest_mtime
+        _detection_cache["total"] = payload["total"]
+        _detection_cache["recent"] = payload["recent"]
+
+
+def get_detection_cache_snapshot():
+    _refresh_detection_cache(force=False)
+    with _detection_cache_lock:
+        return {
+            "mtime": _detection_cache["mtime"],
+            "total": _detection_cache["total"],
+            "recent": list(_detection_cache["recent"]),
+        }
+
+
+def _detection_monitor_loop():
+    while not _detection_monitor_stop.wait(_DETECTION_MONITOR_INTERVAL):
+        try:
+            _refresh_detection_cache(force=False)
+        except Exception:
+            pass
+
+
+def start_detection_monitor():
+    global _detection_monitor_thread
+    with _detection_cache_lock:
+        if _detection_monitor_thread and _detection_monitor_thread.is_alive():
+            return
+    _refresh_detection_cache(force=True)
+    _detection_monitor_stop.clear()
+    thread = Thread(target=_detection_monitor_loop, name="detections-monitor", daemon=True)
+    thread.start()
+    with _detection_cache_lock:
+        _detection_monitor_thread = thread
+
+
+def stop_detection_monitor():
+    global _detection_monitor_thread
+    _detection_monitor_stop.set()
+    with _detection_cache_lock:
+        thread = _detection_monitor_thread
+        _detection_monitor_thread = None
+    if thread and thread.is_alive() and thread is not threading.current_thread():
+        thread.join(timeout=1.0)
 
 
 def handle_index(handler):
@@ -149,68 +303,10 @@ def handle_detections(handler):
     handler.send_header("Content-type", "application/json")
     handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
     handler.end_headers()
-
-    detections = []
-    total = 0
-
-    labels = _load_detection_labels()
-
-    try:
-        for cam_dir in Path(DETECTIONS_DIR).iterdir():
-            if cam_dir.is_dir():
-                jsonl_file = cam_dir / "detections.jsonl"
-                if jsonl_file.exists():
-                    with open(jsonl_file, "r") as f:
-                        for line in f:
-                            try:
-                                d = json.loads(line)
-                                timestamp_str = d.get("timestamp", "")
-                                if timestamp_str:
-                                    dt = datetime.fromisoformat(timestamp_str)
-                                    base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-                                    clip_ext = None
-                                    if (cam_dir / f"{base_filename}.mov").exists():
-                                        clip_ext = ".mov"
-                                    elif (cam_dir / f"{base_filename}.mp4").exists():
-                                        clip_ext = ".mp4"
-
-                                    mp4_path = (
-                                        f"{cam_dir.name}/{base_filename}{clip_ext}"
-                                        if clip_ext
-                                        else ""
-                                    )
-                                    composite_path = f"{cam_dir.name}/{base_filename}_composite.jpg"
-                                    composite_orig_path = f"{cam_dir.name}/{base_filename}_composite_original.jpg"
-                                else:
-                                    mp4_path = ""
-                                    composite_path = ""
-                                    composite_orig_path = ""
-
-                                total += 1
-                                display_time = timestamp_str[:19].replace("T", " ")
-                                label_key = _detection_label_key(cam_dir.name, display_time)
-                                detections.append(
-                                    {
-                                        "time": display_time,
-                                        "camera": cam_dir.name,
-                                        "confidence": f"{d.get('confidence', 0):.0%}",
-                                        "image": composite_path,
-                                        "mp4": mp4_path,
-                                        "composite_original": composite_orig_path,
-                                        "label": _normalize_detection_label(labels.get(label_key, "")),
-                                    }
-                                )
-                            except Exception:
-                                pass
-    except Exception:
-        pass
-
-    detections.sort(key=lambda x: x["time"], reverse=True)
-    result = {
-        "total": total,
-        "recent": detections,
-    }
-    handler.wfile.write(json.dumps(result).encode())
+    snapshot = get_detection_cache_snapshot()
+    handler.wfile.write(
+        json.dumps({"total": snapshot["total"], "recent": snapshot["recent"]}).encode("utf-8")
+    )
 
 
 def handle_detections_mtime(handler):
@@ -222,26 +318,8 @@ def handle_detections_mtime(handler):
     handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
     handler.end_headers()
 
-    latest_mtime = 0.0
-    try:
-        for cam_dir in Path(DETECTIONS_DIR).iterdir():
-            if cam_dir.is_dir():
-                jsonl_file = cam_dir / "detections.jsonl"
-                if jsonl_file.exists():
-                    mtime = jsonl_file.stat().st_mtime
-                    if mtime > latest_mtime:
-                        latest_mtime = mtime
-    except Exception:
-        pass
-
-    try:
-        labels_mtime = _labels_path().stat().st_mtime
-        if labels_mtime > latest_mtime:
-            latest_mtime = labels_mtime
-    except Exception:
-        pass
-
-    handler.wfile.write(json.dumps({"mtime": latest_mtime}).encode("utf-8"))
+    snapshot = get_detection_cache_snapshot()
+    handler.wfile.write(json.dumps({"mtime": snapshot["mtime"]}).encode("utf-8"))
     return True
 
 
@@ -427,6 +505,7 @@ def handle_delete_detection(handler):
             if label_key in labels:
                 del labels[label_key]
                 _save_detection_labels(labels)
+            _refresh_detection_cache(force=True)
 
             handler.send_response(200)
             handler.send_header("Content-type", "application/json")
@@ -482,6 +561,7 @@ def handle_set_detection_label(handler):
         else:
             labels.pop(key, None)
         _save_detection_labels(labels)
+        _refresh_detection_cache(force=True)
 
         handler.send_response(200)
         handler.send_header("Content-type", "application/json")
