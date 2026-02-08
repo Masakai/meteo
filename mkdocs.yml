@@ -8,9 +8,32 @@ docs_dir: documents
 site_dir: site
 
 theme:
-  name: mkdocs
+  name: material
   language: ja
   custom_dir: overrides
+  logo: assets/mascot-meteo-cam.svg
+  favicon: assets/mascot-meteo-cam.svg
+  font:
+    text: "Zen Kaku Gothic New"
+    code: "JetBrains Mono"
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - scheme: default
+      primary: black
+      accent: light blue
+    - scheme: slate
+      primary: black
+      accent: light blue
+      toggle:
+        icon: material/weather-night
+        name: ダークモードに切り替え
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - ホーム: index.md
