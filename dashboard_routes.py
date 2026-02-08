@@ -28,6 +28,8 @@ _detection_cache = {
 }
 _detection_monitor_stop = Event()
 _detection_monitor_thread = None
+_CAMERA_STREAM_TIMEOUT = 300
+_CAMERA_STREAM_CHUNK_SIZE = 1024 * 64
 _dashboard_cpu_lock = Lock()
 _dashboard_cpu = {
     "cpu_percent": 0.0,
@@ -491,7 +493,7 @@ def handle_camera_stats(handler):
         handler.end_headers()
         handler.wfile.write(payload)
         return True
-    except (ValueError, URLError, TimeoutError) as e:
+    except (ValueError, URLError, TimeoutError):
         handler.send_response(503)
         handler.send_header("Content-type", "application/json")
         handler.end_headers()
@@ -641,8 +643,8 @@ def handle_camera_stream(handler):
         cam = CAMERAS[camera_index]
         target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/stream"
         req = Request(target_url)
-        # MJPEG は長時間接続のため、初期フレーム待ちに耐えられるようタイムアウトを長めにする
-        with urlopen(req, timeout=30) as response:
+        # MJPEG は長時間接続のため、読み取りタイムアウトは長めに設定する
+        with urlopen(req, timeout=_CAMERA_STREAM_TIMEOUT) as response:
             content_type = response.headers.get("Content-Type", "multipart/x-mixed-replace")
             handler.send_response(200)
             handler.send_header("Content-type", content_type)
@@ -650,15 +652,21 @@ def handle_camera_stream(handler):
             handler.end_headers()
 
             while True:
-                chunk = response.read(1024 * 4)
+                chunk = response.read(_CAMERA_STREAM_CHUNK_SIZE)
                 if not chunk:
                     break
-                handler.wfile.write(chunk)
-                handler.wfile.flush()
+                try:
+                    handler.wfile.write(chunk)
+                    handler.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    # クライアント切断時は正常系として終了する
+                    return True
         return True
     except (ValueError, URLError, TimeoutError) as e:
         handler.send_response(503)
         handler.end_headers()
+        return True
+    except (BrokenPipeError, ConnectionResetError):
         return True
     except Exception:
         handler.send_response(500)

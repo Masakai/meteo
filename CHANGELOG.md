@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.13] - 2026-02-08
+### Fixed
+- ダッシュボードの `GET /camera_stream/{index}` プロキシで MJPEG 読み取りタイムアウトを `300s` に延長し、30秒ごとの切断を抑制。
+- MJPEG 中継チャンクサイズを `4KB` から `64KB` に拡大し、ストリーム転送効率を改善。
+- クライアント切断時（`BrokenPipeError` / `ConnectionResetError`）の例外処理を追加し、不要なエラー応答を抑制。
+
 ## [1.11.12] - 2026-02-08
 ### Added
 - ダッシュボード自身のCPU使用率を返す `GET /dashboard_stats` を追加。
