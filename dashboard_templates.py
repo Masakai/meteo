@@ -778,6 +778,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         const streamRetryState = [];
         const streamSelectionState = [];
         const autoRecoveryState = [];
+        const AUTO_STREAM_TOGGLE_RECOVERY_COOLDOWN_MS = 45000;
+        const AUTO_STREAM_TOGGLE_RECOVERY_SETTLE_MS = 1200;
+        const AUTO_STREAM_TOGGLE_MAX_ATTEMPTS = 2;
         const AUTO_RESTART_RECOVERY_WAIT_MS = 20000;
         const AUTO_RESTART_ALERT_COOLDOWN_MS = 120000;
         const STREAM_RETRY_MIN_MS = 2000;
@@ -945,6 +948,10 @@ def render_dashboard_html(cameras, version, server_start_time):
         function ensureAutoRecoveryState(i) {{
             if (!autoRecoveryState[i]) {{
                 autoRecoveryState[i] = {{
+                    outageStartedAt: 0,
+                    toggleRecoveryRequestedAt: 0,
+                    toggleRecoveryInFlight: false,
+                    toggleRecoveryAttempts: 0,
                     restartRequestedAt: 0,
                     restartInFlight: false,
                     alertShown: false,
@@ -952,6 +959,53 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }};
             }}
             return autoRecoveryState[i];
+        }}
+
+        function logAutoRecovery(i, event, extra = {{}}) {{
+            const cam = cameras[i];
+            if (!cam) return;
+            const state = ensureAutoRecoveryState(i);
+            const payload = {{
+                camera: cam.name,
+                event: event,
+                toggle_attempts: state.toggleRecoveryAttempts || 0,
+                restart_requested_at: state.restartRequestedAt || 0,
+                ...extra
+            }};
+            console.warn('[auto-recovery]', payload);
+        }}
+
+        function triggerStreamToggleRecovery(i, reason) {{
+            if (!isStreamEnabled(i)) return false;
+            const cam = cameras[i];
+            if (!cam) return false;
+            const state = ensureAutoRecoveryState(i);
+            if (state.toggleRecoveryInFlight) return false;
+            if (state.toggleRecoveryAttempts >= AUTO_STREAM_TOGGLE_MAX_ATTEMPTS) return false;
+
+            const now = Date.now();
+            if (state.toggleRecoveryRequestedAt && (now - state.toggleRecoveryRequestedAt) < AUTO_STREAM_TOGGLE_RECOVERY_COOLDOWN_MS) {{
+                return false;
+            }}
+
+            state.toggleRecoveryInFlight = true;
+            state.toggleRecoveryAttempts += 1;
+            state.toggleRecoveryRequestedAt = now;
+            logAutoRecovery(i, 'toggle_requested', {{
+                reason: reason,
+                attempt: state.toggleRecoveryAttempts
+            }});
+
+            setStreamEnabled(i, false, false);
+            setTimeout(() => {{
+                setStreamEnabled(i, true, false);
+                state.toggleRecoveryInFlight = false;
+                logAutoRecovery(i, 'toggle_reapplied', {{
+                    reason: reason,
+                    attempt: state.toggleRecoveryAttempts
+                }});
+            }}, AUTO_STREAM_TOGGLE_RECOVERY_SETTLE_MS);
+            return true;
         }}
 
         function triggerAutoRestart(i, reason) {{
@@ -965,21 +1019,28 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}
 
             state.restartInFlight = true;
+            logAutoRecovery(i, 'restart_requested', {{ reason: reason }});
             fetch('/camera_restart/' + i, {{ method: 'POST' }})
                 .then(r => r.json())
                 .then(data => {{
                     state.restartRequestedAt = Date.now();
                     state.alertShown = false;
                     if (!data || data.success !== true) {{
-                        console.warn('自動再起動要求に失敗:', cam.name, data);
+                        logAutoRecovery(i, 'restart_request_failed', {{
+                            reason: reason,
+                            response: data || null
+                        }});
                     }} else {{
-                        console.warn('自動再起動要求:', cam.name, reason);
+                        logAutoRecovery(i, 'restart_request_accepted', {{ reason: reason }});
                     }}
                 }})
                 .catch((err) => {{
                     state.restartRequestedAt = Date.now();
                     state.alertShown = false;
-                    console.warn('自動再起動要求でエラー:', cam.name, err);
+                    logAutoRecovery(i, 'restart_request_error', {{
+                        reason: reason,
+                        error: String(err)
+                    }});
                 }})
                 .finally(() => {{
                     state.restartInFlight = false;
@@ -989,6 +1050,13 @@ def render_dashboard_html(cameras, version, server_start_time):
         function evaluateAutoRecovery(i, streamAlive, monitorEnabled = true) {{
             const state = ensureAutoRecoveryState(i);
             if (!monitorEnabled) {{
+                if (state.lastStreamAlive === false) {{
+                    logAutoRecovery(i, 'monitor_disabled_while_offline');
+                }}
+                state.outageStartedAt = 0;
+                state.toggleRecoveryRequestedAt = 0;
+                state.toggleRecoveryInFlight = false;
+                state.toggleRecoveryAttempts = 0;
                 state.restartRequestedAt = 0;
                 state.restartInFlight = false;
                 state.alertShown = false;
@@ -996,6 +1064,17 @@ def render_dashboard_html(cameras, version, server_start_time):
                 return;
             }}
             if (streamAlive) {{
+                if (state.lastStreamAlive === false) {{
+                    const recoveredMs = state.outageStartedAt > 0 ? (Date.now() - state.outageStartedAt) : null;
+                    logAutoRecovery(i, 'stream_recovered', {{
+                        recovered_ms: recoveredMs,
+                        by_restart: state.restartRequestedAt > 0
+                    }});
+                }}
+                state.outageStartedAt = 0;
+                state.toggleRecoveryRequestedAt = 0;
+                state.toggleRecoveryInFlight = false;
+                state.toggleRecoveryAttempts = 0;
                 state.restartRequestedAt = 0;
                 state.restartInFlight = false;
                 state.alertShown = false;
@@ -1004,7 +1083,18 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}
 
             if (state.lastStreamAlive !== false) {{
-                triggerAutoRestart(i, 'stream stopped');
+                state.outageStartedAt = Date.now();
+                logAutoRecovery(i, 'stream_down');
+                const toggled = triggerStreamToggleRecovery(i, 'stream stopped');
+                if (!toggled) {{
+                    triggerAutoRestart(i, 'stream stopped');
+                }}
+            }} else if (
+                state.toggleRecoveryAttempts >= AUTO_STREAM_TOGGLE_MAX_ATTEMPTS &&
+                !state.toggleRecoveryInFlight
+            ) {{
+                logAutoRecovery(i, 'toggle_exhausted_fallback_restart');
+                triggerAutoRestart(i, 'stream toggle recovery exhausted');
             }}
             state.lastStreamAlive = false;
 
@@ -1014,6 +1104,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 (Date.now() - state.restartRequestedAt) >= AUTO_RESTART_RECOVERY_WAIT_MS
             ) {{
                 state.alertShown = true;
+                logAutoRecovery(i, 'recovery_failed_alert');
                 alert('カメラの電源が入っていないかハングアップしています');
             }}
         }}

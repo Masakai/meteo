@@ -7,6 +7,9 @@ def test_render_dashboard_includes_auto_restart_and_failure_dialog():
         version="0.0.0",
         server_start_time=0.0,
     )
+    assert "console.warn('[auto-recovery]', payload);" in html
+    assert "triggerStreamToggleRecovery(i, 'stream stopped')" in html
+    assert "AUTO_STREAM_TOGGLE_MAX_ATTEMPTS = 2" in html
     assert "fetch('/camera_restart/' + i, { method: 'POST' })" in html
     assert "alert('カメラの電源が入っていないかハングアップしています');" in html
 
