@@ -19,6 +19,11 @@ _IN_DOCKER = os.path.exists("/.dockerenv")
 _SERVER_START_TIME = time()
 _LABELS_FILENAME = "detection_labels.json"
 _DETECTION_MONITOR_INTERVAL = float(os.environ.get("DETECTION_MONITOR_INTERVAL", "2.0"))
+_CAMERA_MONITOR_INTERVAL = float(os.environ.get("CAMERA_MONITOR_INTERVAL", "2.0"))
+_CAMERA_MONITOR_TIMEOUT = float(os.environ.get("CAMERA_MONITOR_TIMEOUT", "2.0"))
+_CAMERA_RESTART_TIMEOUT = float(os.environ.get("CAMERA_RESTART_TIMEOUT", "5.0"))
+_CAMERA_RESTART_COOLDOWN_SEC = float(os.environ.get("CAMERA_RESTART_COOLDOWN_SEC", "120"))
+_CAMERA_MONITOR_ENABLED = os.environ.get("CAMERA_MONITOR_ENABLED", "true").lower() in ("1", "true", "yes")
 _detection_cache_lock = Lock()
 _detection_cache = {
     "detections_dir": "",
@@ -28,6 +33,10 @@ _detection_cache = {
 }
 _detection_monitor_stop = Event()
 _detection_monitor_thread = None
+_camera_monitor_lock = Lock()
+_camera_monitor_stop = Event()
+_camera_monitor_thread = None
+_camera_monitor_state = {}
 _CAMERA_STREAM_TIMEOUT = 300
 _CAMERA_STREAM_CHUNK_SIZE = 1024 * 64
 _dashboard_cpu_lock = Lock()
@@ -244,6 +253,148 @@ def _detection_monitor_loop():
             _sample_dashboard_cpu()
         except Exception:
             pass
+
+
+def _camera_restart_target(camera_index):
+    cam = CAMERAS[camera_index]
+    return _camera_url_for_proxy(cam["url"], camera_index) + "/restart"
+
+
+def _camera_stats_target(camera_index):
+    cam = CAMERAS[camera_index]
+    return _camera_url_for_proxy(cam["url"], camera_index) + "/stats"
+
+
+def _camera_monitor_default_snapshot(camera_index):
+    now_ts = time()
+    cam_name = CAMERAS[camera_index]["name"] if camera_index < len(CAMERAS) else f"camera{camera_index+1}"
+    return {
+        "camera": cam_name,
+        "stream_alive": False,
+        "time_since_last_frame": None,
+        "runtime_fps": 0.0,
+        "detections": 0,
+        "is_detecting": False,
+        "mask_active": False,
+        "monitor_enabled": _CAMERA_MONITOR_ENABLED,
+        "monitor_checked_at": now_ts,
+        "monitor_error": "not initialized",
+        "monitor_stop_reason": "unknown",
+        "monitor_last_restart_at": 0.0,
+        "monitor_restart_count": 0,
+    }
+
+
+def _classify_stop_reason(stats):
+    stream_alive = stats.get("stream_alive", False) is not False
+    stuck = stats.get("stuck", False) is True
+    if (not stream_alive) and stuck:
+        return "timeout_and_stuck"
+    if not stream_alive:
+        return "timeout"
+    if stuck:
+        return "stuck"
+    return "none"
+
+
+def _request_camera_restart(camera_index):
+    req = Request(_camera_restart_target(camera_index), method="POST")
+    with urlopen(req, timeout=_CAMERA_RESTART_TIMEOUT) as response:
+        payload = response.read()
+    data = json.loads(payload.decode("utf-8")) if payload else {}
+    return bool(data.get("success", False)), data
+
+
+def _refresh_camera_monitor_once():
+    now_ts = time()
+    for camera_index in range(len(CAMERAS)):
+        with _camera_monitor_lock:
+            state = _camera_monitor_state.get(camera_index, _camera_monitor_default_snapshot(camera_index))
+            last_restart_at = float(state.get("monitor_last_restart_at", 0.0) or 0.0)
+            restart_count = int(state.get("monitor_restart_count", 0) or 0)
+
+        monitor_error = ""
+        restart_triggered = False
+        stop_reason = "none"
+        stats = None
+
+        try:
+            req = Request(_camera_stats_target(camera_index), headers={"Accept": "application/json"})
+            with urlopen(req, timeout=_CAMERA_MONITOR_TIMEOUT) as response:
+                payload = response.read()
+            stats = json.loads(payload.decode("utf-8")) if payload else {}
+            if not isinstance(stats, dict):
+                raise ValueError("camera stats payload is not object")
+            stop_reason = _classify_stop_reason(stats)
+        except Exception as e:
+            monitor_error = str(e)
+            stats = _camera_monitor_default_snapshot(camera_index)
+            stop_reason = "stats_unreachable"
+
+        should_restart = _CAMERA_MONITOR_ENABLED and (stop_reason != "none")
+        restart_allowed = (now_ts - last_restart_at) >= _CAMERA_RESTART_COOLDOWN_SEC
+        if should_restart and restart_allowed:
+            try:
+                ok, _ = _request_camera_restart(camera_index)
+                restart_triggered = ok
+                if ok:
+                    last_restart_at = time()
+                    restart_count += 1
+            except Exception as e:
+                monitor_error = monitor_error or str(e)
+
+        stats["monitor_enabled"] = _CAMERA_MONITOR_ENABLED
+        stats["monitor_checked_at"] = now_ts
+        stats["monitor_error"] = monitor_error
+        stats["monitor_stop_reason"] = stop_reason
+        stats["monitor_last_restart_at"] = last_restart_at
+        stats["monitor_restart_count"] = restart_count
+        stats["monitor_restart_triggered"] = restart_triggered
+
+        with _camera_monitor_lock:
+            _camera_monitor_state[camera_index] = stats
+
+
+def _camera_monitor_loop():
+    while not _camera_monitor_stop.wait(_CAMERA_MONITOR_INTERVAL):
+        try:
+            _refresh_camera_monitor_once()
+        except Exception:
+            pass
+
+
+def start_camera_monitor():
+    global _camera_monitor_thread
+    with _camera_monitor_lock:
+        if _camera_monitor_thread and _camera_monitor_thread.is_alive():
+            return
+        _camera_monitor_state.clear()
+        for camera_index in range(len(CAMERAS)):
+            _camera_monitor_state[camera_index] = _camera_monitor_default_snapshot(camera_index)
+    _refresh_camera_monitor_once()
+    _camera_monitor_stop.clear()
+    thread = Thread(target=_camera_monitor_loop, name="camera-monitor", daemon=True)
+    thread.start()
+    with _camera_monitor_lock:
+        _camera_monitor_thread = thread
+
+
+def stop_camera_monitor():
+    global _camera_monitor_thread
+    _camera_monitor_stop.set()
+    with _camera_monitor_lock:
+        thread = _camera_monitor_thread
+        _camera_monitor_thread = None
+    if thread and thread.is_alive() and thread is not threading.current_thread():
+        thread.join(timeout=1.0)
+
+
+def get_camera_monitor_snapshot(camera_index):
+    with _camera_monitor_lock:
+        snapshot = _camera_monitor_state.get(camera_index)
+    if snapshot is None:
+        snapshot = _camera_monitor_default_snapshot(camera_index)
+    return dict(snapshot)
 
 
 def start_detection_monitor():
@@ -481,19 +632,15 @@ def handle_camera_stats(handler):
 
     try:
         camera_index = _parse_camera_index(handler.path)
-        cam = CAMERAS[camera_index]
-        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/stats"
-        req = Request(target_url, headers={"Accept": "application/json"})
-        with urlopen(req, timeout=2) as response:
-            payload = response.read()
+        payload = get_camera_monitor_snapshot(camera_index)
 
         handler.send_response(200)
         handler.send_header("Content-type", "application/json")
         handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         handler.end_headers()
-        handler.wfile.write(payload)
+        handler.wfile.write(json.dumps(payload).encode("utf-8"))
         return True
-    except (ValueError, URLError, TimeoutError):
+    except (ValueError, URLError, TimeoutError) as e:
         handler.send_response(503)
         handler.send_header("Content-type", "application/json")
         handler.end_headers()

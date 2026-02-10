@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.16] - 2026-02-10
+### Changed
+- カメラ監視の責務をダッシュボードのブラウザJavaScriptから `dashboard` プロセス側へ移管し、サーバー常駐スレッドで `camera*/stats` を定期監視して停止判定するよう変更。
+- `GET /camera_stats/{index}` はカメラへ都度プロキシする方式から、サーバー監視キャッシュを返す方式へ変更。
+- ダッシュボードUI側の自動復旧ロジック（自動トグル/自動再起動要求）を撤去し、UIは監視状態表示と操作に専念する構成へ整理。
+
+### Added
+- サーバー側カメラ監視制御を追加（`start_camera_monitor` / `stop_camera_monitor`）。
+- 監視メタ情報を `camera_stats` レスポンスへ追加（`monitor_enabled` / `monitor_checked_at` / `monitor_error` / `monitor_stop_reason` / `monitor_last_restart_at` / `monitor_restart_count` / `monitor_restart_triggered`）。
+- カメラ監視用の環境変数を追加（`CAMERA_MONITOR_ENABLED` / `CAMERA_MONITOR_INTERVAL` / `CAMERA_MONITOR_TIMEOUT` / `CAMERA_RESTART_TIMEOUT` / `CAMERA_RESTART_COOLDOWN_SEC`）。
+
 ## [1.11.15] - 2026-02-09
 ### Changed
 - ダッシュボードの自動復旧を段階化し、`stream_alive` 低下時はまず「常時表示」の自動再適用（`OFF -> ON`）を実施してから、必要時のみ自動再起動へフォールバックするよう変更。

@@ -1,17 +1,17 @@
 from dashboard_templates import render_dashboard_html
 
 
-def test_render_dashboard_includes_auto_restart_and_failure_dialog():
+def test_render_dashboard_uses_server_side_monitoring_ui():
     html = render_dashboard_html(
         cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
         version="0.0.0",
         server_start_time=0.0,
     )
-    assert "console.warn('[auto-recovery]', payload);" in html
-    assert "triggerStreamToggleRecovery(i, 'stream stopped')" in html
-    assert "AUTO_STREAM_TOGGLE_MAX_ATTEMPTS = 2" in html
-    assert "fetch('/camera_restart/' + i, { method: 'POST' })" in html
-    assert "alert('カメラの電源が入っていないかハングアップしています');" in html
+    assert "document.addEventListener('visibilitychange', syncDashboardVisibilityState);" in html
+    assert "バックグラウンド一時停止" in html
+    assert "function evaluateAutoRecovery" not in html
+    assert "triggerStreamToggleRecovery" not in html
+    assert "console.warn('[auto-recovery]'" not in html
 
 
 def test_render_dashboard_includes_stream_toggle_controls():

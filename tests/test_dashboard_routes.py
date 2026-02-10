@@ -167,3 +167,48 @@ def test_handle_dashboard_stats(monkeypatch):
     assert handler.status == 200
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["cpu_percent"] == 12.3
+
+
+def test_handle_camera_stats_returns_monitor_snapshot(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+    monkeypatch.setattr(
+        dr,
+        "_camera_monitor_state",
+        {
+            0: {
+                "camera": "cam1",
+                "stream_alive": True,
+                "monitor_enabled": True,
+                "monitor_stop_reason": "none",
+                "monitor_checked_at": 123.4,
+            }
+        },
+    )
+    handler = _DummyHandler("/camera_stats/0")
+    assert dr.handle_camera_stats(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["camera"] == "cam1"
+    assert payload["monitor_enabled"] is True
+    assert payload["monitor_stop_reason"] == "none"
+
+
+def test_camera_monitor_triggers_restart_on_timeout(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+    monkeypatch.setattr(dr, "_CAMERA_MONITOR_ENABLED", True)
+    monkeypatch.setattr(dr, "_CAMERA_RESTART_COOLDOWN_SEC", 0.0)
+    monkeypatch.setattr(dr, "_camera_monitor_state", {})
+
+    def _fake_urlopen(req, timeout=0):
+        url = req.full_url
+        if url.endswith("/stats"):
+            return _DummyResponse(b'{"camera":"cam1","stream_alive":false}')
+        if url.endswith("/restart"):
+            return _DummyResponse(b'{"success": true}')
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    dr._refresh_camera_monitor_once()
+    snap = dr.get_camera_monitor_snapshot(0)
+    assert snap["monitor_stop_reason"] == "timeout"
+    assert snap["monitor_restart_count"] == 1

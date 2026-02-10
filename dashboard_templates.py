@@ -777,15 +777,11 @@ def render_dashboard_html(cameras, version, server_start_time):
         const cameraStatsState = [];
         const streamRetryState = [];
         const streamSelectionState = [];
-        const autoRecoveryState = [];
-        const AUTO_STREAM_TOGGLE_RECOVERY_COOLDOWN_MS = 45000;
-        const AUTO_STREAM_TOGGLE_RECOVERY_SETTLE_MS = 1200;
-        const AUTO_STREAM_TOGGLE_MAX_ATTEMPTS = 2;
-        const AUTO_RESTART_RECOVERY_WAIT_MS = 20000;
-        const AUTO_RESTART_ALERT_COOLDOWN_MS = 120000;
         const STREAM_RETRY_MIN_MS = 2000;
         const STREAM_RETRY_MAX_MS = 30000;
         const STREAM_INITIAL_STAGGER_MS = 2000;
+        let dashboardBackgroundPaused = document.hidden === true;
+        let detectionPollTimer = null;
 
         function ensureStreamRetryState(i) {{
             if (!streamRetryState[i]) {{
@@ -861,7 +857,6 @@ def render_dashboard_html(cameras, version, server_start_time):
                 errorEl.style.display = 'flex';
                 setStreamErrorMessage(i, '常時表示オフ');
                 statusEl.className = 'camera-status paused';
-                evaluateAutoRecovery(i, true, false);
             }}
 
             if (persist) {{
@@ -882,6 +877,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function scheduleStreamRetry(i, delay) {{
+            if (dashboardBackgroundPaused) {{
+                return;
+            }}
             if (!isStreamEnabled(i)) {{
                 return;
             }}
@@ -897,6 +895,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function handleStreamError(i) {{
+            if (dashboardBackgroundPaused) {{
+                return;
+            }}
             if (!isStreamEnabled(i)) {{
                 return;
             }}
@@ -916,6 +917,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function handleStreamLoad(i) {{
+            if (dashboardBackgroundPaused) {{
+                return;
+            }}
             if (!isStreamEnabled(i)) {{
                 return;
             }}
@@ -945,171 +949,88 @@ def render_dashboard_html(cameras, version, server_start_time):
             }});
         }}
 
-        function ensureAutoRecoveryState(i) {{
-            if (!autoRecoveryState[i]) {{
-                autoRecoveryState[i] = {{
-                    outageStartedAt: 0,
-                    toggleRecoveryRequestedAt: 0,
-                    toggleRecoveryInFlight: false,
-                    toggleRecoveryAttempts: 0,
-                    restartRequestedAt: 0,
-                    restartInFlight: false,
-                    alertShown: false,
-                    lastStreamAlive: null
-                }};
+        function clearAllCameraStatsTimers() {{
+            for (let i = 0; i < cameraStatsTimers.length; i++) {{
+                if (cameraStatsTimers[i]) {{
+                    clearTimeout(cameraStatsTimers[i]);
+                    cameraStatsTimers[i] = null;
+                }}
             }}
-            return autoRecoveryState[i];
         }}
 
-        function logAutoRecovery(i, event, extra = {{}}) {{
-            const cam = cameras[i];
-            if (!cam) return;
-            const state = ensureAutoRecoveryState(i);
-            const payload = {{
-                camera: cam.name,
-                event: event,
-                toggle_attempts: state.toggleRecoveryAttempts || 0,
-                restart_requested_at: state.restartRequestedAt || 0,
-                ...extra
-            }};
-            console.warn('[auto-recovery]', payload);
-        }}
-
-        function triggerStreamToggleRecovery(i, reason) {{
-            if (!isStreamEnabled(i)) return false;
-            const cam = cameras[i];
-            if (!cam) return false;
-            const state = ensureAutoRecoveryState(i);
-            if (state.toggleRecoveryInFlight) return false;
-            if (state.toggleRecoveryAttempts >= AUTO_STREAM_TOGGLE_MAX_ATTEMPTS) return false;
-
-            const now = Date.now();
-            if (state.toggleRecoveryRequestedAt && (now - state.toggleRecoveryRequestedAt) < AUTO_STREAM_TOGGLE_RECOVERY_COOLDOWN_MS) {{
-                return false;
+        function pauseDashboardActivity() {{
+            dashboardBackgroundPaused = true;
+            clearAllCameraStatsTimers();
+            if (detectionPollTimer) {{
+                clearTimeout(detectionPollTimer);
+                detectionPollTimer = null;
             }}
-
-            state.toggleRecoveryInFlight = true;
-            state.toggleRecoveryAttempts += 1;
-            state.toggleRecoveryRequestedAt = now;
-            logAutoRecovery(i, 'toggle_requested', {{
-                reason: reason,
-                attempt: state.toggleRecoveryAttempts
+            cameras.forEach((_, i) => {{
+                clearStreamRetryTimer(i);
+                const img = document.getElementById('stream' + i);
+                const errorEl = document.getElementById('error' + i);
+                const statusEl = document.getElementById('status' + i);
+                if (img) {{
+                    img.src = streamPlaceholderSrc;
+                    img.style.display = 'none';
+                }}
+                if (errorEl) {{
+                    errorEl.style.display = 'flex';
+                }}
+                if (statusEl) {{
+                    statusEl.className = 'camera-status paused';
+                }}
+                setStreamErrorMessage(i, 'バックグラウンド一時停止');
             }});
-
-            setStreamEnabled(i, false, false);
-            setTimeout(() => {{
-                setStreamEnabled(i, true, false);
-                state.toggleRecoveryInFlight = false;
-                logAutoRecovery(i, 'toggle_reapplied', {{
-                    reason: reason,
-                    attempt: state.toggleRecoveryAttempts
-                }});
-            }}, AUTO_STREAM_TOGGLE_RECOVERY_SETTLE_MS);
-            return true;
         }}
 
-        function triggerAutoRestart(i, reason) {{
-            const cam = cameras[i];
-            if (!cam) return;
-            const state = ensureAutoRecoveryState(i);
-            if (state.restartInFlight) return;
-            const now = Date.now();
-            if (state.restartRequestedAt && (now - state.restartRequestedAt) < AUTO_RESTART_ALERT_COOLDOWN_MS) {{
+        function resumeDashboardActivity() {{
+            if (!dashboardBackgroundPaused) {{
                 return;
             }}
-
-            state.restartInFlight = true;
-            logAutoRecovery(i, 'restart_requested', {{ reason: reason }});
-            fetch('/camera_restart/' + i, {{ method: 'POST' }})
-                .then(r => r.json())
-                .then(data => {{
-                    state.restartRequestedAt = Date.now();
-                    state.alertShown = false;
-                    if (!data || data.success !== true) {{
-                        logAutoRecovery(i, 'restart_request_failed', {{
-                            reason: reason,
-                            response: data || null
-                        }});
-                    }} else {{
-                        logAutoRecovery(i, 'restart_request_accepted', {{ reason: reason }});
-                    }}
-                }})
-                .catch((err) => {{
-                    state.restartRequestedAt = Date.now();
-                    state.alertShown = false;
-                    logAutoRecovery(i, 'restart_request_error', {{
-                        reason: reason,
-                        error: String(err)
-                    }});
-                }})
-                .finally(() => {{
-                    state.restartInFlight = false;
-                }});
+            dashboardBackgroundPaused = false;
+            cameras.forEach((_, i) => {{
+                if (!isStreamEnabled(i)) {{
+                    return;
+                }}
+                const state = ensureStreamRetryState(i);
+                state.delay = STREAM_RETRY_MIN_MS;
+                clearStreamRetryTimer(i);
+                const img = document.getElementById('stream' + i);
+                const errorEl = document.getElementById('error' + i);
+                const statusEl = document.getElementById('status' + i);
+                if (img) {{
+                    const base = img.dataset.streamSrc || ('/camera_stream/' + i);
+                    img.src = base + '?t=' + Date.now();
+                    img.style.display = 'none';
+                }}
+                if (errorEl) {{
+                    errorEl.style.display = 'flex';
+                }}
+                if (statusEl) {{
+                    statusEl.className = 'camera-status';
+                }}
+                setStreamErrorMessage(i, '接続中...');
+                scheduleStreamRetry(i, 0);
+            }});
+            cameras.forEach((_, i) => {{
+                updateCameraStats(i);
+            }});
+            pollDetections();
         }}
 
-        function evaluateAutoRecovery(i, streamAlive, monitorEnabled = true) {{
-            const state = ensureAutoRecoveryState(i);
-            if (!monitorEnabled) {{
-                if (state.lastStreamAlive === false) {{
-                    logAutoRecovery(i, 'monitor_disabled_while_offline');
-                }}
-                state.outageStartedAt = 0;
-                state.toggleRecoveryRequestedAt = 0;
-                state.toggleRecoveryInFlight = false;
-                state.toggleRecoveryAttempts = 0;
-                state.restartRequestedAt = 0;
-                state.restartInFlight = false;
-                state.alertShown = false;
-                state.lastStreamAlive = null;
-                return;
-            }}
-            if (streamAlive) {{
-                if (state.lastStreamAlive === false) {{
-                    const recoveredMs = state.outageStartedAt > 0 ? (Date.now() - state.outageStartedAt) : null;
-                    logAutoRecovery(i, 'stream_recovered', {{
-                        recovered_ms: recoveredMs,
-                        by_restart: state.restartRequestedAt > 0
-                    }});
-                }}
-                state.outageStartedAt = 0;
-                state.toggleRecoveryRequestedAt = 0;
-                state.toggleRecoveryInFlight = false;
-                state.toggleRecoveryAttempts = 0;
-                state.restartRequestedAt = 0;
-                state.restartInFlight = false;
-                state.alertShown = false;
-                state.lastStreamAlive = true;
-                return;
-            }}
-
-            if (state.lastStreamAlive !== false) {{
-                state.outageStartedAt = Date.now();
-                logAutoRecovery(i, 'stream_down');
-                const toggled = triggerStreamToggleRecovery(i, 'stream stopped');
-                if (!toggled) {{
-                    triggerAutoRestart(i, 'stream stopped');
-                }}
-            }} else if (
-                state.toggleRecoveryAttempts >= AUTO_STREAM_TOGGLE_MAX_ATTEMPTS &&
-                !state.toggleRecoveryInFlight
-            ) {{
-                logAutoRecovery(i, 'toggle_exhausted_fallback_restart');
-                triggerAutoRestart(i, 'stream toggle recovery exhausted');
-            }}
-            state.lastStreamAlive = false;
-
-            if (
-                state.restartRequestedAt > 0 &&
-                !state.alertShown &&
-                (Date.now() - state.restartRequestedAt) >= AUTO_RESTART_RECOVERY_WAIT_MS
-            ) {{
-                state.alertShown = true;
-                logAutoRecovery(i, 'recovery_failed_alert');
-                alert('カメラの電源が入っていないかハングアップしています');
+        function syncDashboardVisibilityState() {{
+            if (document.hidden) {{
+                pauseDashboardActivity();
+            }} else {{
+                resumeDashboardActivity();
             }}
         }}
 
         function scheduleCameraStats(i, delay) {{
+            if (dashboardBackgroundPaused) {{
+                return;
+            }}
             if (cameraStatsTimers[i]) {{
                 clearTimeout(cameraStatsTimers[i]);
             }}
@@ -1133,6 +1054,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function updateCameraStats(i) {{
+            if (dashboardBackgroundPaused) return;
             const cam = cameras[i];
             if (!cam) return;
             const baseDelay = 60000;
@@ -1144,6 +1066,9 @@ def render_dashboard_html(cameras, version, server_start_time):
             fetch('/camera_stats/' + i, {{ cache: 'no-store' }})
                 .then(r => r.json())
                 .then(data => {{
+                    if (dashboardBackgroundPaused) {{
+                        return;
+                    }}
                     cameraStatsState[i].delay = baseDelay;
                     document.getElementById('count' + i).textContent = data.detections;
                     renderCameraParams(i, data);
@@ -1160,7 +1085,6 @@ def render_dashboard_html(cameras, version, server_start_time):
                             scheduleStreamRetry(i, 0);
                         }}
                     }}
-                    evaluateAutoRecovery(i, streamAlive, streamEnabled);
                     if (data.is_detecting === true) {{
                         document.getElementById('detection' + i).className = 'detection-status detecting';
                     }} else {{
@@ -1180,6 +1104,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                     }}
                 }})
                 .catch(() => {{
+                    if (dashboardBackgroundPaused) {{
+                        return;
+                    }}
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
                     if (isStreamEnabled(i)) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
@@ -1187,7 +1114,6 @@ def render_dashboard_html(cameras, version, server_start_time):
                         document.getElementById('status' + i).className = 'camera-status paused';
                     }}
                     document.getElementById('detection' + i).className = 'detection-status';
-                    evaluateAutoRecovery(i, false, isStreamEnabled(i));
                 }})
                 .finally(() => {{
                     scheduleCameraStats(i, cameraStatsState[i].delay);
@@ -1199,6 +1125,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             updateCameraStats(i);
         }});
         startCameraStreams();
+        syncDashboardVisibilityState();
 
         // マスク更新
         function updateMask(i) {{
@@ -1445,9 +1372,13 @@ def render_dashboard_html(cameras, version, server_start_time):
         const detectionPollMaxDelay = 30000;
         const detectionWindowIdleDelay = 60000;
         let detectionPollDelay = detectionPollBaseDelay;
-        let detectionPollTimer = null;
+        detectionPollTimer = null;
+        document.addEventListener('visibilitychange', syncDashboardVisibilityState);
 
         function scheduleDetectionPoll(delay) {{
+            if (dashboardBackgroundPaused) {{
+                return;
+            }}
             if (detectionPollTimer) {{
                 clearTimeout(detectionPollTimer);
             }}
@@ -1456,9 +1387,15 @@ def render_dashboard_html(cameras, version, server_start_time):
 
         // 検出一覧を更新
         function updateDetections() {{
+            if (dashboardBackgroundPaused) {{
+                return Promise.resolve();
+            }}
             return fetch('/detections', {{ cache: 'no-store' }})
                 .then(r => r.json())
                 .then(data => {{
+                    if (dashboardBackgroundPaused) {{
+                        return;
+                    }}
                     detectionPollDelay = detectionPollBaseDelay;
                     document.getElementById('total-detections').textContent = data.total;
                     if (data.recent.length > 0) {{
@@ -1552,6 +1489,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function pollDetections() {{
+            if (dashboardBackgroundPaused) {{
+                return;
+            }}
             if (detectionWindowState.enabled && !isWithinDetectionWindow()) {{
                 scheduleDetectionPoll(detectionWindowIdleDelay);
                 return;

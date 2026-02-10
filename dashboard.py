@@ -27,6 +27,8 @@ from dashboard_routes import (
     handle_set_detection_label,
     start_detection_monitor,
     stop_detection_monitor,
+    start_camera_monitor,
+    stop_camera_monitor,
     handle_image,
     handle_index,
 )
@@ -113,6 +115,7 @@ def main():
     print(f"Open http://localhost:{PORT}/ in your browser")
 
     start_detection_monitor()
+    start_camera_monitor()
     httpd = ThreadedHTTPServer(('0.0.0.0', PORT), DashboardHandler)
     try:
         httpd.serve_forever()
@@ -120,6 +123,7 @@ def main():
         print("\nShutting down...")
         httpd.shutdown()
     finally:
+        stop_camera_monitor()
         stop_detection_monitor()
 
 
