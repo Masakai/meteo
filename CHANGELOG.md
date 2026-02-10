@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.18] - 2026-02-10
+### Fixed
+- ダッシュボード上部ステータスバー（総検出数/カメラ数/System CPU/稼働時間/検出時間帯）の値・ラベルのベースラインずれを修正。
+- `stats-bar` を下端基準で揃えるレイアウトへ変更し、フォントサイズ差がある項目間でも視覚的に整列するよう改善。
+
 ## [1.11.17] - 2026-02-10
 ### Changed
 - `GET /dashboard_stats` の `cpu_percent` を、ダッシュボードプロセスCPUではなくシステム全体CPU使用率を返す仕様へ変更。

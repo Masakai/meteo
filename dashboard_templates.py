@@ -74,6 +74,8 @@ def render_dashboard_html(cameras, version, server_start_time):
         .stats-bar {{
             display: flex;
             justify-content: center;
+            align-items: flex-end;
+            flex-wrap: wrap;
             gap: 40px;
             margin-bottom: 30px;
             padding: 15px;
@@ -81,10 +83,14 @@ def render_dashboard_html(cameras, version, server_start_time):
             border-radius: 10px;
         }}
         .stats-bar .stat {{
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
             text-align: center;
             min-width: 120px;
         }}
         .stats-bar .stat-value {{
+            line-height: 1.1;
             font-size: 2em;
             font-weight: bold;
             color: #00ff88;
