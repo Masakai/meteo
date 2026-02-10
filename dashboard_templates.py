@@ -605,7 +605,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         </div>
         <div class="stat">
             <div class="stat-value" id="dashboard-cpu">--</div>
-            <div class="stat-label">Dashboard CPU</div>
+            <div class="stat-label">System CPU</div>
         </div>
         <div class="stat">
             <div class="stat-value" id="uptime">0:00</div>

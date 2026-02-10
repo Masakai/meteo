@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.17] - 2026-02-10
+### Changed
+- `GET /dashboard_stats` の `cpu_percent` を、ダッシュボードプロセスCPUではなくシステム全体CPU使用率を返す仕様へ変更。
+- Linux環境では `/proc/stat` 差分でCPU使用率を算出し、取得不可時は `getloadavg()` ベースの近似へフォールバックするよう変更。
+- ダッシュボード上部メトリクス表示ラベルを `Dashboard CPU` から `System CPU` に変更。
+
 ## [1.11.16] - 2026-02-10
 ### Changed
 - カメラ監視の責務をダッシュボードのブラウザJavaScriptから `dashboard` プロセス側へ移管し、サーバー常駐スレッドで `camera*/stats` を定期監視して停止判定するよう変更。

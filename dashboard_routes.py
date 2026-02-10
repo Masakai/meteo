@@ -42,29 +42,51 @@ _CAMERA_STREAM_CHUNK_SIZE = 1024 * 64
 _dashboard_cpu_lock = Lock()
 _dashboard_cpu = {
     "cpu_percent": 0.0,
-    "last_wall": time(),
-    "last_cpu": 0.0,
+    "last_total": None,
+    "last_idle": None,
 }
 
 
-def _process_cpu_time():
-    process_times = os.times()
-    return process_times.user + process_times.system
+def _read_system_cpu_totals():
+    try:
+        with open("/proc/stat", "r", encoding="utf-8") as f:
+            first = f.readline().strip()
+        if not first.startswith("cpu "):
+            return None, None
+        parts = first.split()[1:]
+        if len(parts) < 4:
+            return None, None
+        values = [int(v) for v in parts]
+        idle = values[3] + (values[4] if len(values) > 4 else 0)
+        total = sum(values)
+        return total, idle
+    except Exception:
+        return None, None
 
 
 def _sample_dashboard_cpu():
-    now_wall = time()
-    now_cpu = _process_cpu_time()
+    now_total, now_idle = _read_system_cpu_totals()
+    if now_total is None or now_idle is None:
+        try:
+            load1, _, _ = os.getloadavg()
+            cpu_count = max(1, os.cpu_count() or 1)
+            approx = max(0.0, min(100.0, (load1 / cpu_count) * 100.0))
+            with _dashboard_cpu_lock:
+                _dashboard_cpu["cpu_percent"] = approx
+        except Exception:
+            pass
+        return
     with _dashboard_cpu_lock:
-        prev_wall = _dashboard_cpu["last_wall"]
-        prev_cpu = _dashboard_cpu["last_cpu"]
-        if prev_wall is not None:
-            elapsed = now_wall - prev_wall
-            cpu_delta = now_cpu - prev_cpu
-            if elapsed > 0 and cpu_delta >= 0:
-                _dashboard_cpu["cpu_percent"] = max(0.0, (cpu_delta / elapsed) * 100.0)
-        _dashboard_cpu["last_wall"] = now_wall
-        _dashboard_cpu["last_cpu"] = now_cpu
+        prev_total = _dashboard_cpu["last_total"]
+        prev_idle = _dashboard_cpu["last_idle"]
+        if prev_total is not None and prev_idle is not None:
+            total_delta = now_total - prev_total
+            idle_delta = now_idle - prev_idle
+            if total_delta > 0:
+                busy = 1.0 - (idle_delta / total_delta)
+                _dashboard_cpu["cpu_percent"] = max(0.0, min(100.0, busy * 100.0))
+        _dashboard_cpu["last_total"] = now_total
+        _dashboard_cpu["last_idle"] = now_idle
 
 
 def get_dashboard_cpu_snapshot(refresh=True):
@@ -404,9 +426,10 @@ def start_detection_monitor():
             return
     _refresh_detection_cache(force=True)
     with _dashboard_cpu_lock:
-        _dashboard_cpu["last_wall"] = time()
-        _dashboard_cpu["last_cpu"] = _process_cpu_time()
+        _dashboard_cpu["last_total"] = None
+        _dashboard_cpu["last_idle"] = None
         _dashboard_cpu["cpu_percent"] = 0.0
+    _sample_dashboard_cpu()
     _detection_monitor_stop.clear()
     thread = Thread(target=_detection_monitor_loop, name="detections-monitor", daemon=True)
     thread.start()
