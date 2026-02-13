@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.21] - 2026-02-13
+### Fixed
+- ダッシュボードの「タブ起動」で新規タブが開いても遷移しないケースに対応し、`focus()` と同一タブ遷移フォールバックを追加。
+- 各カメラの `rtsp_web` 操作パネル中央URLを、設定値の固定表示から「現在アクセス中ホスト名ベースの実際の遷移先URL」表示へ変更。
+
 ## [1.11.20] - 2026-02-13
 ### Fixed
 - ダッシュボードの「タブ起動」が `localhost` 固定URLを開いてしまう問題を修正。

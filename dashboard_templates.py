@@ -25,7 +25,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                     </div>
                     <div class="camera-control-panel">
                         <div class="control-panel-title">rtsp_web 操作パネル</div>
-                        <div class="control-panel-url">{cam['url']}</div>
+                        <div class="control-panel-url" id="control-url{i}">{cam['url']}</div>
                         <div class="control-panel-help">
                             <p>ストリームは dashboard に埋め込まず、専用タブで表示します。</p>
                             <p>上の <b>タブ起動</b> ボタンでこのカメラのプレビュー画面を開いて操作してください。</p>
@@ -885,6 +885,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         cameras.forEach((cam, i) => {{
             updateCameraStats(i);
         }});
+        updateCameraControlUrls();
         syncDashboardVisibilityState();
 
         // マスク更新
@@ -963,7 +964,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        function openCameraTab(i) {{
+        function resolveCameraTabUrl(i) {{
             const cam = cameras[i];
             if (!cam || !cam.url) return;
             try {{
@@ -971,12 +972,45 @@ def render_dashboard_html(cameras, version, server_start_time):
                 const protocol = window.location.protocol || parsed.protocol || 'http:';
                 const host = window.location.hostname || parsed.hostname;
                 const port = parsed.port || String(8081 + i);
-                const target = `${{protocol}}//${{host}}:${{port}}`;
-                window.open(target, '_blank', 'noopener,noreferrer');
+                const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '/';
+                return `${{protocol}}//${{host}}:${{port}}${{path}}`;
             }} catch (_) {{
-                const fallback = `${{window.location.protocol}}//${{window.location.hostname}}:${{8081 + i}}`;
-                window.open(fallback, '_blank', 'noopener,noreferrer');
+                return `${{window.location.protocol}}//${{window.location.hostname}}:${{8081 + i}}/`;
             }}
+        }}
+
+        function updateCameraControlUrls() {{
+            cameras.forEach((_, i) => {{
+                const el = document.getElementById('control-url' + i);
+                if (!el) return;
+                const target = resolveCameraTabUrl(i);
+                if (target) {{
+                    el.textContent = target;
+                }}
+            }});
+        }}
+
+        function openCameraTab(i) {{
+            const target = resolveCameraTabUrl(i);
+            if (!target) return;
+
+            const win = window.open('', '_blank');
+            if (win) {{
+                try {{
+                    win.opener = null;
+                }} catch (_) {{
+                    // noop
+                }}
+                win.location.href = target;
+                try {{
+                    win.focus();
+                }} catch (_) {{
+                    // noop
+                }}
+                return;
+            }}
+            // ポップアップがブロックされた場合は同一タブで遷移
+            window.location.href = target;
         }}
 
         // 画像モーダル表示
