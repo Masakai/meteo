@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 from dashboard_config import CAMERAS, DETECTIONS_DIR, VERSION, get_detection_window
-from dashboard_templates import render_dashboard_html
+from dashboard_templates import render_dashboard_html, render_dashboard_settings_html
 
 
 _IN_DOCKER = os.path.exists("/.dockerenv")
@@ -287,6 +287,11 @@ def _camera_stats_target(camera_index):
     return _camera_url_for_proxy(cam["url"], camera_index) + "/stats"
 
 
+def _camera_settings_target(camera_index):
+    cam = CAMERAS[camera_index]
+    return _camera_url_for_proxy(cam["url"], camera_index) + "/settings"
+
+
 def _camera_monitor_default_snapshot(camera_index):
     now_ts = time()
     cam_name = CAMERAS[camera_index]["name"] if camera_index < len(CAMERAS) else f"camera{camera_index+1}"
@@ -456,6 +461,19 @@ def handle_index(handler):
 
     html = render_dashboard_html(CAMERAS, VERSION, _SERVER_START_TIME)
     handler.wfile.write(html.encode())
+
+
+def handle_settings_page(handler):
+    if handler.path != "/settings":
+        return False
+    handler.send_response(200)
+    handler.send_header("Content-type", "text/html; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.send_header("Pragma", "no-cache")
+    handler.end_headers()
+    html = render_dashboard_settings_html(CAMERAS, VERSION)
+    handler.wfile.write(html.encode())
+    return True
 
 
 def handle_detection_window(handler):
@@ -907,6 +925,32 @@ def handle_camera_mask(handler):
         return True
 
 
+def handle_camera_mask_reset(handler):
+    if not handler.path.startswith("/camera_mask_reset/"):
+        return False
+
+    try:
+        camera_index = _parse_camera_index(handler.path)
+        cam = CAMERAS[camera_index]
+        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/reset_mask"
+        req = Request(target_url, method="POST")
+        with urlopen(req, timeout=5) as response:
+            payload = response.read()
+
+        handler.send_response(200)
+        handler.send_header("Content-type", "application/json")
+        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        handler.end_headers()
+        handler.wfile.write(payload)
+        return True
+    except (ValueError, URLError, TimeoutError) as e:
+        handler.send_response(503)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+
+
 def handle_camera_restart(handler):
     if not handler.path.startswith("/camera_restart/"):
         return False
@@ -933,6 +977,141 @@ def handle_camera_restart(handler):
         return True
     except Exception as e:
         handler.send_response(500)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+
+
+def _normalize_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if text in ("1", "true", "yes", "on"):
+        return True
+    if text in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
+def handle_apply_settings_all(handler):
+    if handler.path != "/apply_settings_all":
+        return False
+
+    try:
+        content_length = int(handler.headers.get("Content-Length", "0"))
+        body = handler.rfile.read(content_length) if content_length > 0 else b"{}"
+        payload = json.loads(body.decode("utf-8")) if body else {}
+        if not isinstance(payload, dict):
+            raise ValueError("payload must be object")
+
+        settings_payload = {}
+        bool_keys = {"extract_clips", "fb_normalize", "fb_delete_mov"}
+        int_keys = {
+            "diff_threshold",
+            "min_brightness",
+            "min_brightness_tracking",
+            "min_length",
+            "max_length",
+            "min_area",
+            "max_area",
+            "mask_dilate",
+        }
+        float_keys = {
+            "min_duration",
+            "max_duration",
+            "min_speed",
+            "min_linearity",
+            "max_gap_time",
+            "max_distance",
+            "merge_max_gap_time",
+            "merge_max_distance",
+            "merge_max_speed_ratio",
+            "exclude_bottom",
+            "scale",
+            "buffer",
+        }
+        allowed_keys = bool_keys | int_keys | float_keys | {"sensitivity"}
+
+        for key in list(payload.keys()):
+            if key not in allowed_keys:
+                continue
+            if key in bool_keys:
+                settings_payload[key] = _normalize_bool(payload.get(key), default=False)
+            elif key in int_keys:
+                settings_payload[key] = int(payload.get(key))
+            elif key in float_keys:
+                settings_payload[key] = float(payload.get(key))
+            elif key == "sensitivity":
+                value = str(payload.get("sensitivity", "")).strip().lower()
+                if value not in {"low", "medium", "high", "fireball"}:
+                    raise ValueError("invalid sensitivity")
+                settings_payload["sensitivity"] = value
+
+        if "exclude_bottom" in settings_payload:
+            ex = float(settings_payload["exclude_bottom"])
+            if ex < 0.0 or ex > 0.5:
+                raise ValueError("exclude_bottom must be between 0.0 and 0.5")
+            settings_payload["exclude_bottom"] = ex
+
+        if not settings_payload:
+            raise ValueError("no valid settings provided")
+
+        results = []
+        success_count = 0
+        for camera_index, cam in enumerate(CAMERAS):
+            camera_name = cam.get("name", f"camera{camera_index+1}")
+            try:
+                req = Request(
+                    _camera_settings_target(camera_index),
+                    data=json.dumps(settings_payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "Accept": "application/json"},
+                    method="POST",
+                )
+                with urlopen(req, timeout=5) as response:
+                    raw = response.read()
+                camera_payload = json.loads(raw.decode("utf-8")) if raw else {}
+                ok = bool(camera_payload.get("success", False))
+                if ok:
+                    success_count += 1
+                results.append(
+                    {
+                        "camera": camera_name,
+                        "success": ok,
+                        "error": str(camera_payload.get("error", "")) if not ok else "",
+                    }
+                )
+            except Exception as e:
+                results.append({"camera": camera_name, "success": False, "error": str(e)})
+
+        with _camera_monitor_lock:
+            for idx, snapshot in list(_camera_monitor_state.items()):
+                if isinstance(snapshot, dict):
+                    settings = snapshot.get("settings")
+                    if isinstance(settings, dict):
+                        settings.update(settings_payload)
+
+        all_success = success_count == len(CAMERAS)
+        handler.send_response(200 if all_success else 207)
+        handler.send_header("Content-type", "application/json")
+        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        handler.end_headers()
+        handler.wfile.write(
+            json.dumps(
+                {
+                    "success": all_success,
+                    "applied": settings_payload,
+                    "success_count": success_count,
+                    "total": len(CAMERAS),
+                    "results": results,
+                }
+            ).encode("utf-8")
+        )
+        return True
+    except Exception as e:
+        handler.send_response(400)
         handler.send_header("Content-type", "application/json")
         handler.end_headers()
         handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))

@@ -73,8 +73,71 @@ current_settings = {
     "extract_clips": True,
     "exclude_bottom": 0.0625,
     "fb_normalize": False,
+    "fb_delete_mov": False,
     "source_fps": 30.0,
 }
+
+
+def _apply_sensitivity_params(params: DetectionParams, sensitivity: str) -> str:
+    value = str(sensitivity or "medium").strip().lower()
+    if value not in {"low", "medium", "high", "fireball"}:
+        value = "medium"
+
+    if value == "low":
+        params.diff_threshold = 40
+        params.min_brightness = 220
+        params.max_duration = 12.0
+        params.min_speed = 50.0
+        params.min_linearity = 0.7
+    elif value == "high":
+        params.diff_threshold = 20
+        params.min_brightness = 180
+        params.max_duration = 12.0
+        params.min_speed = 50.0
+        params.min_linearity = 0.7
+    elif value == "fireball":
+        params.diff_threshold = 15
+        params.min_brightness = 150
+        params.max_duration = 20.0
+        params.min_speed = 20.0
+        params.min_linearity = 0.6
+    else:
+        params.diff_threshold = 30
+        params.min_brightness = 200
+        params.max_duration = 12.0
+        params.min_speed = 50.0
+        params.min_linearity = 0.7
+
+    params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+    return value
+
+
+def _collect_detector_settings(params: Optional[DetectionParams]) -> dict:
+    if params is None:
+        return dict(current_settings)
+    settings = dict(current_settings)
+    settings.update(
+        {
+            "diff_threshold": int(params.diff_threshold),
+            "min_brightness": int(params.min_brightness),
+            "min_brightness_tracking": int(params.min_brightness_tracking),
+            "min_length": int(params.min_length),
+            "max_length": int(params.max_length),
+            "min_duration": float(params.min_duration),
+            "max_duration": float(params.max_duration),
+            "min_speed": float(params.min_speed),
+            "min_linearity": float(params.min_linearity),
+            "min_area": int(params.min_area),
+            "max_area": int(params.max_area),
+            "max_gap_time": float(params.max_gap_time),
+            "max_distance": float(params.max_distance),
+            "merge_max_gap_time": float(params.merge_max_gap_time),
+            "merge_max_distance": float(params.merge_max_distance),
+            "merge_max_speed_ratio": float(params.merge_max_speed_ratio),
+            "exclude_bottom": float(params.exclude_bottom_ratio),
+        }
+    )
+    return settings
 
 
 def fb_normalize_clip(
@@ -253,6 +316,23 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             opacity: 0.6;
             cursor: wait;
         }}
+        .mask-reset-btn {{
+            background: #3a2430;
+            border: 1px solid #ff7f7f;
+            color: #ffb3b3;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .mask-reset-btn:hover {{
+            background: #ff6b6b;
+            color: #1a1a2e;
+        }}
+        .mask-reset-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
         .mask-toggle-btn {{
             background: #1f324f;
             border: 1px solid #ff6b6b;
@@ -289,6 +369,37 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         .status.offline {{ color: #ff4444; }}
         .status.detecting {{ color: #ff4444; }}
         .status.idle {{ color: #888; }}
+        .settings-box {{
+            margin-top: 16px;
+            padding: 12px;
+            background: #16213e;
+            border-radius: 8px;
+        }}
+        .settings-box h3 {{
+            margin: 0 0 10px;
+            color: #00d4ff;
+            font-size: 1em;
+        }}
+        .settings-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 6px 12px;
+            font-size: 0.85em;
+        }}
+        .settings-item {{
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            border-bottom: 1px dashed #2a3f6f;
+            padding-bottom: 3px;
+        }}
+        .settings-item .k {{
+            color: #9bb1d8;
+        }}
+        .settings-item .v {{
+            color: #c8ffe7;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }}
     </style>
 </head>
 <body>
@@ -301,6 +412,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         <div class="actions">
             <button class="snapshot-btn" id="snapshot-btn" onclick="downloadSnapshot()">スナップショット保存</button>
             <button class="mask-btn" id="mask-update-btn" onclick="updateMask()">マスク更新</button>
+            <button class="mask-reset-btn" id="mask-reset-btn" onclick="resetMask()">マスクリセット</button>
             <button class="mask-toggle-btn" id="mask-toggle-btn" onclick="toggleMask()" disabled>マスク表示</button>
         </div>
         <div class="stats">
@@ -308,6 +420,10 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             <span>Detect: <b class="status idle" id="detect-status">IDLE</b></span>
             <span>Mask: <b class="status idle" id="mask-status">OFF</b></span>
             <span>Detections: <b class="count" id="count">-</b></span>
+        </div>
+        <div class="settings-box">
+            <h3>現在のパラメータ</h3>
+            <div class="settings-grid" id="settings-grid"></div>
         </div>
         <p style="color:#888; margin-top:20px;">
             緑丸: 検出中の物体 / 黄線: 追跡中の軌跡 / 赤表示: 流星検出
@@ -360,6 +476,31 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 }});
         }}
 
+        function resetMask() {{
+            const btn = document.getElementById('mask-reset-btn');
+            if (!btn) return;
+            if (!confirm('マスクをリセットしますか?')) return;
+            btn.disabled = true;
+            btn.textContent = 'リセット中...';
+            fetch('/reset_mask', {{ method: 'POST' }})
+                .then(r => r.json())
+                .then(data => {{
+                    btn.textContent = data.success ? 'リセット完了' : '失敗';
+                    if (data.success) {{
+                        setMaskOverlay(false);
+                    }}
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = 'マスクリセット';
+                        btn.disabled = false;
+                    }}, 1500);
+                }});
+        }}
+
         function downloadSnapshot() {{
             const btn = document.getElementById('snapshot-btn');
             if (!btn) return;
@@ -383,6 +524,35 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                     btn.disabled = false;
                 }}, 1500);
             }}
+        }}
+
+        function renderSettings(settings) {{
+            const grid = document.getElementById('settings-grid');
+            if (!grid) return;
+            if (!settings || typeof settings !== 'object') {{
+                grid.innerHTML = '<div class="settings-item"><span class="k">settings</span><span class="v">-</span></div>';
+                return;
+            }}
+            const order = [
+                'sensitivity', 'diff_threshold', 'min_brightness', 'min_brightness_tracking',
+                'min_length', 'max_length', 'min_duration', 'max_duration',
+                'min_speed', 'min_linearity', 'min_area', 'max_area',
+                'max_gap_time', 'max_distance', 'merge_max_gap_time', 'merge_max_distance',
+                'merge_max_speed_ratio', 'exclude_bottom', 'extract_clips', 'scale', 'buffer',
+                'fb_normalize', 'fb_delete_mov', 'mask_dilate', 'source_fps'
+            ];
+            const renderedKeys = new Set();
+            const items = [];
+            order.forEach((key) => {{
+                if (!(key in settings)) return;
+                renderedKeys.add(key);
+                items.push(`<div class="settings-item"><span class="k">${{key}}</span><span class="v">${{settings[key]}}</span></div>`);
+            }});
+            Object.keys(settings).sort().forEach((key) => {{
+                if (renderedKeys.has(key)) return;
+                items.push(`<div class="settings-item"><span class="k">${{key}}</span><span class="v">${{settings[key]}}</span></div>`);
+            }});
+            grid.innerHTML = items.join('');
         }}
 
         setInterval(() => {{
@@ -412,6 +582,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                         }}
                     }}
                 }}
+                renderSettings(data.settings);
             }});
         }}, 1000);
     </script>
@@ -490,6 +661,12 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "mask_active": mask_active,
             }
             self.wfile.write(json.dumps(stats).encode())
+        elif path == '/settings':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "settings": current_settings}).encode())
         elif path == '/mask':
             mask = None
             if current_detector is not None:
@@ -531,6 +708,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        global current_mask_dilate
         if self.path == '/restart':
             self.send_response(202)
             self.send_header('Content-type', 'application/json')
@@ -598,6 +776,141 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "message": "mask updated" if mask is not None else "mask update failed",
                 "saved": str(save_path) if save_path else ""
             }).encode())
+            return
+
+        if self.path == '/reset_mask':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            try:
+                if current_detector is None:
+                    raise ValueError("detector not ready")
+
+                current_detector.update_exclusion_mask(None)
+
+                deleted = ""
+                save_path = current_mask_save if current_mask_save else None
+                if save_path is None and current_output_dir and current_camera_name:
+                    save_path = current_output_dir / "masks" / f"{current_camera_name}_mask.png"
+                if save_path and Path(save_path).exists():
+                    Path(save_path).unlink()
+                    deleted = str(save_path)
+
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "message": "mask reset",
+                    "deleted": deleted,
+                }).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": str(e),
+                }).encode())
+            return
+
+        if self.path == '/settings':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            try:
+                content_length = int(self.headers.get('Content-Length', '0'))
+                raw = self.rfile.read(content_length) if content_length > 0 else b'{}'
+                payload = json.loads(raw.decode('utf-8')) if raw else {}
+                if not isinstance(payload, dict):
+                    raise ValueError("payload must be object")
+                if current_detector is None:
+                    raise ValueError("detector not ready")
+
+                params = current_detector.params
+                if "sensitivity" in payload:
+                    current_settings["sensitivity"] = _apply_sensitivity_params(params, payload.get("sensitivity"))
+
+                if "extract_clips" in payload:
+                    val = payload.get("extract_clips")
+                    if not isinstance(val, bool):
+                        val = str(val).strip().lower() in ('1', 'true', 'yes', 'on')
+                    current_settings["extract_clips"] = bool(val)
+
+                if "fb_normalize" in payload:
+                    val = payload.get("fb_normalize")
+                    if not isinstance(val, bool):
+                        val = str(val).strip().lower() in ('1', 'true', 'yes', 'on')
+                    current_settings["fb_normalize"] = bool(val)
+
+                if "fb_delete_mov" in payload:
+                    val = payload.get("fb_delete_mov")
+                    if not isinstance(val, bool):
+                        val = str(val).strip().lower() in ('1', 'true', 'yes', 'on')
+                    current_settings["fb_delete_mov"] = bool(val)
+
+                float_fields = [
+                    ("min_duration", 0.01, 120.0),
+                    ("max_duration", 0.01, 120.0),
+                    ("min_speed", 0.0, 10000.0),
+                    ("min_linearity", 0.0, 1.0),
+                    ("max_gap_time", 0.0, 60.0),
+                    ("max_distance", 1.0, 5000.0),
+                    ("merge_max_gap_time", 0.0, 60.0),
+                    ("merge_max_distance", 1.0, 5000.0),
+                    ("merge_max_speed_ratio", 0.0, 10.0),
+                    ("exclude_bottom", 0.0, 0.5),
+                ]
+                for key, lo, hi in float_fields:
+                    if key not in payload:
+                        continue
+                    value = float(payload.get(key))
+                    value = max(lo, min(hi, value))
+                    if key == "exclude_bottom":
+                        params.exclude_bottom_ratio = value
+                    else:
+                        setattr(params, key, value)
+                    current_settings[key] = value
+
+                int_fields = [
+                    ("diff_threshold", 1, 255),
+                    ("min_brightness", 1, 255),
+                    ("min_brightness_tracking", 1, 255),
+                    ("min_length", 1, 20000),
+                    ("max_length", 1, 50000),
+                    ("min_area", 1, 100000),
+                    ("max_area", 1, 1000000),
+                    ("mask_dilate", 0, 500),
+                ]
+                for key, lo, hi in int_fields:
+                    if key not in payload:
+                        continue
+                    value = int(payload.get(key))
+                    value = max(lo, min(hi, value))
+                    if key == "mask_dilate":
+                        current_mask_dilate = value
+                    else:
+                        setattr(params, key, value)
+                    current_settings[key] = value
+
+                if "scale" in payload:
+                    current_settings["scale"] = float(payload.get("scale"))
+                if "buffer" in payload:
+                    current_settings["buffer"] = float(payload.get("buffer"))
+
+                if "min_brightness" in payload and "min_brightness_tracking" not in payload:
+                    params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+                    current_settings["min_brightness_tracking"] = int(params.min_brightness_tracking)
+
+                current_settings.update(_collect_detector_settings(params))
+
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "settings": current_settings,
+                }).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": str(e),
+                }).encode())
             return
 
         self.send_response(404)
@@ -861,13 +1174,16 @@ def detection_thread_worker(
                         ring_buffer,
                         output_path,
                         fps=fps,
-                        extract_clips=extract_clips,
+                        extract_clips=bool(current_settings.get("extract_clips", extract_clips)),
                         clip_margin_before=1.0,
                         clip_margin_after=1.0,
                         composite_after=1.0,
                     )
-                    if fb_normalize and clip_path is not None:
-                        fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
+                    if bool(current_settings.get("fb_normalize", fb_normalize)) and clip_path is not None:
+                        fb_normalize_clip(
+                            clip_path,
+                            delete_source=bool(current_settings.get("fb_delete_mov", fb_delete_mov)),
+                        )
 
             expired_events = merger.flush_expired(timestamp)
             for expired_event in expired_events:
@@ -879,13 +1195,16 @@ def detection_thread_worker(
                     ring_buffer,
                     output_path,
                     fps=fps,
-                    extract_clips=extract_clips,
+                    extract_clips=bool(current_settings.get("extract_clips", extract_clips)),
                     clip_margin_before=1.0,
                     clip_margin_after=1.0,
                     composite_after=1.0,
                 )
-                if fb_normalize and clip_path is not None:
-                    fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
+                if bool(current_settings.get("fb_normalize", fb_normalize)) and clip_path is not None:
+                    fb_normalize_clip(
+                        clip_path,
+                        delete_source=bool(current_settings.get("fb_delete_mov", fb_delete_mov)),
+                    )
 
             # プレビュー用フレーム生成
             display = frame.copy()
@@ -927,13 +1246,16 @@ def detection_thread_worker(
                 ring_buffer,
                 output_path,
                 fps=fps,
-                extract_clips=extract_clips,
+                extract_clips=bool(current_settings.get("extract_clips", extract_clips)),
                 clip_margin_before=1.0,
                 clip_margin_after=1.0,
                 composite_after=1.0,
             )
-            if fb_normalize and clip_path is not None:
-                fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
+            if bool(current_settings.get("fb_normalize", fb_normalize)) and clip_path is not None:
+                fb_normalize_clip(
+                    clip_path,
+                    delete_source=bool(current_settings.get("fb_delete_mov", fb_delete_mov)),
+                )
 
     for event in merger.flush_all():
         detection_count += 1
@@ -942,13 +1264,16 @@ def detection_thread_worker(
             ring_buffer,
             output_path,
             fps=fps,
-            extract_clips=extract_clips,
+            extract_clips=bool(current_settings.get("extract_clips", extract_clips)),
             clip_margin_before=1.0,
             clip_margin_after=1.0,
             composite_after=1.0,
         )
-        if fb_normalize and clip_path is not None:
-            fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
+        if bool(current_settings.get("fb_normalize", fb_normalize)) and clip_path is not None:
+            fb_normalize_clip(
+                clip_path,
+                delete_source=bool(current_settings.get("fb_delete_mov", fb_delete_mov)),
+            )
 
 
 def process_rtsp_stream(
@@ -975,21 +1300,7 @@ def process_rtsp_stream(
     params = params or DetectionParams()
     camera_name = cam_name
 
-    if sensitivity == "low":
-        params.diff_threshold = 40
-        params.min_brightness = 220
-    elif sensitivity == "high":
-        params.diff_threshold = 20
-        params.min_brightness = 180
-    elif sensitivity == "fireball":
-        params.diff_threshold = 15
-        params.min_brightness = 150
-        params.max_duration = 20.0
-        params.min_speed = 20.0
-        params.min_linearity = 0.6
-
-    # 追跡中は検出閾値より低めにして追跡継続を優先
-    params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+    sensitivity = _apply_sensitivity_params(params, sensitivity)
 
     required_buffer = params.max_duration + 2.0
     effective_buffer_seconds = min(buffer_seconds, required_buffer)
@@ -1009,6 +1320,7 @@ def process_rtsp_stream(
         "mask_from_day": mask_from_day or "",
         "mask_dilate": mask_dilate,
     })
+    current_settings.update(_collect_detector_settings(params))
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)

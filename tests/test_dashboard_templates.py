@@ -25,6 +25,11 @@ def test_render_dashboard_includes_rtsp_web_controls():
     assert 'id="control-url0"' in html
     assert 'id="latest-time0"' in html
     assert "最終検出時刻" in html
+    assert "全カメラ設定" in html
+    assert "applySettingsAll()" in html
+    assert "マスクリセット" in html
+    assert "resetMask(0)" in html
+    assert "/apply_settings_all" in html
     assert "resolveCameraTabUrl" in html
     assert "window.location.hostname" in html
     assert "window.location.href = target;" in html

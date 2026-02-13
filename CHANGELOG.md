@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.24] - 2026-02-13
+### Added
+- ダッシュボードに設定メニュー導線（`/settings`）を追加し、専用ページから全カメラへ一括設定反映できるよう変更。
+- 設定メニューで検出パラメータ群（感度、しきい値、線形性、距離/時間、マージ条件、マスク関連、クリップ/FB関連）をまとめて編集・適用する機能を追加。
+- ダッシュボードと `rtsp_web` の両方に「マスクリセット」ボタンを追加。
+
+### Changed
+- `meteor_detector_rtsp_web.py` の `stats.settings` を拡張し、現在有効な主要パラメータを網羅して返すよう変更。
+- `rtsp_web` 画面に「現在のパラメータ」表示を追加し、各値をWeb上で確認できるよう変更。
+
 ## [1.11.23] - 2026-02-13
 ### Added
 - `meteor_detector_rtsp_web.py` のWeb UIに「スナップショット保存」ボタンを追加。

@@ -106,6 +106,20 @@ def test_handle_camera_snapshot_invalid_index(monkeypatch):
     assert handler.status == 503
 
 
+def test_handle_camera_mask_reset_success(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam-1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(_req, timeout=0):
+        assert timeout == 5
+        return _DummyResponse(b'{"success": true}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    handler = _DummyHandler("/camera_mask_reset/0")
+    assert dr.handle_camera_mask_reset(handler) is True
+    assert handler.status == 200
+    assert b'"success": true' in handler.wfile.getvalue()
+
+
 def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     body = json.dumps(
@@ -212,3 +226,47 @@ def test_camera_monitor_triggers_restart_on_timeout(monkeypatch):
     snap = dr.get_camera_monitor_snapshot(0)
     assert snap["monitor_stop_reason"] == "timeout"
     assert snap["monitor_restart_count"] == 1
+
+
+def test_handle_apply_settings_all_success(monkeypatch):
+    monkeypatch.setattr(
+        dr,
+        "CAMERAS",
+        [
+            {"name": "cam1", "url": "http://localhost:8081"},
+            {"name": "cam2", "url": "http://localhost:8082"},
+        ],
+    )
+
+    def _fake_urlopen(req, timeout=0):
+        assert timeout == 5
+        assert req.full_url.endswith("/settings")
+        payload = json.loads(req.data.decode("utf-8"))
+        assert payload["sensitivity"] == "high"
+        assert payload["extract_clips"] is False
+        assert payload["exclude_bottom"] == 0.1
+        return _DummyResponse(b'{"success": true}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps(
+        {
+            "sensitivity": "high",
+            "extract_clips": False,
+            "exclude_bottom": 0.1,
+        }
+    ).encode("utf-8")
+    handler = _DummyHandler("/apply_settings_all", body=body, headers={"Content-Type": "application/json"})
+    assert dr.handle_apply_settings_all(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["success_count"] == 2
+
+
+def test_handle_apply_settings_all_invalid_payload():
+    body = json.dumps({"sensitivity": "invalid", "extract_clips": True, "exclude_bottom": 0.1}).encode("utf-8")
+    handler = _DummyHandler("/apply_settings_all", body=body, headers={"Content-Type": "application/json"})
+    assert dr.handle_apply_settings_all(handler) is True
+    assert handler.status == 400
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is False

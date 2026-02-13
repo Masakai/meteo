@@ -21,7 +21,9 @@ from dashboard_routes import (
     handle_detections_mtime,
     handle_dashboard_stats,
     handle_camera_mask,
+    handle_camera_mask_reset,
     handle_camera_mask_image,
+    handle_apply_settings_all,
     handle_camera_stats,
     handle_camera_stream,
     handle_set_detection_label,
@@ -31,6 +33,7 @@ from dashboard_routes import (
     stop_camera_monitor,
     handle_image,
     handle_index,
+    handle_settings_page,
 )
 
 
@@ -41,6 +44,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
             handle_index(self)
+            return
+        if self.path == '/settings':
+            handle_settings_page(self)
             return
         if self.path.startswith('/detection_window'):
             handle_detection_window(self)
@@ -94,8 +100,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if self.path.startswith('/camera_mask/'):
             handle_camera_mask(self)
             return
+        if self.path.startswith('/camera_mask_reset/'):
+            handle_camera_mask_reset(self)
+            return
         if self.path.startswith('/camera_restart/'):
             handle_camera_restart(self)
+            return
+        if self.path == '/apply_settings_all':
+            handle_apply_settings_all(self)
             return
 
         self.send_response(404)

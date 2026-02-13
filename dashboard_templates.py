@@ -20,6 +20,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                     <div class="camera-actions">
                         <button class="open-tab-btn" onclick="openCameraTab({i})">タブ起動 (:808{i + 1})</button>
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
+                        <button class="mask-reset-btn" onclick="resetMask({i})">マスクリセット</button>
                         <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
                         <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
                     </div>
@@ -66,6 +67,20 @@ def render_dashboard_html(cameras, version, server_start_time):
             color: #888;
             font-size: 0.9em;
         }}
+        .settings-menu-link {{
+            display: inline-block;
+            margin-top: 10px;
+            color: #7bf3be;
+            text-decoration: none;
+            border: 1px solid #2a6f59;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 0.85em;
+        }}
+        .settings-menu-link:hover {{
+            background: #2a6f59;
+            color: #eafff5;
+        }}
         .stats-bar {{
             display: flex;
             justify-content: center;
@@ -100,6 +115,79 @@ def render_dashboard_html(cameras, version, server_start_time):
         .stats-bar .stat-label {{
             color: #888;
             font-size: 0.85em;
+        }}
+        .settings-panel {{
+            max-width: 1800px;
+            margin: 0 auto 18px;
+            padding: 12px 14px;
+            background: #1e2a4a;
+            border: 1px solid #2a3f6f;
+            border-radius: 10px;
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            flex-wrap: wrap;
+        }}
+        .settings-panel-title {{
+            color: #00d4ff;
+            font-weight: bold;
+            margin-right: 8px;
+        }}
+        .settings-field {{
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 130px;
+        }}
+        .settings-field label {{
+            color: #9bb1d8;
+            font-size: 0.78em;
+        }}
+        .settings-field select,
+        .settings-field input[type="number"] {{
+            background: #131f3d;
+            color: #eee;
+            border: 1px solid #2a3f6f;
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 0.85em;
+        }}
+        .settings-check {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #c1d0eb;
+            font-size: 0.85em;
+            padding-bottom: 6px;
+        }}
+        .settings-apply-btn {{
+            background: #2a3f6f;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 7px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .settings-apply-btn:hover {{
+            background: #00d4ff;
+            color: #0f1530;
+        }}
+        .settings-apply-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .settings-message {{
+            color: #9bb1d8;
+            font-size: 0.82em;
+            min-height: 1.2em;
+            margin-left: auto;
+        }}
+        .settings-message.error {{
+            color: #ff7f7f;
+        }}
+        .settings-message.ok {{
+            color: #7bf3be;
         }}
         .camera-grid {{
             display: grid;
@@ -189,6 +277,23 @@ def render_dashboard_html(cameras, version, server_start_time):
             color: #0f1530;
         }}
         .mask-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .mask-reset-btn {{
+            background: #3a2430;
+            border: 1px solid #ff7f7f;
+            color: #ffb3b3;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .mask-reset-btn:hover {{
+            background: #ff6b6b;
+            color: #1a1a2e;
+        }}
+        .mask-reset-btn:disabled {{
             opacity: 0.6;
             cursor: wait;
         }}
@@ -589,6 +694,7 @@ def render_dashboard_html(cameras, version, server_start_time):
     <div class="header">
         <h1>Meteor Detection Dashboard</h1>
         <div class="subtitle">リアルタイム流星検出システム</div>
+        <a class="settings-menu-link" href="/settings">設定メニューへ</a>
     </div>
 
     <div class="stats-bar">
@@ -612,6 +718,29 @@ def render_dashboard_html(cameras, version, server_start_time):
             <div class="stat-value" id="detection-window">--:-- ~ --:--</div>
             <div class="stat-label">検出時間帯</div>
         </div>
+    </div>
+
+    <div class="settings-panel">
+        <div class="settings-panel-title">全カメラ設定</div>
+        <div class="settings-field">
+            <label for="setting-sensitivity">感度</label>
+            <select id="setting-sensitivity">
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="fireball">fireball</option>
+            </select>
+        </div>
+        <div class="settings-field">
+            <label for="setting-exclude-bottom">下部除外比率</label>
+            <input id="setting-exclude-bottom" type="number" min="0" max="0.5" step="0.01" value="0.0625">
+        </div>
+        <label class="settings-check">
+            <input id="setting-extract-clips" type="checkbox" checked>
+            クリップ保存
+        </label>
+        <button class="settings-apply-btn" id="settings-apply-btn" onclick="applySettingsAll()">全カメラへ反映</button>
+        <div class="settings-message" id="settings-message"></div>
     </div>
 
     <div class="camera-grid">
@@ -766,6 +895,92 @@ def render_dashboard_html(cameras, version, server_start_time):
         updateDetectionWindow();
         setInterval(updateDetectionWindow, 60000);  // 1分ごとに更新
 
+        let settingsFormHydrated = false;
+        let settingsFormDirty = false;
+
+        function markSettingsDirty() {{
+            settingsFormDirty = true;
+        }}
+
+        function hydrateSettingsForm(settings) {{
+            if (!settings || settingsFormDirty) return;
+            const sensitivityEl = document.getElementById('setting-sensitivity');
+            const excludeBottomEl = document.getElementById('setting-exclude-bottom');
+            const extractClipsEl = document.getElementById('setting-extract-clips');
+            if (sensitivityEl && typeof settings.sensitivity === 'string') {{
+                sensitivityEl.value = settings.sensitivity;
+            }}
+            if (excludeBottomEl && Number.isFinite(Number(settings.exclude_bottom))) {{
+                excludeBottomEl.value = Number(settings.exclude_bottom).toFixed(4).replace(/0+$/, '').replace(/\\.$/, '') || '0';
+            }}
+            if (extractClipsEl && typeof settings.extract_clips === 'boolean') {{
+                extractClipsEl.checked = settings.extract_clips;
+            }}
+            settingsFormHydrated = true;
+        }}
+
+        function setSettingsMessage(message, level = '') {{
+            const el = document.getElementById('settings-message');
+            if (!el) return;
+            el.textContent = message || '';
+            el.className = 'settings-message' + (level ? ' ' + level : '');
+        }}
+
+        function applySettingsAll() {{
+            const sensitivityEl = document.getElementById('setting-sensitivity');
+            const excludeBottomEl = document.getElementById('setting-exclude-bottom');
+            const extractClipsEl = document.getElementById('setting-extract-clips');
+            const btn = document.getElementById('settings-apply-btn');
+            if (!sensitivityEl || !excludeBottomEl || !extractClipsEl || !btn) return;
+
+            const excludeBottom = Number(excludeBottomEl.value);
+            if (!Number.isFinite(excludeBottom) || excludeBottom < 0 || excludeBottom > 0.5) {{
+                setSettingsMessage('下部除外比率は 0.0 から 0.5 で入力してください', 'error');
+                return;
+            }}
+
+            const payload = {{
+                sensitivity: sensitivityEl.value,
+                extract_clips: extractClipsEl.checked === true,
+                exclude_bottom: excludeBottom,
+            }};
+
+            btn.disabled = true;
+            btn.textContent = '反映中...';
+            setSettingsMessage('全カメラへ設定反映中...');
+            fetch('/apply_settings_all', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify(payload),
+            }})
+                .then(r => r.json())
+                .then(data => {{
+                    settingsFormDirty = false;
+                    const ok = data && data.success === true;
+                    if (ok) {{
+                        setSettingsMessage('反映完了 (' + data.success_count + '/' + data.total + ')', 'ok');
+                    }} else {{
+                        const failed = (data && Array.isArray(data.results))
+                            ? data.results.filter(x => !x.success).map(x => x.camera).join(', ')
+                            : '';
+                        const countText = '一部失敗 (' + (data.success_count || 0) + '/' + (data.total || cameras.length) + ')';
+                        setSettingsMessage(countText + (failed ? (' ' + failed) : ''), 'error');
+                    }}
+                    cameras.forEach((_, i) => updateCameraStats(i));
+                }})
+                .catch((err) => {{
+                    setSettingsMessage('反映失敗: ' + err.message, 'error');
+                }})
+                .finally(() => {{
+                    btn.disabled = false;
+                    btn.textContent = '全カメラへ反映';
+                }});
+        }}
+
+        document.getElementById('setting-sensitivity').addEventListener('change', markSettingsDirty);
+        document.getElementById('setting-exclude-bottom').addEventListener('input', markSettingsDirty);
+        document.getElementById('setting-extract-clips').addEventListener('change', markSettingsDirty);
+
         // 各カメラの統計を取得
         let totalDetections = 0;
         const cameraStatsTimers = [];
@@ -836,6 +1051,9 @@ def render_dashboard_html(cameras, version, server_start_time):
             const el = document.getElementById('params' + i);
             if (!el || !data || !data.settings) return;
             const s = data.settings;
+            if (!settingsFormHydrated) {{
+                hydrateSettingsForm(s);
+            }}
             const clipClass = s.extract_clips ? 'param-clip' : 'param-no-clip';
             const clipText = s.extract_clips ? 'CLIP:ON' : 'CLIP:OFF';
             const sourceFps = Number(s.source_fps || 0);
@@ -920,6 +1138,34 @@ def render_dashboard_html(cameras, version, server_start_time):
                 .finally(() => {{
                     setTimeout(() => {{
                         btn.textContent = 'マスク更新';
+                        btn.disabled = false;
+                    }}, 1500);
+                }});
+        }}
+
+        function resetMask(i) {{
+            const btn = document.querySelectorAll('.mask-reset-btn')[i];
+            if (!btn) return;
+            if (!confirm('マスクをリセットしますか?')) return;
+            btn.disabled = true;
+            btn.textContent = 'リセット中...';
+            fetch('/camera_mask_reset/' + i, {{ method: 'POST' }})
+                .then(r => r.json())
+                .then(data => {{
+                    btn.textContent = data.success ? 'リセット完了' : '失敗';
+                    if (data.success) {{
+                        const maskStatusEl = document.getElementById('mask-status' + i);
+                        if (maskStatusEl) {{
+                            maskStatusEl.className = 'mask-status';
+                        }}
+                    }}
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = 'マスクリセット';
                         btn.disabled = false;
                     }}, 1500);
                 }});
@@ -1374,6 +1620,249 @@ def render_dashboard_html(cameras, version, server_start_time):
                 closeChangelog();
             }}
         }};
+    </script>
+</body>
+</html>'''
+
+
+def render_dashboard_settings_html(cameras, version):
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Meteor Dashboard Settings</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #111a30;
+            color: #e6edff;
+            margin: 0;
+            padding: 22px;
+        }}
+        .container {{
+            max-width: 980px;
+            margin: 0 auto;
+            background: #1b2645;
+            border: 1px solid #2a3f6f;
+            border-radius: 12px;
+            padding: 18px;
+        }}
+        h1 {{
+            margin: 0 0 8px;
+            color: #00d4ff;
+            font-size: 1.6em;
+        }}
+        .subtitle {{
+            color: #9bb1d8;
+            margin-bottom: 16px;
+            font-size: 0.9em;
+        }}
+        .actions {{
+            margin-bottom: 16px;
+        }}
+        .back-link {{
+            color: #7bf3be;
+            text-decoration: none;
+            font-size: 0.9em;
+        }}
+        .grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }}
+        .field {{
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }}
+        .field label {{
+            color: #a7badc;
+            font-size: 0.8em;
+        }}
+        .field input, .field select {{
+            background: #0f1730;
+            color: #e6edff;
+            border: 1px solid #2a3f6f;
+            border-radius: 6px;
+            padding: 8px;
+        }}
+        .checks {{
+            margin-top: 10px;
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }}
+        .checks label {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #c6d5f0;
+            font-size: 0.9em;
+        }}
+        .submit-row {{
+            margin-top: 14px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }}
+        .apply-btn {{
+            background: #2a3f6f;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            border-radius: 6px;
+            padding: 9px 14px;
+            cursor: pointer;
+        }}
+        .apply-btn:hover {{
+            background: #00d4ff;
+            color: #0f1530;
+        }}
+        .apply-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .message {{
+            color: #9bb1d8;
+            font-size: 0.9em;
+        }}
+        .message.ok {{ color: #7bf3be; }}
+        .message.error {{ color: #ff8c8c; }}
+        .footer {{
+            margin-top: 18px;
+            color: #6f84ad;
+            font-size: 0.82em;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>全カメラ設定メニュー</h1>
+        <div class="subtitle">対象カメラ数: {len(cameras)} / version {version}</div>
+        <div class="actions"><a class="back-link" href="/">← ダッシュボードへ戻る</a></div>
+
+        <div class="grid">
+            <div class="field"><label>sensitivity</label><select id="sensitivity">
+                <option value="low">low</option><option value="medium">medium</option>
+                <option value="high">high</option><option value="fireball">fireball</option>
+            </select></div>
+            <div class="field"><label>diff_threshold</label><input id="diff_threshold" type="number" min="1" max="255" value="30"></div>
+            <div class="field"><label>min_brightness</label><input id="min_brightness" type="number" min="1" max="255" value="200"></div>
+            <div class="field"><label>min_brightness_tracking</label><input id="min_brightness_tracking" type="number" min="1" max="255" value="160"></div>
+            <div class="field"><label>min_length</label><input id="min_length" type="number" min="1" value="20"></div>
+            <div class="field"><label>max_length</label><input id="max_length" type="number" min="1" value="5000"></div>
+            <div class="field"><label>min_duration</label><input id="min_duration" type="number" step="0.01" min="0" value="0.1"></div>
+            <div class="field"><label>max_duration</label><input id="max_duration" type="number" step="0.01" min="0.01" value="12.0"></div>
+            <div class="field"><label>min_speed</label><input id="min_speed" type="number" step="0.1" min="0" value="50"></div>
+            <div class="field"><label>min_linearity</label><input id="min_linearity" type="number" step="0.01" min="0" max="1" value="0.7"></div>
+            <div class="field"><label>min_area</label><input id="min_area" type="number" min="1" value="5"></div>
+            <div class="field"><label>max_area</label><input id="max_area" type="number" min="1" value="10000"></div>
+            <div class="field"><label>max_gap_time</label><input id="max_gap_time" type="number" step="0.1" min="0" value="2.0"></div>
+            <div class="field"><label>max_distance</label><input id="max_distance" type="number" step="0.1" min="1" value="80"></div>
+            <div class="field"><label>merge_max_gap_time</label><input id="merge_max_gap_time" type="number" step="0.1" min="0" value="1.5"></div>
+            <div class="field"><label>merge_max_distance</label><input id="merge_max_distance" type="number" step="0.1" min="1" value="80"></div>
+            <div class="field"><label>merge_max_speed_ratio</label><input id="merge_max_speed_ratio" type="number" step="0.01" min="0" value="0.5"></div>
+            <div class="field"><label>exclude_bottom</label><input id="exclude_bottom" type="number" step="0.01" min="0" max="0.5" value="0.0625"></div>
+            <div class="field"><label>scale (再起動で有効)</label><input id="scale" type="number" step="0.01" min="0.1" max="1.0" value="0.5"></div>
+            <div class="field"><label>buffer (再起動で有効)</label><input id="buffer" type="number" step="0.1" min="1" value="12"></div>
+            <div class="field"><label>mask_dilate</label><input id="mask_dilate" type="number" min="0" value="20"></div>
+        </div>
+
+        <div class="checks">
+            <label><input id="extract_clips" type="checkbox" checked> extract_clips</label>
+            <label><input id="fb_normalize" type="checkbox"> fb_normalize</label>
+            <label><input id="fb_delete_mov" type="checkbox"> fb_delete_mov</label>
+        </div>
+
+        <div class="submit-row">
+            <button class="apply-btn" id="apply-btn" onclick="applyAll()">全カメラへ反映</button>
+            <div class="message" id="msg"></div>
+        </div>
+        <div class="footer">注: scale/buffer は再起動後に有効になります。</div>
+    </div>
+    <script>
+        function setMsg(text, cls='') {{
+            const el = document.getElementById('msg');
+            el.textContent = text || '';
+            el.className = 'message' + (cls ? (' ' + cls) : '');
+        }}
+        function num(id) {{
+            return Number(document.getElementById(id).value);
+        }}
+        function applyAll() {{
+            const btn = document.getElementById('apply-btn');
+            const payload = {{
+                sensitivity: document.getElementById('sensitivity').value,
+                diff_threshold: num('diff_threshold'),
+                min_brightness: num('min_brightness'),
+                min_brightness_tracking: num('min_brightness_tracking'),
+                min_length: num('min_length'),
+                max_length: num('max_length'),
+                min_duration: num('min_duration'),
+                max_duration: num('max_duration'),
+                min_speed: num('min_speed'),
+                min_linearity: num('min_linearity'),
+                min_area: num('min_area'),
+                max_area: num('max_area'),
+                max_gap_time: num('max_gap_time'),
+                max_distance: num('max_distance'),
+                merge_max_gap_time: num('merge_max_gap_time'),
+                merge_max_distance: num('merge_max_distance'),
+                merge_max_speed_ratio: num('merge_max_speed_ratio'),
+                exclude_bottom: num('exclude_bottom'),
+                scale: num('scale'),
+                buffer: num('buffer'),
+                mask_dilate: num('mask_dilate'),
+                extract_clips: document.getElementById('extract_clips').checked,
+                fb_normalize: document.getElementById('fb_normalize').checked,
+                fb_delete_mov: document.getElementById('fb_delete_mov').checked,
+            }};
+            btn.disabled = true;
+            btn.textContent = '反映中...';
+            setMsg('全カメラへ反映中...');
+            fetch('/apply_settings_all', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify(payload),
+            }})
+            .then(r => r.json())
+            .then(data => {{
+                if (data.success) {{
+                    setMsg('反映完了 (' + data.success_count + '/' + data.total + ')', 'ok');
+                }} else {{
+                    const failed = Array.isArray(data.results) ? data.results.filter(x => !x.success).map(x => x.camera).join(', ') : '';
+                    setMsg('一部失敗 (' + (data.success_count || 0) + '/' + (data.total || 0) + ')' + (failed ? (' ' + failed) : ''), 'error');
+                }}
+            }})
+            .catch((err) => {{
+                setMsg('反映失敗: ' + err.message, 'error');
+            }})
+            .finally(() => {{
+                btn.disabled = false;
+                btn.textContent = '全カメラへ反映';
+            }});
+        }}
+        // 初期値はcamera_stats/0のsettingsを使う
+        fetch('/camera_stats/0', {{ cache: 'no-store' }})
+            .then(r => r.json())
+            .then(data => {{
+                const s = data && data.settings ? data.settings : null;
+                if (!s) return;
+                const setVal = (id, key) => {{
+                    const el = document.getElementById(id);
+                    if (!el || !(key in s)) return;
+                    if (el.type === 'checkbox') el.checked = !!s[key];
+                    else el.value = s[key];
+                }};
+                [
+                    'sensitivity','diff_threshold','min_brightness','min_brightness_tracking',
+                    'min_length','max_length','min_duration','max_duration','min_speed',
+                    'min_linearity','min_area','max_area','max_gap_time','max_distance',
+                    'merge_max_gap_time','merge_max_distance','merge_max_speed_ratio',
+                    'exclude_bottom','scale','buffer','mask_dilate','extract_clips',
+                    'fb_normalize','fb_delete_mov'
+                ].forEach((k) => setVal(k, k));
+            }})
+            .catch(() => {{}});
     </script>
 </body>
 </html>'''
