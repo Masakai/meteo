@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.23] - 2026-02-13
+### Added
+- `meteor_detector_rtsp_web.py` のWeb UIに「スナップショット保存」ボタンを追加。
+- ライブ表示タイミングに合わせて、`/snapshot` を直接ダウンロード保存できる操作を追加。
+
 ## [1.11.22] - 2026-02-13
 ### Changed
 - ダッシュボードの `rtsp_web 操作パネル` から説明文を削除し、代わりにカメラごとの最新検出サマリー表示（最終検出時刻 / 信頼度 / 分類）を追加。

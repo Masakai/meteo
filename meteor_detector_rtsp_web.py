@@ -216,6 +216,25 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             display: flex;
             justify-content: flex-end;
             gap: 8px;
+            flex-wrap: wrap;
+        }}
+        .snapshot-btn {{
+            margin-right: auto;
+            background: #1e3b37;
+            border: 1px solid #48d1bf;
+            color: #9ff7e9;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .snapshot-btn:hover {{
+            background: #48d1bf;
+            color: #0f1530;
+        }}
+        .snapshot-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
         }}
         .mask-btn {{
             background: #2a3f6f;
@@ -280,6 +299,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             <img class="mask-overlay" id="mask-overlay" data-src="/mask" alt="mask">
         </div>
         <div class="actions">
+            <button class="snapshot-btn" id="snapshot-btn" onclick="downloadSnapshot()">スナップショット保存</button>
             <button class="mask-btn" id="mask-update-btn" onclick="updateMask()">マスク更新</button>
             <button class="mask-toggle-btn" id="mask-toggle-btn" onclick="toggleMask()" disabled>マスク表示</button>
         </div>
@@ -338,6 +358,31 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                         btn.disabled = false;
                     }}, 1500);
                 }});
+        }}
+
+        function downloadSnapshot() {{
+            const btn = document.getElementById('snapshot-btn');
+            if (!btn) return;
+            btn.disabled = true;
+            btn.textContent = '保存中...';
+            try {{
+                const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                const link = document.createElement('a');
+                link.href = '/snapshot?t=' + Date.now();
+                link.download = `snapshot_{camera_name}_${{ts}}.jpg`;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                btn.textContent = '保存要求済み';
+            }} catch (_) {{
+                btn.textContent = '失敗';
+            }} finally {{
+                setTimeout(() => {{
+                    btn.textContent = 'スナップショット保存';
+                    btn.disabled = false;
+                }}, 1500);
+            }}
         }}
 
         setInterval(() => {{
