@@ -35,6 +35,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                     </div>
                     <div class="camera-stats">
                         <span>検出: <b id="count{i}">-</b></span>
+                        <span class="meteor-lamp idle" id="meteor-lamp{i}"><span class="dot">●</span>視野内検出 OFF</span>
                         <span class="camera-params" id="params{i}"></span>
                     </div>
                 </div>
@@ -387,6 +388,32 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
         .camera-stats b {{
             color: #00ff88;
+        }}
+        .meteor-lamp {{
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.82em;
+            border: 1px solid #3a4f79;
+            border-radius: 999px;
+            padding: 3px 8px;
+            background: #1a2747;
+            color: #9bb1d8;
+            white-space: nowrap;
+        }}
+        .meteor-lamp .dot {{
+            font-size: 0.9em;
+            line-height: 1;
+            color: #7d8daa;
+        }}
+        .meteor-lamp.on {{
+            border-color: #ff6b6b;
+            background: #3b2030;
+            color: #ffd3d3;
+        }}
+        .meteor-lamp.on .dot {{
+            color: #ff4d4d;
+            animation: blink 0.8s infinite;
         }}
         .camera-params {{
             font-size: 0.8em;
@@ -1093,8 +1120,18 @@ def render_dashboard_html(cameras, version, server_start_time):
                     }}
                     if (data.is_detecting === true) {{
                         document.getElementById('detection' + i).className = 'detection-status detecting';
+                        const lampEl = document.getElementById('meteor-lamp' + i);
+                        if (lampEl) {{
+                            lampEl.className = 'meteor-lamp on';
+                            lampEl.innerHTML = '<span class="dot">●</span>視野内検出 ON';
+                        }}
                     }} else {{
                         document.getElementById('detection' + i).className = 'detection-status';
+                        const lampEl = document.getElementById('meteor-lamp' + i);
+                        if (lampEl) {{
+                            lampEl.className = 'meteor-lamp idle';
+                            lampEl.innerHTML = '<span class="dot">●</span>視野内検出 OFF';
+                        }}
                     }}
                     const maskActive = data.mask_active === true;
                     const maskStatusEl = document.getElementById('mask-status' + i);
@@ -1109,6 +1146,11 @@ def render_dashboard_html(cameras, version, server_start_time):
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
                     document.getElementById('status' + i).className = 'camera-status offline';
                     document.getElementById('detection' + i).className = 'detection-status';
+                    const lampEl = document.getElementById('meteor-lamp' + i);
+                    if (lampEl) {{
+                        lampEl.className = 'meteor-lamp idle';
+                        lampEl.innerHTML = '<span class="dot">●</span>視野内検出 OFF';
+                    }}
                 }})
                 .finally(() => {{
                     scheduleCameraStats(i, cameraStatsState[i].delay);

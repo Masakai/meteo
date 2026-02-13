@@ -29,6 +29,8 @@ def test_render_dashboard_includes_rtsp_web_controls():
     assert "applySettingsAll()" in html
     assert "マスクリセット" in html
     assert "resetMask(0)" in html
+    assert 'id="meteor-lamp0"' in html
+    assert "視野内検出 OFF" in html
     assert "/apply_settings_all" in html
     assert "resolveCameraTabUrl" in html
     assert "window.location.hostname" in html

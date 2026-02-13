@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.25] - 2026-02-13
+### Added
+- ダッシュボード各カメラカードに「視野内検出 ON/OFF」ランプを追加。
+- `is_detecting` の状態に連動して、ランプ色と表示文言をリアルタイム更新するよう変更。
+
 ## [1.11.24] - 2026-02-13
 ### Added
 - ダッシュボードに設定メニュー導線（`/settings`）を追加し、専用ページから全カメラへ一括設定反映できるよう変更。
