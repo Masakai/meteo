@@ -23,6 +23,8 @@ def test_render_dashboard_includes_rtsp_web_controls():
     assert "タブ起動 (:8081)" in html
     assert "openCameraTab(0)" in html
     assert 'id="control-url0"' in html
+    assert 'id="latest-time0"' in html
+    assert "最終検出時刻" in html
     assert "resolveCameraTabUrl" in html
     assert "window.location.hostname" in html
     assert "window.location.href = target;" in html

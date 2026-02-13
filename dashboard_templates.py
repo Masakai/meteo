@@ -26,9 +26,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                     <div class="camera-control-panel">
                         <div class="control-panel-title">rtsp_web 操作パネル</div>
                         <div class="control-panel-url" id="control-url{i}">{cam['url']}</div>
-                        <div class="control-panel-help">
-                            <p>ストリームは dashboard に埋め込まず、専用タブで表示します。</p>
-                            <p>上の <b>タブ起動</b> ボタンでこのカメラのプレビュー画面を開いて操作してください。</p>
+                        <div class="camera-latest-detection">
+                            <div class="latest-row"><span>最終検出時刻</span><b id="latest-time{i}">-</b></div>
+                            <div class="latest-row"><span>信頼度</span><b id="latest-confidence{i}">-</b></div>
+                            <div class="latest-row"><span>分類</span><b id="latest-label{i}">-</b></div>
                         </div>
                     </div>
                     <div class="camera-stats">
@@ -247,13 +248,27 @@ def render_dashboard_html(cameras, version, server_start_time):
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             font-size: 0.85em;
         }}
-        .control-panel-help {{
+        .camera-latest-detection {{
+            background: #131f3d;
+            border: 1px solid #2a3f6f;
+            border-radius: 6px;
+            padding: 8px 10px;
             color: #b8c8e8;
             font-size: 0.85em;
-            line-height: 1.5;
         }}
-        .control-panel-help p + p {{
+        .latest-row {{
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
             margin-top: 6px;
+        }}
+        .latest-row:first-child {{
+            margin-top: 0;
+        }}
+        .latest-row b {{
+            color: #00ff88;
+            font-weight: 700;
         }}
         .camera-stats {{
             padding: 10px 15px;
@@ -1142,6 +1157,24 @@ def render_dashboard_html(cameras, version, server_start_time):
             }});
         }}
 
+        function labelToText(label) {{
+            return label === 'post_detected' ? 'それ以外' : '流星';
+        }}
+
+        function updateLatestDetectionSummary(groupedDetections) {{
+            cameras.forEach((cam, i) => {{
+                const latest = (groupedDetections && groupedDetections[cam.name] && groupedDetections[cam.name][0])
+                    ? groupedDetections[cam.name][0]
+                    : null;
+                const timeEl = document.getElementById('latest-time' + i);
+                const confEl = document.getElementById('latest-confidence' + i);
+                const labelEl = document.getElementById('latest-label' + i);
+                if (timeEl) timeEl.textContent = latest ? latest.time : '-';
+                if (confEl) confEl.textContent = latest ? latest.confidence : '-';
+                if (labelEl) labelEl.textContent = latest ? labelToText(latest.label) : '-';
+            }});
+        }}
+
         let lastDetectionsKey = '';
         let lastDetectionsMtime = 0;
         const detectionPollBaseDelay = 5000;
@@ -1190,6 +1223,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                             }}
                             grouped[d.camera].push(d);
                         }});
+                        updateLatestDetectionSummary(grouped);
 
                         const cameraOrder = cameras.map(cam => cam.name).filter(name => grouped[name]);
                         Object.keys(grouped).forEach(name => {{
@@ -1255,12 +1289,14 @@ def render_dashboard_html(cameras, version, server_start_time):
                         }}).join('');
                         document.getElementById('detection-list').innerHTML = html;
                     }} else {{
+                        updateLatestDetectionSummary(null);
                         document.getElementById('detection-list').innerHTML = '<div class="detection-item" style="color:#666">検出待機中...</div>';
                     }}
                 }})
                 .catch(err => {{
                     detectionPollDelay = Math.min(detectionPollDelay * 2, detectionPollMaxDelay);
                     console.warn('Detections fetch error:', err);
+                    updateLatestDetectionSummary(null);
                 }});
         }}
 
