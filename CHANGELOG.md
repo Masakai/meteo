@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.20] - 2026-02-13
+### Fixed
+- ダッシュボードの「タブ起動」が `localhost` 固定URLを開いてしまう問題を修正。
+- 「タブ起動」は現在アクセス中の dashboard ホスト名を使用して `:808x` を開くよう変更し、実行環境依存を解消。
+
 ## [1.11.19] - 2026-02-13
 ### Changed
 - ダッシュボードの各カメラカードから埋め込みライブストリーム表示を撤去し、`rtsp_web` 操作用パネルへ置き換え。

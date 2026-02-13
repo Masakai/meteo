@@ -966,7 +966,17 @@ def render_dashboard_html(cameras, version, server_start_time):
         function openCameraTab(i) {{
             const cam = cameras[i];
             if (!cam || !cam.url) return;
-            window.open(cam.url, '_blank', 'noopener,noreferrer');
+            try {{
+                const parsed = new URL(cam.url, window.location.origin);
+                const protocol = window.location.protocol || parsed.protocol || 'http:';
+                const host = window.location.hostname || parsed.hostname;
+                const port = parsed.port || String(8081 + i);
+                const target = `${{protocol}}//${{host}}:${{port}}`;
+                window.open(target, '_blank', 'noopener,noreferrer');
+            }} catch (_) {{
+                const fallback = `${{window.location.protocol}}//${{window.location.hostname}}:${{8081 + i}}`;
+                window.open(fallback, '_blank', 'noopener,noreferrer');
+            }}
         }}
 
         // 画像モーダル表示
