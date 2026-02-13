@@ -534,8 +534,8 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 }).encode())
                 return
 
-            save_path = None
-            if current_output_dir and current_camera_name:
+            save_path = current_mask_save if current_mask_save else None
+            if save_path is None and current_output_dir and current_camera_name:
                 save_dir = current_output_dir / "masks"
                 save_dir.mkdir(parents=True, exist_ok=True)
                 save_path = save_dir / f"{current_camera_name}_mask.png"
@@ -708,7 +708,8 @@ def detection_thread_worker(
     persistent_mask_path = None
     if output_path:
         persistent_mask_path = Path(output_path) / "masks" / f"{camera_name}_mask.png"
-        if mask_image is None and persistent_mask_path.exists():
+        if persistent_mask_path.exists():
+            # /update_mask で更新した永続マスクを最優先する（再起動後も維持）
             mask_image = str(persistent_mask_path)
     if mask_image:
         mask_img = cv2.imread(mask_image, cv2.IMREAD_GRAYSCALE)

@@ -18,23 +18,17 @@ def render_dashboard_html(cameras, version, server_start_time):
                         </div>
                     </div>
                     <div class="camera-actions">
-                        <label class="stream-toggle-label" title="ON時は常時ライブ表示します">
-                            <input type="checkbox" id="stream-toggle{i}" checked onchange="toggleStreamEnabled({i}, this.checked)">
-                            <span>常時表示</span>
-                        </label>
+                        <button class="open-tab-btn" onclick="openCameraTab({i})">タブ起動 (:808{i + 1})</button>
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
                         <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
                         <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
-                        <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
-                    <div class="camera-video">
-                        <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-stream-src="/camera_stream/{i}" alt="{cam['name']}"
-                             onerror="handleStreamError({i})"
-                             onload="handleStreamLoad({i})">
-                        <img class="mask-overlay" id="mask{i}" data-src="/camera_mask_image/{i}" alt="mask"
-                             onerror="this.style.display='none'; this.dataset.visible='';">
-                        <div class="camera-error" id="error{i}">
-                            <span>接続中...</span>
+                    <div class="camera-control-panel">
+                        <div class="control-panel-title">rtsp_web 操作パネル</div>
+                        <div class="control-panel-url">{cam['url']}</div>
+                        <div class="control-panel-help">
+                            <p>ストリームは dashboard に埋め込まず、専用タブで表示します。</p>
+                            <p>上の <b>タブ起動</b> ボタンでこのカメラのプレビュー画面を開いて操作してください。</p>
                         </div>
                     </div>
                     <div class="camera-stats">
@@ -157,11 +151,6 @@ def render_dashboard_html(cameras, version, server_start_time):
             0%, 50% {{ opacity: 1; }}
             51%, 100% {{ opacity: 0.3; }}
         }}
-        .camera-video {{
-            position: relative;
-            background: #000;
-            aspect-ratio: 16/9;
-        }}
         .camera-actions {{
             padding: 8px 12px;
             background: #16213e;
@@ -169,20 +158,21 @@ def render_dashboard_html(cameras, version, server_start_time):
             display: flex;
             justify-content: flex-end;
             gap: 8px;
+            flex-wrap: wrap;
         }}
-        .stream-toggle-label {{
+        .open-tab-btn {{
             margin-right: auto;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            color: #9bb1d8;
-            font-size: 0.78em;
+            background: #234a37;
+            border: 1px solid #7bf3be;
+            color: #c8ffe7;
+            padding: 4px 10px;
+            border-radius: 6px;
             cursor: pointer;
-            user-select: none;
+            font-size: 0.8em;
         }}
-        .stream-toggle-label input {{
-            accent-color: #00d4ff;
-            cursor: pointer;
+        .open-tab-btn:hover {{
+            background: #7bf3be;
+            color: #0f1530;
         }}
         .mask-btn {{
             background: #2a3f6f;
@@ -235,49 +225,35 @@ def render_dashboard_html(cameras, version, server_start_time):
             opacity: 0.6;
             cursor: wait;
         }}
-        .mask-preview-btn {{
-            background: #1f324f;
-            border: 1px solid #ff6b6b;
-            color: #ff6b6b;
-            padding: 4px 10px;
+        .camera-control-panel {{
+            padding: 14px 15px;
+            background: #0f172d;
+            border-bottom: 1px solid #2a3f6f;
+            min-height: 180px;
+        }}
+        .control-panel-title {{
+            color: #7bf3be;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }}
+        .control-panel-url {{
+            color: #9bb1d8;
+            background: #131f3d;
+            border: 1px solid #2a3f6f;
             border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.8em;
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            word-break: break-all;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.85em;
         }}
-        .mask-preview-btn:hover {{
-            background: #ff6b6b;
-            color: #0f1530;
+        .control-panel-help {{
+            color: #b8c8e8;
+            font-size: 0.85em;
+            line-height: 1.5;
         }}
-        .mask-preview-btn:disabled {{
-            opacity: 0.5;
-            cursor: not-allowed;
-        }}
-        .camera-video img {{
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }}
-        .mask-overlay {{
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: none;
-            pointer-events: none;
-        }}
-        .camera-error {{
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0,0,0,0.8);
-            color: #888;
+        .control-panel-help p + p {{
+            margin-top: 6px;
         }}
         .camera-stats {{
             padding: 10px 15px;
@@ -661,8 +637,6 @@ def render_dashboard_html(cameras, version, server_start_time):
     <script>
         const cameras = {json.dumps(cameras)};
         const serverStartTime = {int(server_start_time * 1000)};
-        const streamPlaceholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-        const streamSelectionStorageKey = 'dashboard_stream_enabled_v1';
 
         // 稼働時間を更新
         setInterval(() => {{
@@ -781,179 +755,8 @@ def render_dashboard_html(cameras, version, server_start_time):
         let totalDetections = 0;
         const cameraStatsTimers = [];
         const cameraStatsState = [];
-        const streamRetryState = [];
-        const streamSelectionState = [];
-        const STREAM_RETRY_MIN_MS = 2000;
-        const STREAM_RETRY_MAX_MS = 30000;
-        const STREAM_INITIAL_STAGGER_MS = 2000;
         let dashboardBackgroundPaused = document.hidden === true;
         let detectionPollTimer = null;
-
-        function ensureStreamRetryState(i) {{
-            if (!streamRetryState[i]) {{
-                streamRetryState[i] = {{
-                    delay: STREAM_RETRY_MIN_MS,
-                    timer: null
-                }};
-            }}
-            return streamRetryState[i];
-        }}
-
-        function loadStreamSelection() {{
-            let saved = null;
-            try {{
-                saved = JSON.parse(localStorage.getItem(streamSelectionStorageKey) || 'null');
-            }} catch (_) {{
-                saved = null;
-            }}
-            cameras.forEach((_, i) => {{
-                const enabled = Array.isArray(saved) && typeof saved[i] === 'boolean' ? saved[i] : true;
-                streamSelectionState[i] = enabled;
-            }});
-        }}
-
-        function saveStreamSelection() {{
-            try {{
-                localStorage.setItem(streamSelectionStorageKey, JSON.stringify(streamSelectionState));
-            }} catch (_) {{
-                // localStorage が使えない環境では保存をスキップ
-            }}
-        }}
-
-        function isStreamEnabled(i) {{
-            return streamSelectionState[i] !== false;
-        }}
-
-        function setStreamErrorMessage(i, message) {{
-            const errorEl = document.getElementById('error' + i);
-            if (!errorEl) return;
-            const span = errorEl.querySelector('span');
-            if (span) {{
-                span.textContent = message;
-            }}
-        }}
-
-        function applyStreamToggleUI(i) {{
-            const checkbox = document.getElementById('stream-toggle' + i);
-            if (checkbox) {{
-                checkbox.checked = isStreamEnabled(i);
-            }}
-        }}
-
-        function setStreamEnabled(i, enabled, persist = true) {{
-            streamSelectionState[i] = enabled === true;
-            applyStreamToggleUI(i);
-            clearStreamRetryTimer(i);
-
-            const img = document.getElementById('stream' + i);
-            const errorEl = document.getElementById('error' + i);
-            const statusEl = document.getElementById('status' + i);
-            if (!img || !errorEl || !statusEl) {{
-                if (persist) saveStreamSelection();
-                return;
-            }}
-
-            if (isStreamEnabled(i)) {{
-                setStreamErrorMessage(i, '接続中...');
-                statusEl.className = 'camera-status';
-                scheduleStreamRetry(i, 0);
-            }} else {{
-                img.src = streamPlaceholderSrc;
-                img.style.display = 'none';
-                errorEl.style.display = 'flex';
-                setStreamErrorMessage(i, '常時表示オフ');
-                statusEl.className = 'camera-status paused';
-            }}
-
-            if (persist) {{
-                saveStreamSelection();
-            }}
-        }}
-
-        function toggleStreamEnabled(i, enabled) {{
-            setStreamEnabled(i, enabled, true);
-        }}
-
-        function clearStreamRetryTimer(i) {{
-            const state = ensureStreamRetryState(i);
-            if (state.timer) {{
-                clearTimeout(state.timer);
-                state.timer = null;
-            }}
-        }}
-
-        function scheduleStreamRetry(i, delay) {{
-            if (dashboardBackgroundPaused) {{
-                return;
-            }}
-            if (!isStreamEnabled(i)) {{
-                return;
-            }}
-            const state = ensureStreamRetryState(i);
-            clearStreamRetryTimer(i);
-            state.timer = setTimeout(() => {{
-                if (!isStreamEnabled(i)) return;
-                const img = document.getElementById('stream' + i);
-                if (!img) return;
-                const base = img.dataset.streamSrc || ('/camera_stream/' + i);
-                img.src = base + '?t=' + Date.now();
-            }}, Math.max(0, delay));
-        }}
-
-        function handleStreamError(i) {{
-            if (dashboardBackgroundPaused) {{
-                return;
-            }}
-            if (!isStreamEnabled(i)) {{
-                return;
-            }}
-            const img = document.getElementById('stream' + i);
-            const errorEl = document.getElementById('error' + i);
-            if (img) {{
-                img.style.display = 'none';
-            }}
-            if (errorEl) {{
-                errorEl.style.display = 'flex';
-            }}
-            setStreamErrorMessage(i, '接続エラー（再試行中）');
-
-            const state = ensureStreamRetryState(i);
-            scheduleStreamRetry(i, state.delay);
-            state.delay = Math.min(state.delay * 2, STREAM_RETRY_MAX_MS);
-        }}
-
-        function handleStreamLoad(i) {{
-            if (dashboardBackgroundPaused) {{
-                return;
-            }}
-            if (!isStreamEnabled(i)) {{
-                return;
-            }}
-            const img = document.getElementById('stream' + i);
-            const errorEl = document.getElementById('error' + i);
-            if (img) {{
-                img.style.display = '';
-            }}
-            if (errorEl) {{
-                errorEl.style.display = 'none';
-            }}
-
-            const state = ensureStreamRetryState(i);
-            state.delay = STREAM_RETRY_MIN_MS;
-            clearStreamRetryTimer(i);
-        }}
-
-        function startCameraStreams() {{
-            // Safari での初期リロード詰まりを避けるため段階的に接続する
-            cameras.forEach((_, i) => {{
-                applyStreamToggleUI(i);
-                if (isStreamEnabled(i)) {{
-                    scheduleStreamRetry(i, i * STREAM_INITIAL_STAGGER_MS);
-                }} else {{
-                    setStreamEnabled(i, false, false);
-                }}
-            }});
-        }}
 
         function clearAllCameraStatsTimers() {{
             for (let i = 0; i < cameraStatsTimers.length; i++) {{
@@ -972,21 +775,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                 detectionPollTimer = null;
             }}
             cameras.forEach((_, i) => {{
-                clearStreamRetryTimer(i);
-                const img = document.getElementById('stream' + i);
-                const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
-                if (img) {{
-                    img.src = streamPlaceholderSrc;
-                    img.style.display = 'none';
-                }}
-                if (errorEl) {{
-                    errorEl.style.display = 'flex';
-                }}
                 if (statusEl) {{
                     statusEl.className = 'camera-status paused';
                 }}
-                setStreamErrorMessage(i, 'バックグラウンド一時停止');
             }});
         }}
 
@@ -996,28 +788,10 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}
             dashboardBackgroundPaused = false;
             cameras.forEach((_, i) => {{
-                if (!isStreamEnabled(i)) {{
-                    return;
-                }}
-                const state = ensureStreamRetryState(i);
-                state.delay = STREAM_RETRY_MIN_MS;
-                clearStreamRetryTimer(i);
-                const img = document.getElementById('stream' + i);
-                const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
-                if (img) {{
-                    const base = img.dataset.streamSrc || ('/camera_stream/' + i);
-                    img.src = base + '?t=' + Date.now();
-                    img.style.display = 'none';
-                }}
-                if (errorEl) {{
-                    errorEl.style.display = 'flex';
-                }}
                 if (statusEl) {{
                     statusEl.className = 'camera-status';
                 }}
-                setStreamErrorMessage(i, '接続中...');
-                scheduleStreamRetry(i, 0);
             }});
             cameras.forEach((_, i) => {{
                 updateCameraStats(i);
@@ -1078,18 +852,11 @@ def render_dashboard_html(cameras, version, server_start_time):
                     cameraStatsState[i].delay = baseDelay;
                     document.getElementById('count' + i).textContent = data.detections;
                     renderCameraParams(i, data);
-                    const streamEnabled = isStreamEnabled(i);
                     const streamAlive = data.stream_alive !== false;
-                    if (!streamEnabled) {{
-                        document.getElementById('status' + i).className = 'camera-status paused';
-                    }} else if (!streamAlive) {{
+                    if (!streamAlive) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status';
-                        const streamImg = document.getElementById('stream' + i);
-                        if (streamImg && streamImg.style.display === 'none') {{
-                            scheduleStreamRetry(i, 0);
-                        }}
                     }}
                     if (data.is_detecting === true) {{
                         document.getElementById('detection' + i).className = 'detection-status detecting';
@@ -1101,24 +868,13 @@ def render_dashboard_html(cameras, version, server_start_time):
                     if (maskStatusEl) {{
                         maskStatusEl.className = maskActive ? 'mask-status active' : 'mask-status';
                     }}
-                    const maskBtn = document.getElementById('mask-btn' + i);
-                    if (maskBtn) {{
-                        maskBtn.disabled = !maskActive;
-                        if (!maskActive) {{
-                            setMaskOverlay(i, false);
-                        }}
-                    }}
                 }})
                 .catch(() => {{
                     if (dashboardBackgroundPaused) {{
                         return;
                     }}
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
-                    if (isStreamEnabled(i)) {{
-                        document.getElementById('status' + i).className = 'camera-status offline';
-                    }} else {{
-                        document.getElementById('status' + i).className = 'camera-status paused';
-                    }}
+                    document.getElementById('status' + i).className = 'camera-status offline';
                     document.getElementById('detection' + i).className = 'detection-status';
                 }})
                 .finally(() => {{
@@ -1126,11 +882,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        loadStreamSelection();
         cameras.forEach((cam, i) => {{
             updateCameraStats(i);
         }});
-        startCameraStreams();
         syncDashboardVisibilityState();
 
         // マスク更新
@@ -1143,12 +897,6 @@ def render_dashboard_html(cameras, version, server_start_time):
                 .then(r => r.json())
                 .then(data => {{
                     btn.textContent = data.success ? '更新完了' : '失敗';
-                    if (data.success) {{
-                        const overlay = document.getElementById('mask' + i);
-                        if (overlay && overlay.dataset.visible === '1') {{
-                            setMaskOverlay(i, true);
-                        }}
-                    }}
                 }})
                 .catch(() => {{
                     btn.textContent = '失敗';
@@ -1181,11 +929,6 @@ def render_dashboard_html(cameras, version, server_start_time):
             }} catch (_) {{
                 btn.textContent = '失敗';
             }} finally {{
-                // 接続飽和を避けるため、必要なカメラだけ再接続する
-                const streamImg = document.getElementById('stream' + i);
-                if (streamImg && streamImg.style.display === 'none') {{
-                    scheduleStreamRetry(i, 300);
-                }}
                 setTimeout(() => {{
                     btn.textContent = 'スナップショット保存';
                     btn.disabled = false;
@@ -1220,27 +963,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        function setMaskOverlay(i, visible) {{
-            const overlay = document.getElementById('mask' + i);
-            const btn = document.getElementById('mask-btn' + i);
-            if (!overlay || !btn) return;
-            if (visible) {{
-                overlay.src = overlay.dataset.src + '?t=' + Date.now();
-                overlay.style.display = 'block';
-                overlay.dataset.visible = '1';
-                btn.textContent = 'マスク非表示';
-            }} else {{
-                overlay.style.display = 'none';
-                overlay.dataset.visible = '';
-                btn.textContent = 'マスク表示';
-            }}
-        }}
-
-        function toggleMask(i) {{
-            const overlay = document.getElementById('mask' + i);
-            if (!overlay) return;
-            const visible = overlay.dataset.visible === '1';
-            setMaskOverlay(i, !visible);
+        function openCameraTab(i) {{
+            const cam = cameras[i];
+            if (!cam || !cam.url) return;
+            window.open(cam.url, '_blank', 'noopener,noreferrer');
         }}
 
         // 画像モーダル表示

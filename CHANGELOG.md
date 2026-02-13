@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.19] - 2026-02-13
+### Changed
+- ダッシュボードの各カメラカードから埋め込みライブストリーム表示を撤去し、`rtsp_web` 操作用パネルへ置き換え。
+- 各カメラカードに `:808x` の個別プレビューを新規ブラウザタブで開く「タブ起動」ボタンを追加。
+
+### Fixed
+- `POST /update_mask` で更新したマスクの保存先を永続化設定（`mask_save`）優先に修正。
+- 起動時に `output/masks/<camera>_mask.png` が存在する場合、その永続マスクを優先ロードするよう変更し、再起動後も更新マスクを維持。
+
 ## [1.11.18] - 2026-02-10
 ### Fixed
 - ダッシュボード上部ステータスバー（総検出数/カメラ数/System CPU/稼働時間/検出時間帯）の値・ラベルのベースラインずれを修正。
