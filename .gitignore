@@ -21,8 +21,10 @@ tests/__pycache__/
 /.claude/
 /output/
 /tmp/
+/scaffold/
 /meteor_*.mov
 /meteor_*.mp4
+/scripts/pre_publish_leak_check.sh
 
 # User-specific configuration
 streamers

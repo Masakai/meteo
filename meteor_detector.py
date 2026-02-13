@@ -111,6 +111,144 @@ class DetectionParams:
     exclude_bottom_ratio: float = 1/16  # 下部の除外範囲（0-1）
 
 
+def clone_detection_params(params: DetectionParams) -> DetectionParams:
+    """DetectionParamsを複製"""
+    return DetectionParams(**vars(params))
+
+
+def apply_sensitivity_preset(params: DetectionParams, sensitivity: str) -> None:
+    """感度プリセットを適用"""
+    if sensitivity == "low":
+        params.diff_threshold = 40
+        params.min_brightness = 220
+        params.min_length = 30
+        params.min_speed = 8.0
+    elif sensitivity == "high":
+        params.diff_threshold = 20
+        params.min_brightness = 180
+        params.min_length = 15
+        params.min_speed = 3.0
+    elif sensitivity == "fireball":
+        # 火球検出モード: 長時間・長距離・明るい流星に最適化
+        params.diff_threshold = 15        # 低い閾値で検出しやすく
+        params.min_brightness = 150       # 暗めでも検出
+        params.min_length = 30            # ある程度の長さは必要
+        params.max_length = 10000         # 画面全体を横断してもOK
+        params.min_duration = 3           # 最低3フレーム
+        params.max_duration = 600         # 20秒@30fps まで対応
+        params.min_speed = 1.0            # 遅い火球も検出
+        params.min_linearity = 0.6        # 多少曲がってもOK
+        params.max_area = 20000           # 大きな光点も対応
+        params.max_gap_frames = 10        # 明滅にも対応
+        params.max_distance = 150         # 速い火球の追跡にも対応
+
+
+def build_seek_candidates(base: DetectionParams, max_trials: int) -> List[DetectionParams]:
+    """seekモード用に段階的に緩和した候補を生成"""
+    max_trials = max(1, max_trials)
+    candidates: List[DetectionParams] = []
+    seen = set()
+
+    # 0段階目は現在の設定をそのまま使う。段階が進むほど検出条件を緩和する。
+    for level in range(max_trials):
+        trial = clone_detection_params(base)
+        relax = min(level, 6)
+
+        if relax >= 1:
+            trial.diff_threshold = max(5, int(round(base.diff_threshold - 5)))
+            trial.min_brightness = max(80, int(round(base.min_brightness - 10)))
+        if relax >= 2:
+            trial.min_length = max(8, int(round(base.min_length - 5)))
+            trial.min_speed = max(0.5, base.min_speed * 0.8)
+        if relax >= 3:
+            trial.diff_threshold = max(5, int(round(base.diff_threshold - 10)))
+            trial.min_brightness = max(60, int(round(base.min_brightness - 20)))
+            trial.min_linearity = max(0.5, base.min_linearity - 0.05)
+            trial.max_gap_frames = max(base.max_gap_frames, base.max_gap_frames + 2)
+            trial.max_distance = max(base.max_distance, base.max_distance + 20)
+        if relax >= 4:
+            trial.min_length = max(5, int(round(base.min_length - 10)))
+            trial.min_speed = max(0.3, base.min_speed * 0.6)
+            trial.min_area = max(3, int(round(base.min_area - 2)))
+        if relax >= 5:
+            trial.diff_threshold = max(5, int(round(base.diff_threshold - 15)))
+            trial.min_brightness = max(40, int(round(base.min_brightness - 35)))
+            trial.min_linearity = max(0.45, base.min_linearity - 0.1)
+            trial.max_gap_frames = max(base.max_gap_frames, base.max_gap_frames + 5)
+            trial.max_distance = max(base.max_distance, base.max_distance + 50)
+        if relax >= 6:
+            trial.diff_threshold = max(5, int(round(base.diff_threshold - 20)))
+            trial.min_brightness = max(30, int(round(base.min_brightness - 50)))
+            trial.min_speed = max(0.2, base.min_speed * 0.4)
+            trial.min_linearity = max(0.4, base.min_linearity - 0.15)
+            trial.max_gap_frames = max(base.max_gap_frames, base.max_gap_frames + 8)
+            trial.max_distance = max(base.max_distance, base.max_distance + 80)
+            trial.max_duration = max(base.max_duration, int(round(base.max_duration * 1.5)))
+            trial.max_area = max(base.max_area, int(round(base.max_area * 1.5)))
+
+        key = (
+            trial.diff_threshold,
+            trial.min_brightness,
+            trial.min_length,
+            round(trial.min_speed, 4),
+            round(trial.min_linearity, 4),
+            trial.min_area,
+            trial.max_area,
+            trial.max_gap_frames,
+            round(trial.max_distance, 4),
+            trial.max_duration,
+        )
+        if key not in seen:
+            seen.add(key)
+            candidates.append(trial)
+
+    return candidates
+
+
+def seek_detection_params(
+    input_path: str,
+    base_params: DetectionParams,
+    *,
+    max_trials: int,
+    process_scale: float,
+    frame_skip: int,
+    use_threading: bool,
+) -> Tuple[DetectionParams, List[MeteorCandidate]]:
+    """流星が検出できるまでパラメータを探索"""
+    candidates = build_seek_candidates(base_params, max_trials=max_trials)
+    print(f"seekモード: 最大{len(candidates)}回の探索を実行します")
+
+    best_params = clone_detection_params(base_params)
+    for idx, trial_params in enumerate(candidates, start=1):
+        print(
+            f"\n[seek {idx}/{len(candidates)}] "
+            f"diff={trial_params.diff_threshold}, "
+            f"brightness={trial_params.min_brightness}, "
+            f"length={trial_params.min_length}, "
+            f"speed={trial_params.min_speed:.2f}, "
+            f"linearity={trial_params.min_linearity:.2f}"
+        )
+        meteors = process_video(
+            input_path,
+            output_path=None,
+            params=trial_params,
+            show_preview=False,
+            save_json=False,
+            save_images=False,
+            image_output_dir=None,
+            process_scale=process_scale,
+            frame_skip=frame_skip,
+            use_threading=use_threading,
+        )
+        best_params = trial_params
+        if meteors:
+            print(f"\nseek成功: {idx}回目で{len(meteors)}件検出")
+            return trial_params, meteors
+
+    print("\nseek失敗: 指定回数内では検出できませんでした。最終試行のパラメータを採用します。")
+    return best_params, []
+
+
 class FrameBuffer:
     """フレームバッファ（ノイズ除去用）"""
 
@@ -1055,6 +1193,9 @@ def main():
   # 火球検出モード（長時間・長距離の明るい流星）
   python meteor_detector.py input.mp4 --sensitivity fireball
 
+  # seekモード（検出できるまで段階的にパラメータ探索）
+  python meteor_detector.py input.mp4 --seek --seek-max-trials 8
+
   # 流星クリップを切り出し
   python meteor_detector.py input.mp4 --extract-clips
 
@@ -1081,6 +1222,10 @@ def main():
                        help="プレビューを表示")
     parser.add_argument("--sensitivity", choices=["low", "medium", "high", "fireball"],
                        default="medium", help="検出感度 (default: medium, fireball=火球検出モード)")
+    parser.add_argument("--seek", action="store_true",
+                       help="検出できるまで段階的にパラメータを探索してから本処理を実行")
+    parser.add_argument("--seek-max-trials", type=int, default=6,
+                       help="seekモードの最大試行回数 (default: 6)")
     parser.add_argument("--extract-clips", dest="extract_clips", action="store_true", default=True,
                        help="流星クリップを切り出して保存 (デフォルト: 有効)")
     parser.add_argument("--no-clips", dest="extract_clips", action="store_false",
@@ -1133,29 +1278,7 @@ def main():
     params = DetectionParams()
 
     # 感度プリセット
-    if args.sensitivity == "low":
-        params.diff_threshold = 40
-        params.min_brightness = 220
-        params.min_length = 30
-        params.min_speed = 8.0
-    elif args.sensitivity == "high":
-        params.diff_threshold = 20
-        params.min_brightness = 180
-        params.min_length = 15
-        params.min_speed = 3.0
-    elif args.sensitivity == "fireball":
-        # 火球検出モード: 長時間・長距離・明るい流星に最適化
-        params.diff_threshold = 15        # 低い閾値で検出しやすく
-        params.min_brightness = 150       # 暗めでも検出
-        params.min_length = 30            # ある程度の長さは必要
-        params.max_length = 10000         # 画面全体を横断してもOK
-        params.min_duration = 3           # 最低3フレーム
-        params.max_duration = 600         # 20秒@30fps まで対応
-        params.min_speed = 1.0            # 遅い火球も検出
-        params.min_linearity = 0.6        # 多少曲がってもOK
-        params.max_area = 20000           # 大きな光点も対応
-        params.max_gap_frames = 10        # 明滅にも対応
-        params.max_distance = 150         # 速い火球の追跡にも対応
+    apply_sensitivity_preset(params, args.sensitivity)
 
     # 個別パラメータ上書き
     if args.diff_threshold:
@@ -1177,6 +1300,8 @@ def main():
 
     # 処理実行
     if args.realtime:
+        if args.seek:
+            print("[WARN] --seek は通常検出モード専用です。--realtime では無視されます。")
         process_video_realtime(
             args.input,
             output_dir=args.output_dir,
@@ -1191,6 +1316,16 @@ def main():
             mask_save=args.mask_save.strip() if args.mask_save else None,
         )
         return
+
+    if args.seek:
+        params, _ = seek_detection_params(
+            args.input,
+            params,
+            max_trials=args.seek_max_trials,
+            process_scale=process_scale,
+            frame_skip=frame_skip,
+            use_threading=not args.no_threading,
+        )
 
     meteors = process_video(
         args.input,

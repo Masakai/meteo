@@ -168,7 +168,7 @@ graph TB
 | 変数名 | 値 | 説明 |
 |-------|-----|------|
 | `TZ` | `Asia/Tokyo` | タイムゾーン |
-| `RTSP_URL` | `rtsp://6199:4003@10.0.1.25/live` | RTSPストリームURL |
+| `RTSP_URL` | `rtsp://username:password@192.168.1.100/live` | RTSPストリームURL |
 | `CAMERA_NAME` | `camera1_10_0_1_25` | カメラ識別名（ディレクトリ名） |
 | `SENSITIVITY` | `medium` | 感度 (low/medium/high/fireball) |
 | `SCALE` | `0.5` | 処理スケール (0.0-1.0) |
@@ -722,16 +722,16 @@ sequenceDiagram
 
 **入力 (streamers)**:
 ```
-rtsp://6199:4003@10.0.1.25/live
-rtsp://6199:4003@10.0.1.3/live
+rtsp://username:password@192.168.1.100/live
+rtsp://username:password@192.168.1.101/live
 ```
 
 ※ 昼間画像を指定する場合は `| camera1.jpg` のように行末に追加します。
 
 **出力 (docker-compose.yml)**:
 - ダッシュボード: `localhost:8080`
-- カメラ1 (10.0.1.25): `localhost:8081`
-- カメラ2 (10.0.1.3): `localhost:8082`
+- カメラ1 (192.168.1.100): `localhost:8081`
+- カメラ2 (192.168.1.101): `localhost:8082`
 
 ### カメラ削除手順
 
