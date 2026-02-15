@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.27] - 2026-02-15
+### Fixed
+- ダッシュボードの「タブ起動」で `cameraN:8080` / `localhost:8080` 系URLを参照した場合、外部アクセス不能な宛先へ遷移してしまう問題を修正。
+- `resolveCameraTabUrl()` で内部ホスト判定時は `:8081 + index` を優先し、`rtsp_web` タブが正しい公開ポートに遷移するよう改善。
+
 ## [1.11.26] - 2026-02-15
 ### Fixed
 - `meteor_detector_rtsp_web.py` の `GET /stream` で初期フレーム未到着時にCPUスピンしていた処理を修正し、待機時に短いスリープを入れて初期表示遅延を抑制。

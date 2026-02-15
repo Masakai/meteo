@@ -1272,9 +1272,18 @@ def render_dashboard_html(cameras, version, server_start_time):
             if (!cam || !cam.url) return;
             try {{
                 const parsed = new URL(cam.url, window.location.origin);
-                const protocol = window.location.protocol || parsed.protocol || 'http:';
+                const protocol = parsed.protocol || window.location.protocol || 'http:';
                 const host = window.location.hostname || parsed.hostname;
-                const port = parsed.port || String(8081 + i);
+                const camHost = (parsed.hostname || '').toLowerCase();
+                const isInternalCameraHost =
+                    camHost === 'localhost' ||
+                    camHost === '127.0.0.1' ||
+                    camHost === '::1' ||
+                    /^camera\\d+$/.test(camHost);
+                const port =
+                    (isInternalCameraHost && (!parsed.port || parsed.port === '8080'))
+                        ? String(8081 + i)
+                        : (parsed.port || String(8081 + i));
                 const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '/';
                 return `${{protocol}}//${{host}}:${{port}}${{path}}`;
             }} catch (_) {{
