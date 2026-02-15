@@ -593,13 +593,22 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         elif path == '/stream':
             self.send_response(200)
             self.send_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
             self.end_headers()
 
             while True:
                 with current_frame_lock:
-                    if current_frame is None:
-                        continue
-                    _, jpeg = cv2.imencode('.jpg', current_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    frame = None if current_frame is None else current_frame.copy()
+
+                if frame is None:
+                    # 初期フレーム未到着時のCPUスピンを避ける
+                    time.sleep(0.03)
+                    continue
+
+                ok, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                if not ok:
+                    time.sleep(0.01)
+                    continue
 
                 try:
                     self.wfile.write(b'--frame\r\n')

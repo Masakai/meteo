@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.26] - 2026-02-15
+### Fixed
+- `meteor_detector_rtsp_web.py` の `GET /stream` で初期フレーム未到着時にCPUスピンしていた処理を修正し、待機時に短いスリープを入れて初期表示遅延を抑制。
+- MJPEG配信ループでロック保持時間を短縮し、フレームコピー後にエンコードする構成へ変更して初期応答の安定性を改善。
+
 ## [1.11.25] - 2026-02-13
 ### Added
 - ダッシュボード各カメラカードに「視野内検出 ON/OFF」ランプを追加。
