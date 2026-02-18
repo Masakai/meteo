@@ -82,14 +82,36 @@ RTSP版は CLI から調整できる項目が限定されています。
 - `--scale`（処理解像度）
 - `--exclude-bottom`（画面下部の除外率）
 - マスク関連 (`--mask-image`, `--mask-from-day`)
+- ノイズ帯マスク関連 (`--nuisance-mask-image`, `--nuisance-from-night`, `--nuisance-dilate`)
+- ノイズ帯重なり閾値 (`--nuisance-overlap-threshold`)
 
 **例**
 ```bash
 python meteor_detector_rtsp_web.py rtsp://... \
   --sensitivity high \
   --scale 1.0 \
-  --exclude-bottom 0.02
+  --exclude-bottom 0.02 \
+  --nuisance-from-night ./night_reference.jpg \
+  --nuisance-dilate 3 \
+  --nuisance-overlap-threshold 0.60
 ```
+
+## 誤検出（電線・部分照明）を減らす調整
+
+夜間の電線や電柱付近が車のヘッドライトで一時的に光るケース向けに、
+RTSP版には以下の抑制が追加されています。
+
+- 小さい候補がノイズ帯マスクと大きく重なる場合に除外
+- 追跡点数が少ないトラックを除外
+- 連続点の移動が少ない（ほぼ静止）トラックを除外
+- トラック軌跡がノイズ帯と強く重なる場合に除外
+
+### 推奨手順
+
+1. `--nuisance-from-night` で夜間基準画像からノイズ帯マスクを自動生成
+2. 電柱・電線が多い場合は `--nuisance-mask-image` で手動マスクを併用
+3. 誤検出が多い場合は `--nuisance-overlap-threshold` を `0.55` へ下げる
+4. 見逃しが増える場合は `--nuisance-overlap-threshold` を `0.65` へ上げる
 
 ## Docker環境での調整例
 

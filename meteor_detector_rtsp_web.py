@@ -39,7 +39,7 @@ from meteor_detector_realtime import (
     sanitize_fps,
 )
 
-VERSION = "1.9.0"
+VERSION = "1.12.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -74,6 +74,10 @@ current_settings = {
     "exclude_bottom": 0.0625,
     "fb_normalize": False,
     "source_fps": 30.0,
+    "nuisance_mask_image": "",
+    "nuisance_from_night": "",
+    "nuisance_dilate": 3,
+    "nuisance_overlap_threshold": 0.60,
 }
 
 
@@ -673,6 +677,56 @@ def build_exclusion_mask_from_frame(
     return exclusion
 
 
+def build_nuisance_mask_from_night(
+    night_image_path: str,
+    proc_size: Tuple[int, int],
+    dilate_px: int = 3,
+    save_path: Optional[Path] = None,
+) -> Optional[np.ndarray]:
+    """夜間基準画像から、電線などの細い静的線分をノイズ帯として抽出"""
+    img = cv2.imread(night_image_path)
+    if img is None:
+        print(f"[WARN] ノイズ帯画像を読み込めません: {night_image_path}")
+        return None
+
+    proc_w, proc_h = proc_size
+    resized = cv2.resize(img, (proc_w, proc_h), interpolation=cv2.INTER_AREA)
+    gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+    denoised = cv2.GaussianBlur(gray, (3, 3), 0)
+    edges = cv2.Canny(denoised, 40, 120)
+
+    lines = cv2.HoughLinesP(
+        edges,
+        rho=1,
+        theta=np.pi / 180,
+        threshold=30,
+        minLineLength=max(20, proc_w // 15),
+        maxLineGap=6,
+    )
+
+    nuisance = np.zeros((proc_h, proc_w), dtype=np.uint8)
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            length = float(np.hypot(x2 - x1, y2 - y1))
+            if length < 15:
+                continue
+            cv2.line(nuisance, (x1, y1), (x2, y2), 255, 1, cv2.LINE_AA)
+
+    if dilate_px > 0:
+        k = max(1, int(dilate_px))
+        dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+        nuisance = cv2.dilate(nuisance, dilate_kernel)
+
+    if save_path:
+        try:
+            cv2.imwrite(str(save_path), nuisance)
+        except Exception:
+            print(f"[WARN] ノイズ帯マスク保存に失敗: {save_path}")
+
+    return nuisance
+
+
 def detection_thread_worker(
     reader,
     params,
@@ -686,6 +740,9 @@ def detection_thread_worker(
     mask_from_day=None,
     mask_dilate=5,
     mask_save=None,
+    nuisance_mask_image=None,
+    nuisance_from_night=None,
+    nuisance_dilate=3,
     enable_time_window=False,
     latitude=35.3606,
     longitude=138.7274,
@@ -705,6 +762,7 @@ def detection_thread_worker(
 
     ring_buffer = RingBuffer(buffer_seconds, fps)
     exclusion_mask = None
+    nuisance_mask = None
     persistent_mask_path = None
     if output_path:
         persistent_mask_path = Path(output_path) / "masks" / f"{camera_name}_mask.png"
@@ -729,7 +787,32 @@ def detection_thread_worker(
         if exclusion_mask is not None:
             print(f"マスク適用: {mask_from_day}")
 
-    detector = RealtimeMeteorDetector(params, fps, exclusion_mask=exclusion_mask)
+    if nuisance_mask_image:
+        nuisance_img = cv2.imread(nuisance_mask_image, cv2.IMREAD_GRAYSCALE)
+        if nuisance_img is None:
+            print(f"[WARN] ノイズ帯マスク画像を読み込めません: {nuisance_mask_image}")
+        else:
+            if (nuisance_img.shape[1], nuisance_img.shape[0]) != (proc_width, proc_height):
+                nuisance_img = cv2.resize(nuisance_img, (proc_width, proc_height), interpolation=cv2.INTER_NEAREST)
+            _, nuisance_mask = cv2.threshold(nuisance_img, 1, 255, cv2.THRESH_BINARY)
+            print(f"ノイズ帯マスク適用: {nuisance_mask_image}")
+
+    if nuisance_from_night:
+        auto_nuisance = build_nuisance_mask_from_night(
+            nuisance_from_night,
+            (proc_width, proc_height),
+            dilate_px=nuisance_dilate,
+        )
+        if auto_nuisance is not None:
+            nuisance_mask = auto_nuisance if nuisance_mask is None else cv2.bitwise_or(nuisance_mask, auto_nuisance)
+            print(f"ノイズ帯マスク自動生成: {nuisance_from_night}")
+
+    detector = RealtimeMeteorDetector(
+        params,
+        fps,
+        exclusion_mask=exclusion_mask,
+        nuisance_mask=nuisance_mask,
+    )
     merger = EventMerger(params)
     current_detector = detector
     current_proc_size = (proc_width, proc_height)
@@ -919,6 +1002,10 @@ def process_rtsp_stream(
     mask_from_day: Optional[str] = None,
     mask_dilate: int = 5,
     mask_save: Optional[str] = None,
+    nuisance_mask_image: Optional[str] = None,
+    nuisance_from_night: Optional[str] = None,
+    nuisance_dilate: int = 3,
+    nuisance_overlap_threshold: float = 0.60,
     fb_normalize: bool = False,
     fb_delete_mov: bool = False,
 ):
@@ -944,6 +1031,7 @@ def process_rtsp_stream(
 
     # 追跡中は検出閾値より低めにして追跡継続を優先
     params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+    params.nuisance_overlap_threshold = nuisance_overlap_threshold
 
     required_buffer = params.max_duration + 2.0
     effective_buffer_seconds = min(buffer_seconds, required_buffer)
@@ -962,6 +1050,10 @@ def process_rtsp_stream(
         "mask_image": mask_image or "",
         "mask_from_day": mask_from_day or "",
         "mask_dilate": mask_dilate,
+        "nuisance_mask_image": nuisance_mask_image or "",
+        "nuisance_from_night": nuisance_from_night or "",
+        "nuisance_dilate": nuisance_dilate,
+        "nuisance_overlap_threshold": nuisance_overlap_threshold,
     })
 
     output_path = Path(output_dir)
@@ -1029,6 +1121,9 @@ def process_rtsp_stream(
             'mask_from_day': mask_from_day,
             'mask_dilate': mask_dilate,
             'mask_save': Path(mask_save) if mask_save else None,
+            'nuisance_mask_image': nuisance_mask_image,
+            'nuisance_from_night': nuisance_from_night,
+            'nuisance_dilate': nuisance_dilate,
             'enable_time_window': enable_time_window,
             'latitude': latitude,
             'longitude': longitude,
@@ -1078,6 +1173,15 @@ def main():
     parser.add_argument("--mask-from-day", help="昼間画像から検出除外マスクを生成（空以外を除外）")
     parser.add_argument("--mask-dilate", type=int, default=20, help="除外マスクの拡張ピクセル数")
     parser.add_argument("--mask-save", help="生成した除外マスク画像の保存先")
+    parser.add_argument("--nuisance-mask-image", help="作成済みのノイズ帯マスク画像を使用")
+    parser.add_argument("--nuisance-from-night", help="夜間基準画像からノイズ帯マスクを生成")
+    parser.add_argument("--nuisance-dilate", type=int, default=3, help="ノイズ帯マスクの拡張ピクセル数")
+    parser.add_argument(
+        "--nuisance-overlap-threshold",
+        type=float,
+        default=0.60,
+        help="小領域候補を除外するノイズ帯重なり率の閾値",
+    )
     parser.add_argument("--fb-normalize", action="store_true",
                         help="Facebook向けにH.264 MP4へ正規化")
     parser.add_argument("--fb-delete-mov", action="store_true",
@@ -1098,6 +1202,10 @@ def main():
     mask_from_day = mask_from_day if mask_from_day else None
     mask_save = args.mask_save.strip() if args.mask_save else None
     mask_save = mask_save if mask_save else None
+    nuisance_mask_image = args.nuisance_mask_image.strip() if args.nuisance_mask_image else None
+    nuisance_mask_image = nuisance_mask_image if nuisance_mask_image else None
+    nuisance_from_night = args.nuisance_from_night.strip() if args.nuisance_from_night else None
+    nuisance_from_night = nuisance_from_night if nuisance_from_night else None
 
     process_rtsp_stream(
         args.url,
@@ -1113,6 +1221,10 @@ def main():
         mask_from_day=mask_from_day,
         mask_dilate=args.mask_dilate,
         mask_save=mask_save,
+        nuisance_mask_image=nuisance_mask_image,
+        nuisance_from_night=nuisance_from_night,
+        nuisance_dilate=args.nuisance_dilate,
+        nuisance_overlap_threshold=args.nuisance_overlap_threshold,
         fb_normalize=args.fb_normalize,
         fb_delete_mov=args.fb_delete_mov,
     )

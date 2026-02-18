@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-02-18
+### Added
+- RTSP検出に電線・部分照明向けのノイズ帯マスク機能を追加（`nuisance_mask`）。
+- 夜間基準画像からノイズ帯を抽出する処理を追加（`Canny + HoughLinesP + dilate`）。
+- RTSP CLIに以下を追加:
+  - `--nuisance-mask-image`
+  - `--nuisance-from-night`
+  - `--nuisance-dilate`
+  - `--nuisance-overlap-threshold`
+- 誤検出抑制のユニットテスト `tests/test_meteor_detector_nuisance.py` を追加。
+
+### Changed
+- `DetectionParams` に誤検出抑制パラメータを追加:
+  - `nuisance_overlap_threshold`
+  - `nuisance_path_overlap_threshold`
+  - `min_track_points`
+  - `max_stationary_ratio`
+  - `small_area_threshold`
+- 候補物体段階で、ノイズ帯との重なり率が高い小領域を除外する判定を追加。
+- トラック確定時に、追跡点数不足・高静止率・ノイズ帯経路重なりを除外する判定を追加。
+- 誤検出抑制のデバッグログ（`rejected_by=...`）を出力するよう変更。
+
+### Documentation
+- `documents/DETECTION_TUNING.md` に、電線・部分照明の誤検出を減らすための新オプション説明と推奨チューニング手順を追記。
+
 ## [1.11.18] - 2026-02-10
 ### Fixed
 - ダッシュボード上部ステータスバー（総検出数/カメラ数/System CPU/稼働時間/検出時間帯）の値・ラベルのベースラインずれを修正。

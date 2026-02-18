@@ -114,6 +114,11 @@ class DetectionParams:
     merge_max_distance: float = 80
     merge_max_speed_ratio: float = 0.5
     exclude_bottom_ratio: float = 1 / 16
+    nuisance_overlap_threshold: float = 0.60
+    nuisance_path_overlap_threshold: float = 0.70
+    min_track_points: int = 4
+    max_stationary_ratio: float = 0.40
+    small_area_threshold: int = 40
 
     def __post_init__(self):
         if self.min_brightness_tracking is None:
@@ -241,10 +246,17 @@ class RealtimeMeteorDetector:
     CONF_DURATION_SCALE = 0.1
     CONF_DURATION_MAX = 0.2
 
-    def __init__(self, params: DetectionParams, fps: float = 30, exclusion_mask: Optional[np.ndarray] = None):
+    def __init__(
+        self,
+        params: DetectionParams,
+        fps: float = 30,
+        exclusion_mask: Optional[np.ndarray] = None,
+        nuisance_mask: Optional[np.ndarray] = None,
+    ):
         self.params = params
         self.fps = fps
         self.exclusion_mask = exclusion_mask
+        self.nuisance_mask = nuisance_mask
         self.active_tracks: Dict[int, List[Tuple[float, int, int, float]]] = {}
         self.next_track_id = 0
         self.lock = Lock()
@@ -259,9 +271,10 @@ class RealtimeMeteorDetector:
         _, thresh = cv2.threshold(diff, self.params.diff_threshold, 255, cv2.THRESH_BINARY)
         thresh[max_y:, :] = 0
         with self.mask_lock:
-            mask = self.exclusion_mask
-        if mask is not None:
-            thresh[mask > 0] = 0
+            exclusion_mask = self.exclusion_mask
+            nuisance_mask = self.nuisance_mask
+        if exclusion_mask is not None:
+            thresh[exclusion_mask > 0] = 0
 
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
@@ -289,12 +302,22 @@ class RealtimeMeteorDetector:
             mask_img = np.zeros(frame.shape, dtype=np.uint8)
             cv2.drawContours(mask_img, [contour], -1, 255, -1)
             brightness = cv2.mean(frame, mask=mask_img)[0]
+            nuisance_overlap_ratio = 0.0
+            if nuisance_mask is not None and area <= self.params.small_area_threshold:
+                nuisance_overlap_ratio = self._calculate_mask_overlap_ratio(mask_img, nuisance_mask)
+                if nuisance_overlap_ratio >= self.params.nuisance_overlap_threshold:
+                    print(
+                        f"[DEBUG] rejected_by=nuisance_overlap area={area:.1f} "
+                        f"ratio={nuisance_overlap_ratio:.2f}"
+                    )
+                    continue
 
             if brightness >= min_brightness:
                 objects.append({
                     "centroid": (cx, cy),
                     "area": area,
                     "brightness": brightness,
+                    "nuisance_overlap_ratio": nuisance_overlap_ratio,
                 })
 
         return objects
@@ -367,33 +390,67 @@ class RealtimeMeteorDetector:
             return None
 
         track_points = self.active_tracks.pop(track_id)
+        if len(track_points) < self.params.min_track_points:
+            print(
+                f"[DEBUG] rejected_by=min_track_points points={len(track_points)} "
+                f"required={self.params.min_track_points}"
+            )
+            return None
+
         times = [p[0] for p in track_points]
         duration = max(times) - min(times)
 
         if not (self.params.min_duration <= duration <= self.params.max_duration):
+            print(f"[DEBUG] rejected_by=duration duration={duration:.3f}")
             return None
 
         xs = [p[1] for p in track_points]
         ys = [p[2] for p in track_points]
         brightness = [p[3] for p in track_points]
 
+        stationary_ratio = self._calculate_stationary_ratio(xs, ys)
+        if stationary_ratio > self.params.max_stationary_ratio:
+            print(
+                f"[DEBUG] rejected_by=stationary_ratio ratio={stationary_ratio:.2f} "
+                f"max={self.params.max_stationary_ratio:.2f}"
+            )
+            return None
+
         start_idx = times.index(min(times))
         end_idx = times.index(max(times))
         start_point = (xs[start_idx], ys[start_idx])
         end_point = (xs[end_idx], ys[end_idx])
 
+        with self.mask_lock:
+            nuisance_mask = self.nuisance_mask
+        if nuisance_mask is not None:
+            nuisance_path_overlap_ratio = self._calculate_line_overlap_ratio(
+                nuisance_mask,
+                start_point,
+                end_point,
+            )
+            if nuisance_path_overlap_ratio > self.params.nuisance_path_overlap_threshold:
+                print(
+                    f"[DEBUG] rejected_by=nuisance_path_overlap ratio={nuisance_path_overlap_ratio:.2f} "
+                    f"max={self.params.nuisance_path_overlap_threshold:.2f}"
+                )
+                return None
+
         length = np.sqrt((end_point[0] - start_point[0]) ** 2 +
                          (end_point[1] - start_point[1]) ** 2)
 
         if not (self.params.min_length <= length <= self.params.max_length):
+            print(f"[DEBUG] rejected_by=length length={length:.1f}")
             return None
 
         speed = length / max(0.001, duration)
         if speed < self.params.min_speed:
+            print(f"[DEBUG] rejected_by=speed speed={speed:.1f}")
             return None
 
         linearity = calculate_linearity(xs, ys)
         if linearity < self.params.min_linearity:
+            print(f"[DEBUG] rejected_by=linearity linearity={linearity:.2f}")
             return None
 
         confidence = calculate_confidence(
@@ -431,6 +488,44 @@ class RealtimeMeteorDetector:
     def update_exclusion_mask(self, new_mask: Optional[np.ndarray]) -> None:
         with self.mask_lock:
             self.exclusion_mask = new_mask
+
+    def update_nuisance_mask(self, new_mask: Optional[np.ndarray]) -> None:
+        with self.mask_lock:
+            self.nuisance_mask = new_mask
+
+    @staticmethod
+    def _calculate_mask_overlap_ratio(candidate_mask: np.ndarray, nuisance_mask: np.ndarray) -> float:
+        candidate_area = int(np.count_nonzero(candidate_mask))
+        if candidate_area == 0:
+            return 0.0
+        overlap = int(np.count_nonzero((candidate_mask > 0) & (nuisance_mask > 0)))
+        return overlap / candidate_area
+
+    @staticmethod
+    def _calculate_stationary_ratio(xs: List[int], ys: List[int], px_threshold: float = 2.0) -> float:
+        if len(xs) < 2:
+            return 1.0
+        stationary = 0
+        steps = len(xs) - 1
+        for idx in range(1, len(xs)):
+            dist = np.hypot(xs[idx] - xs[idx - 1], ys[idx] - ys[idx - 1])
+            if dist <= px_threshold:
+                stationary += 1
+        return stationary / max(1, steps)
+
+    @staticmethod
+    def _calculate_line_overlap_ratio(
+        nuisance_mask: np.ndarray,
+        start_point: Tuple[int, int],
+        end_point: Tuple[int, int],
+    ) -> float:
+        line_mask = np.zeros_like(nuisance_mask, dtype=np.uint8)
+        cv2.line(line_mask, start_point, end_point, 255, 2, cv2.LINE_AA)
+        line_pixels = int(np.count_nonzero(line_mask))
+        if line_pixels == 0:
+            return 0.0
+        overlap = int(np.count_nonzero((line_mask > 0) & (nuisance_mask > 0)))
+        return overlap / line_pixels
 
 
 class EventMerger:
