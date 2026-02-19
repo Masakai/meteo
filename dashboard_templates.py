@@ -1706,6 +1706,11 @@ def render_settings_html(cameras, version):
             height: 36px;
             line-height: 1.2;
         }}
+        input.changed-from-default,
+        select.changed-from-default {{
+            border-color: #ff5f5f;
+            box-shadow: 0 0 0 1px rgba(255, 95, 95, 0.35);
+        }}
         .status {{
             margin-top: 12px;
             padding: 10px;
@@ -1790,6 +1795,7 @@ def render_settings_html(cameras, version):
                         <tr><td>min_speed</td><td>最低速度</td><td>下げると遅い見かけ速度も通る</td></tr>
                         <tr><td>min_linearity</td><td>直線性の下限</td><td>下げると多少ぶれた軌跡も通る</td></tr>
                         <tr><td>exclude_bottom_ratio</td><td>画面下部の除外率</td><td>下げると低空の流星を拾いやすい</td></tr>
+                        <tr><td>exclude_edge_ratio</td><td>画面周辺（四辺）の除外率</td><td>上げると周辺ノイズを抑制しやすい</td></tr>
                     </tbody>
                 </table>
             </details>
@@ -1804,6 +1810,7 @@ def render_settings_html(cameras, version):
                 <div><label>最小速度(px/秒)（min_speed）</label><input id="min_speed" type="number" step="0.1"></div>
                 <div><label>最小直線性（min_linearity）</label><input id="min_linearity" type="number" step="0.01"></div>
                 <div><label>画面下部除外率（exclude_bottom_ratio）</label><input id="exclude_bottom_ratio" type="number" step="0.01"></div>
+                <div><label>画面周辺除外率（exclude_edge_ratio）</label><input id="exclude_edge_ratio" type="number" step="0.001"></div>
             </div>
         </div>
 
@@ -1846,6 +1853,7 @@ def render_settings_html(cameras, version):
                         <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
                     </thead>
                     <tbody>
+                        <tr><td>exclude_edge_ratio</td><td>画面周辺（四辺）の除外率</td><td>上げると端の固定ノイズを抑制しやすい</td></tr>
                         <tr><td>nuisance_overlap_threshold</td><td>小領域がノイズ帯に重なる許容率</td><td>下げると電線起因の誤検出を強く抑える</td></tr>
                         <tr><td>nuisance_path_overlap_threshold</td><td>軌跡全体のノイズ帯重なり許容率</td><td>下げるとノイズ帯沿いの誤検出を抑える</td></tr>
                         <tr><td>min_track_points</td><td>確定に必要な追跡点数</td><td>上げると誤検出減、下げると見逃し減</td></tr>
@@ -1880,7 +1888,7 @@ def render_settings_html(cameras, version):
             'clip_margin_before', 'clip_margin_after',
             'diff_threshold', 'min_brightness', 'min_brightness_tracking',
             'min_length', 'max_length', 'min_duration', 'max_duration', 'min_speed',
-            'min_linearity', 'exclude_bottom_ratio',
+            'min_linearity', 'exclude_bottom_ratio', 'exclude_edge_ratio',
             'min_area', 'max_area', 'max_gap_time', 'max_distance',
             'merge_max_gap_time', 'merge_max_distance', 'merge_max_speed_ratio',
             'nuisance_overlap_threshold', 'nuisance_path_overlap_threshold',
@@ -1907,6 +1915,7 @@ def render_settings_html(cameras, version):
             min_speed: 50.0,
             min_linearity: 0.7,
             exclude_bottom_ratio: 0.0625,
+            exclude_edge_ratio: 0.0,
             min_area: 5,
             max_area: 10000,
             max_gap_time: 2.0,
@@ -1943,6 +1952,32 @@ def render_settings_html(cameras, version):
                     }}
                 }}
             }});
+            refreshDiffStates();
+        }}
+
+        function _normalizeForCompare(el, value) {{
+            if (el.type === 'checkbox') {{
+                return value === true || String(value).toLowerCase() === 'true' ? 'true' : 'false';
+            }}
+            return String(value ?? '').trim();
+        }}
+
+        function updateFieldDiffState(name) {{
+            const el = document.getElementById(name);
+            if (!el) return;
+            if (!Object.prototype.hasOwnProperty.call(defaultSettings, name)) {{
+                el.classList.remove('changed-from-default');
+                return;
+            }}
+            const current = el.type === 'checkbox'
+                ? (el.checked ? 'true' : 'false')
+                : String(el.value ?? '').trim();
+            const def = _normalizeForCompare(el, defaultSettings[name]);
+            el.classList.toggle('changed-from-default', current !== def);
+        }}
+
+        function refreshDiffStates() {{
+            fields.forEach((name) => updateFieldDiffState(name));
         }}
 
         function collectPayload() {{
@@ -2004,6 +2039,17 @@ def render_settings_html(cameras, version):
                 setStatus('適用失敗: ' + e);
             }}
         }}
+
+        fields.forEach((name) => {{
+            const el = document.getElementById(name);
+            if (!el) return;
+            if (el.type === 'checkbox') {{
+                el.addEventListener('change', () => updateFieldDiffState(name));
+                return;
+            }}
+            el.addEventListener('input', () => updateFieldDiffState(name));
+            el.addEventListener('change', () => updateFieldDiffState(name));
+        }});
 
         loadCurrent();
     </script>

@@ -39,7 +39,7 @@ from meteor_detector_realtime import (
     sanitize_fps,
 )
 
-VERSION = "1.15.0"
+VERSION = "1.16.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -76,6 +76,7 @@ current_settings = {
     "buffer": 15.0,
     "extract_clips": True,
     "exclude_bottom": 0.0625,
+    "exclude_edge_ratio": 0.0,
     "fb_normalize": False,
     "source_fps": 30.0,
     "nuisance_mask_image": "",
@@ -681,6 +682,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 ("merge_max_distance", 0.0, None),
                 ("merge_max_speed_ratio", 0.0, 1.0),
                 ("exclude_bottom_ratio", 0.0, 1.0),
+                ("exclude_edge_ratio", 0.0, 0.5),
                 ("nuisance_overlap_threshold", 0.0, 1.0),
                 ("nuisance_path_overlap_threshold", 0.0, 1.0),
                 ("max_stationary_ratio", 0.0, 1.0),
@@ -864,6 +866,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
 
             for field in (
                 "exclude_bottom_ratio",
+                "exclude_edge_ratio",
                 "diff_threshold",
                 "min_brightness",
                 "min_brightness_tracking",
@@ -921,6 +924,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "merge_max_distance",
                 "merge_max_speed_ratio",
                 "exclude_bottom_ratio",
+                "exclude_edge_ratio",
                 "nuisance_overlap_threshold",
                 "nuisance_path_overlap_threshold",
                 "min_track_points",
@@ -1468,6 +1472,7 @@ def process_rtsp_stream(
     clip_margin_after = float(runtime_overrides.get("clip_margin_after", clip_margin_after))
 
     params.exclude_bottom_ratio = float(runtime_overrides.get("exclude_bottom_ratio", params.exclude_bottom_ratio))
+    params.exclude_edge_ratio = float(runtime_overrides.get("exclude_edge_ratio", params.exclude_edge_ratio))
     pending_param_overrides = {}
     for field in (
         "diff_threshold",
@@ -1486,6 +1491,7 @@ def process_rtsp_stream(
         "merge_max_gap_time",
         "merge_max_distance",
         "merge_max_speed_ratio",
+        "exclude_edge_ratio",
         "nuisance_path_overlap_threshold",
         "min_track_points",
         "max_stationary_ratio",
@@ -1528,6 +1534,7 @@ def process_rtsp_stream(
         "extract_clips": extract_clips,
         "exclude_bottom": params.exclude_bottom_ratio,
         "exclude_bottom_ratio": params.exclude_bottom_ratio,
+        "exclude_edge_ratio": params.exclude_edge_ratio,
         "fb_normalize": fb_normalize,
         "fb_delete_mov": fb_delete_mov,
         "source_fps": 30.0,

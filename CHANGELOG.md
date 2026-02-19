@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-02-19
+### Added
+- 検出パラメータに `exclude_edge_ratio`（画面四辺の周辺除外率）を追加し、端部ノイズを検出対象から除外できるよう改善。
+- 全カメラ設定画面に `exclude_edge_ratio` の入力欄とHELP説明を追加。
+- 全カメラ設定画面で、デフォルト値から変更された入力項目を赤枠表示する差分ハイライトを追加。
+
+### Changed
+- `POST /apply_settings` とランタイム設定保存に `exclude_edge_ratio` を追加し、再起動後も設定が維持されるよう改善。
+
 ## [1.15.0] - 2026-02-19
 ### Added
 - 全カメラ設定画面に「デフォルト値に戻す」ボタンを追加し、既定値をフォームへ即時反映できるように改善。

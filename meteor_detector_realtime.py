@@ -114,6 +114,7 @@ class DetectionParams:
     merge_max_distance: float = 80
     merge_max_speed_ratio: float = 0.5
     exclude_bottom_ratio: float = 1 / 16
+    exclude_edge_ratio: float = 0.0
     nuisance_overlap_threshold: float = 0.60
     nuisance_path_overlap_threshold: float = 0.70
     min_track_points: int = 4
@@ -265,11 +266,19 @@ class RealtimeMeteorDetector:
     def detect_bright_objects(self, frame: np.ndarray, prev_frame: np.ndarray, tracking_mode: bool = False) -> List[dict]:
         """明るい移動物体を検出"""
         height = frame.shape[0]
+        width = frame.shape[1]
         max_y = int(height * (1 - self.params.exclude_bottom_ratio))
 
         diff = cv2.absdiff(frame, prev_frame)
         _, thresh = cv2.threshold(diff, self.params.diff_threshold, 255, cv2.THRESH_BINARY)
         thresh[max_y:, :] = 0
+        # 画像周辺の固定ノイズを除外
+        edge = max(0, int(min(width, height) * self.params.exclude_edge_ratio))
+        if edge > 0:
+            thresh[:edge, :] = 0
+            thresh[height - edge:, :] = 0
+            thresh[:, :edge] = 0
+            thresh[:, width - edge:] = 0
         with self.mask_lock:
             exclusion_mask = self.exclusion_mask
             nuisance_mask = self.nuisance_mask
