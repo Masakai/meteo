@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-02-19
+### Added
+- 全カメラ設定画面に「デフォルト値に戻す」ボタンを追加し、既定値をフォームへ即時反映できるように改善。
+- 全カメラ設定画面の各セクション（運用プリセット、基本検出、追跡・結合、誤検出抑制）に、折りたたみ式 HELP を追加。
+
+### Changed
+- 全カメラ設定画面の `sensitivity` 入力を自由入力から選択式（`low` / `medium` / `high` / `fireball`）へ変更。
+- 全カメラ設定画面の `select` 高さを他フォームと統一し、UIの視認性を改善。
+- ランタイム設定の保存先を共通パス（`/output/runtime_settings/<camera>.json`）優先に変更し、従来パスとの互換読み込みを維持。
+- `POST /apply_settings` 適用時の保存処理を強化し、再起動後も変更パラメータを復元できるように改善。
+
 ## [1.14.0] - 2026-02-19
 ### Added
 - ダッシュボードの全カメラ設定UIに、録画前後マージン設定（`clip_margin_before` / `clip_margin_after`）を追加。

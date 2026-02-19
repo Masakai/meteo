@@ -39,7 +39,7 @@ from meteor_detector_realtime import (
     sanitize_fps,
 )
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -68,7 +68,7 @@ current_output_dir = None
 current_camera_name = ""
 current_stop_flag = None
 current_runtime_fps = 0.0
-current_runtime_overrides_path = None
+current_runtime_overrides_paths = []
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -95,9 +95,14 @@ def _to_bool(value, default=False):
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
-def _runtime_override_path(output_dir: str, cam_name: str) -> Path:
+def _runtime_override_paths(output_dir: str, cam_name: str) -> List[Path]:
     safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in cam_name).strip("_") or "camera"
-    return Path(output_dir) / "runtime_settings" / f"{safe}.json"
+    output_path = Path(output_dir)
+    primary = output_path.parent / "runtime_settings" / f"{safe}.json"
+    legacy = output_path / "runtime_settings" / f"{safe}.json"
+    if primary == legacy:
+        return [primary]
+    return [primary, legacy]
 
 
 def _load_runtime_overrides(path: Path) -> dict:
@@ -884,11 +889,16 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 if field in applied:
                     overrides_update[field] = applied[field]
 
-            if current_runtime_overrides_path is not None:
+            if current_runtime_overrides_paths:
                 try:
-                    persisted = _load_runtime_overrides(current_runtime_overrides_path)
+                    persisted = {}
+                    for path in current_runtime_overrides_paths:
+                        persisted = _load_runtime_overrides(path)
+                        if persisted:
+                            break
                     persisted.update(overrides_update)
-                    _save_runtime_overrides(current_runtime_overrides_path, persisted)
+                    for path in current_runtime_overrides_paths:
+                        _save_runtime_overrides(path, persisted)
                 except Exception as e:
                     errors.append(f"failed to save runtime overrides: {e}")
 
@@ -1416,17 +1426,28 @@ def process_rtsp_stream(
     fb_delete_mov: bool = False,
 ):
     global current_frame, detection_count, start_time_global, camera_name, current_settings
-    global current_runtime_fps, current_runtime_overrides_path
+    global current_runtime_fps, current_runtime_overrides_paths
     global current_stop_flag
 
     params = params or DetectionParams()
     camera_name = cam_name
 
-    overrides_path = _runtime_override_path(output_dir, cam_name)
-    current_runtime_overrides_path = overrides_path
-    runtime_overrides = _load_runtime_overrides(overrides_path)
+    override_paths = _runtime_override_paths(output_dir, cam_name)
+    current_runtime_overrides_paths = override_paths
+    runtime_overrides = {}
+    loaded_from = None
+    for path in override_paths:
+        runtime_overrides = _load_runtime_overrides(path)
+        if runtime_overrides:
+            loaded_from = path
+            break
     if runtime_overrides:
-        print(f"ランタイム設定を適用: {overrides_path}")
+        print(f"ランタイム設定を適用: {loaded_from}")
+        # 旧パスから読んだ場合でも、優先保存先へ寄せる
+        try:
+            _save_runtime_overrides(override_paths[0], runtime_overrides)
+        except Exception as e:
+            print(f"[WARN] ランタイム設定の移行保存に失敗: {override_paths[0]} ({e})")
 
     sensitivity = str(runtime_overrides.get("sensitivity", sensitivity))
     process_scale = float(runtime_overrides.get("scale", process_scale))

@@ -1651,6 +1651,39 @@ def render_settings_html(cameras, version):
             font-size: 1rem;
             color: #7dd9ff;
         }}
+        details.help {{
+            border: 1px solid #3a5488;
+            border-radius: 10px;
+            background: #172544;
+            padding: 10px 12px;
+        }}
+        details.help summary {{
+            cursor: pointer;
+            color: #9fe8ff;
+            font-weight: 600;
+        }}
+        .help-note {{
+            margin: 8px 0 0;
+            color: #a8bfdc;
+            font-size: 0.85rem;
+        }}
+        .help-table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.84rem;
+        }}
+        .help-table th,
+        .help-table td {{
+            border: 1px solid #36507f;
+            padding: 6px 8px;
+            vertical-align: top;
+        }}
+        .help-table th {{
+            background: #13203c;
+            color: #a8dfff;
+            text-align: left;
+        }}
         .grid {{
             display: grid;
             grid-template-columns: repeat(2, minmax(200px, 1fr));
@@ -1662,13 +1695,16 @@ def render_settings_html(cameras, version):
             color: #bfd1ee;
             margin-bottom: 4px;
         }}
-        input {{
+        input,
+        select {{
             width: 100%;
             background: #13203c;
             border: 1px solid #34507f;
             color: #e6f2ff;
             border-radius: 8px;
             padding: 8px 10px;
+            height: 36px;
+            line-height: 1.2;
         }}
         .status {{
             margin-top: 12px;
@@ -1695,15 +1731,37 @@ def render_settings_html(cameras, version):
         <div class="toolbar">
             <a class="btn" href="/">ダッシュボードへ戻る</a>
             <button class="btn" type="button" onclick="loadCurrent()">現在値を取得</button>
+            <button class="btn" type="button" onclick="applyDefaults()">デフォルト値に戻す</button>
             <button class="btn" type="button" onclick="applyAll()">全カメラに適用</button>
         </div>
 
         <div class="panel">
             <h2>運用プリセット / 起動時設定</h2>
+            <details class="help">
+                <summary>HELP</summary>
+                <table class="help-table">
+                    <thead>
+                        <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>sensitivity</td><td>感度プリセット</td><td>highで見逃し減、lowで誤検出減</td></tr>
+                        <tr><td>scale</td><td>処理解像度スケール</td><td>上げると小さい流星に有利だが重くなる</td></tr>
+                        <tr><td>buffer</td><td>リングバッファ秒数</td><td>長くすると検出前後の切り出し余裕が増える</td></tr>
+                        <tr><td>extract_clips</td><td>検出時に動画クリップを保存</td><td>オフで容量節約（静止画中心運用向け）</td></tr>
+                        <tr><td>fb_normalize / fb_delete_mov</td><td>MP4正規化とMOV削除</td><td>互換性重視時に有効化</td></tr>
+                        <tr><td>clip_margin_before/after</td><td>検出前後に含める秒数</td><td>増やすと状況把握しやすい</td></tr>
+                    </tbody>
+                </table>
+            </details>
             <div class="grid">
                 <div>
                     <label>感度プリセット（sensitivity） low / medium / high / fireball</label>
-                    <input id="sensitivity" type="text" placeholder="medium">
+                    <select id="sensitivity">
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                        <option value="fireball">fireball</option>
+                    </select>
                 </div>
                 <div><label>処理解像度スケール（scale）</label><input id="scale" type="number" step="0.01"></div>
                 <div><label>録画バッファ秒数（buffer）</label><input id="buffer" type="number" step="0.1"></div>
@@ -1717,6 +1775,24 @@ def render_settings_html(cameras, version):
 
         <div class="panel">
             <h2>基本検出</h2>
+            <details class="help">
+                <summary>HELP</summary>
+                <table class="help-table">
+                    <thead>
+                        <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>diff_threshold</td><td>フレーム差分のしきい値</td><td>下げると暗い/細い軌跡を拾いやすい</td></tr>
+                        <tr><td>min_brightness</td><td>候補採用の最小輝度</td><td>下げると暗い流星に強くなる</td></tr>
+                        <tr><td>min_brightness_tracking</td><td>追跡継続時の最小輝度</td><td>下げると追跡切れしにくい</td></tr>
+                        <tr><td>min_length / max_length</td><td>軌跡長の許容範囲</td><td>minを下げると短い流星に有利</td></tr>
+                        <tr><td>min_duration / max_duration</td><td>継続時間の許容範囲</td><td>minを下げると瞬間的な流星を拾いやすい</td></tr>
+                        <tr><td>min_speed</td><td>最低速度</td><td>下げると遅い見かけ速度も通る</td></tr>
+                        <tr><td>min_linearity</td><td>直線性の下限</td><td>下げると多少ぶれた軌跡も通る</td></tr>
+                        <tr><td>exclude_bottom_ratio</td><td>画面下部の除外率</td><td>下げると低空の流星を拾いやすい</td></tr>
+                    </tbody>
+                </table>
+            </details>
             <div class="grid">
                 <div><label>差分しきい値（diff_threshold）</label><input id="diff_threshold" type="number" step="1"></div>
                 <div><label>最小輝度（min_brightness）</label><input id="min_brightness" type="number" step="1"></div>
@@ -1733,6 +1809,22 @@ def render_settings_html(cameras, version):
 
         <div class="panel">
             <h2>追跡・結合</h2>
+            <details class="help">
+                <summary>HELP</summary>
+                <table class="help-table">
+                    <thead>
+                        <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>min_area / max_area</td><td>候補領域サイズの許容範囲</td><td>minを下げると細い流星に有利</td></tr>
+                        <tr><td>max_gap_time</td><td>追跡の途切れ許容時間</td><td>上げると点が途切れても追跡しやすい</td></tr>
+                        <tr><td>max_distance</td><td>フレーム間の追跡許容距離</td><td>上げると速い移動も追いやすい</td></tr>
+                        <tr><td>merge_max_gap_time</td><td>イベント結合の時間条件</td><td>上げると近接イベントをまとめやすい</td></tr>
+                        <tr><td>merge_max_distance</td><td>イベント結合の距離条件</td><td>上げると近い軌跡をまとめやすい</td></tr>
+                        <tr><td>merge_max_speed_ratio</td><td>イベント結合の速度差条件</td><td>上げると速度差があっても結合しやすい</td></tr>
+                    </tbody>
+                </table>
+            </details>
             <div class="grid">
                 <div><label>最小面積(px²)（min_area）</label><input id="min_area" type="number" step="1"></div>
                 <div><label>最大面積(px²)（max_area）</label><input id="max_area" type="number" step="1"></div>
@@ -1746,6 +1838,25 @@ def render_settings_html(cameras, version):
 
         <div class="panel">
             <h2>誤検出抑制（電線・部分照明）</h2>
+            <details class="help">
+                <summary>HELP</summary>
+                <p class="help-note">厳しくすると誤検出は減りますが、見逃しは増えやすくなります。</p>
+                <table class="help-table">
+                    <thead>
+                        <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>nuisance_overlap_threshold</td><td>小領域がノイズ帯に重なる許容率</td><td>下げると電線起因の誤検出を強く抑える</td></tr>
+                        <tr><td>nuisance_path_overlap_threshold</td><td>軌跡全体のノイズ帯重なり許容率</td><td>下げるとノイズ帯沿いの誤検出を抑える</td></tr>
+                        <tr><td>min_track_points</td><td>確定に必要な追跡点数</td><td>上げると誤検出減、下げると見逃し減</td></tr>
+                        <tr><td>max_stationary_ratio</td><td>静止成分の許容上限</td><td>下げると静止ノイズを除外しやすい</td></tr>
+                        <tr><td>small_area_threshold</td><td>小領域判定の面積しきい値</td><td>上げると小さいノイズへの抑制を広げる</td></tr>
+                        <tr><td>mask_dilate / nuisance_dilate</td><td>マスク膨張量</td><td>上げると除外範囲を広げる</td></tr>
+                        <tr><td>mask_image / mask_from_day</td><td>除外マスクの入力元</td><td>空以外を除外して誤検出を減らす</td></tr>
+                        <tr><td>nuisance_mask_image / nuisance_from_night</td><td>ノイズ帯マスクの入力元</td><td>電線・街灯帯の誤検出抑制に有効</td></tr>
+                    </tbody>
+                </table>
+            </details>
             <div class="grid">
                 <div><label>ノイズ帯重なり閾値（nuisance_overlap_threshold）</label><input id="nuisance_overlap_threshold" type="number" step="0.01"></div>
                 <div><label>経路のノイズ帯重なり閾値（nuisance_path_overlap_threshold）</label><input id="nuisance_path_overlap_threshold" type="number" step="0.01"></div>
@@ -1777,6 +1888,44 @@ def render_settings_html(cameras, version):
             'mask_dilate', 'nuisance_dilate',
             'mask_image', 'mask_from_day', 'nuisance_mask_image', 'nuisance_from_night'
         ];
+        const defaultSettings = {{
+            sensitivity: 'medium',
+            scale: 0.5,
+            buffer: 15.0,
+            extract_clips: true,
+            fb_normalize: false,
+            fb_delete_mov: false,
+            clip_margin_before: 1.0,
+            clip_margin_after: 1.0,
+            diff_threshold: 30,
+            min_brightness: 200,
+            min_brightness_tracking: 160,
+            min_length: 20,
+            max_length: 5000,
+            min_duration: 0.1,
+            max_duration: 10.0,
+            min_speed: 50.0,
+            min_linearity: 0.7,
+            exclude_bottom_ratio: 0.0625,
+            min_area: 5,
+            max_area: 10000,
+            max_gap_time: 2.0,
+            max_distance: 80.0,
+            merge_max_gap_time: 1.5,
+            merge_max_distance: 80.0,
+            merge_max_speed_ratio: 0.5,
+            nuisance_overlap_threshold: 0.60,
+            nuisance_path_overlap_threshold: 0.70,
+            min_track_points: 4,
+            max_stationary_ratio: 0.40,
+            small_area_threshold: 40,
+            mask_dilate: 20,
+            nuisance_dilate: 3,
+            mask_image: '',
+            mask_from_day: '',
+            nuisance_mask_image: '',
+            nuisance_from_night: ''
+        }};
 
         function setStatus(message) {{
             document.getElementById('status').textContent = message;
@@ -1826,6 +1975,11 @@ def render_settings_html(cameras, version):
             }} catch (e) {{
                 setStatus('取得失敗: ' + e);
             }}
+        }}
+
+        function applyDefaults() {{
+            fillForm(defaultSettings);
+            setStatus('デフォルト値をフォームに反映しました（まだ適用していません）');
         }}
 
         async function applyAll() {{
