@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-02-19
+### Added
+- ダッシュボードの全カメラ設定UIに、録画前後マージン設定（`clip_margin_before` / `clip_margin_after`）を追加。
+- 各設定項目に日本語説明を追加し、項目名の末尾にパラメータ名を併記する表示へ変更。
+- 関連ドキュメントに誤検出抑制機能（nuisance mask系）とランタイム設定反映手順を追記。
+
+### Changed
+- ダッシュボードから適用した設定をカメラプロセスへ即時反映できる項目を拡張し、再ビルド不要で主要パラメータを変更可能化。
+- カメラ側 `POST /apply_settings` で `clip_margin_before` / `clip_margin_after` を受け付け、保存動画の前後余白時間を運用時に調整可能化。
+- `save_meteor_event` 呼び出し時の固定余白値を設定値連動へ変更し、複合クリップ（`composite_after`）にも反映。
+
 ## [1.13.0] - 2026-02-19
 ### Added
 - ダッシュボードに全カメラ設定ページ `GET /settings` を追加し、検出パラメータを一括編集できるUIを実装。

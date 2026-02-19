@@ -123,6 +123,29 @@ environment:
   - RTSP_URL=rtsp://${RTSP_USER}:${RTSP_PASS}@10.0.1.25/live
 ```
 
+### ダッシュボード一括設定（再ビルド不要）
+
+`/settings` から全カメラへ設定を一括反映できます。
+
+- `GET /settings`: 設定UI
+- `GET /camera_settings/current`: 現在値取得
+- `POST /camera_settings/apply_all`: 全カメラ一括反映
+
+#### 反映タイミング
+
+- 即時反映（再起動不要）:
+  - `diff_threshold`, `min_brightness`, `min_linearity`
+  - `nuisance_overlap_threshold`, `nuisance_path_overlap_threshold`
+  - `min_track_points`, `max_stationary_ratio`, `small_area_threshold`
+  - `mask_dilate`, `nuisance_dilate`, `mask_*`, `nuisance_*` の画像パス
+- 自動再起動で反映（再ビルド不要）:
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+
+#### 永続化
+
+起動時依存の設定は `output/runtime_settings/<camera>.json` に保存されます。
+これにより、コンテナ再起動後も同じ設定が維持されます。
+
 ---
 
 ## マスク設定（固定カメラ向け）

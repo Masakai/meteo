@@ -156,6 +156,27 @@ python meteor_detector_rtsp_web.py rtsp://... --no-clips
 
 ストレージ容量を節約したい場合は `--no-clips` を使用してください。
 
+#### ダッシュボードから全カメラ一括設定（再ビルド不要）
+
+ダッシュボード上部の「全カメラ設定」から `/settings` を開くと、
+複数カメラに対して設定を一括反映できます。
+
+- `GET /settings`: 設定UIページ
+- `GET /camera_settings/current`: 現在値を取得
+- `POST /camera_settings/apply_all`: 全カメラへ一括適用
+
+一括適用はカメラ側 `POST /apply_settings` を呼び出して反映します。
+
+- 即時反映（再起動不要）:
+  - `diff_threshold`, `min_brightness`, `min_linearity` など検出ロジックのしきい値
+  - `nuisance_*`, `min_track_points`, `max_stationary_ratio` など誤検出抑制パラメータ
+  - マスク更新系（`mask_dilate`, `nuisance_dilate`, `mask_*`/`nuisance_*` の画像パス）
+- 自動再起動で反映（再ビルド不要）:
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+
+起動時に効く設定は `output/runtime_settings/<camera>.json` に保存され、
+コンテナ再起動後も維持されます。
+
 ### 3. Web版と同じ検出ロジックでファイル再検証
 
 ```bash

@@ -22,7 +22,7 @@
   </div>
   <div class="link-card">
     <strong><a href="CONFIGURATION_GUIDE/">設定ガイド</a></strong>
-    検出精度と運用要件に合わせた設定。
+    検出精度と運用要件に合わせた設定（ダッシュボード `/settings` による一括設定を含む）。
   </div>
   <div class="link-card">
     <strong><a href="OPERATIONS_GUIDE/">運用ガイド</a></strong>

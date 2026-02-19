@@ -103,6 +103,22 @@ python generate_compose.py
 - `スナップショット保存`: 各カメラの現在フレームをJPEGでダウンロード
 - `再起動`: 対象カメラのみ再起動要求（反映まで数秒かかる場合あり）
 
+### ダッシュボードからの全カメラ一括設定（/settings）
+
+ダッシュボード上部の「全カメラ設定」から、複数カメラへ同時に設定反映できます。
+
+- `現在値を取得`: 各カメラの `/stats.settings` を取得
+- `全カメラに適用`: `POST /camera_settings/apply_all` を実行
+
+反映タイミング:
+- 即時反映（再起動不要）:
+  - 検出しきい値、追跡/結合、誤検出抑制（`nuisance_*`）など
+- 自動再起動で反映（再ビルド不要）:
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+
+起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、
+コンテナ再起動後も維持されます。
+
 ### 停止
 
 ```bash

@@ -1699,48 +1699,65 @@ def render_settings_html(cameras, version):
         </div>
 
         <div class="panel">
+            <h2>運用プリセット / 起動時設定</h2>
+            <div class="grid">
+                <div>
+                    <label>感度プリセット（sensitivity） low / medium / high / fireball</label>
+                    <input id="sensitivity" type="text" placeholder="medium">
+                </div>
+                <div><label>処理解像度スケール（scale）</label><input id="scale" type="number" step="0.01"></div>
+                <div><label>録画バッファ秒数（buffer）</label><input id="buffer" type="number" step="0.1"></div>
+                <div><label>検出クリップ保存（extract_clips）</label><input id="extract_clips" type="checkbox"></div>
+                <div><label>Facebook向けMP4正規化（fb_normalize）</label><input id="fb_normalize" type="checkbox"></div>
+                <div><label>正規化後に元MOV削除（fb_delete_mov）</label><input id="fb_delete_mov" type="checkbox"></div>
+                <div><label>検出前の記録秒数（clip_margin_before）</label><input id="clip_margin_before" type="number" step="0.1"></div>
+                <div><label>検出後の記録秒数（clip_margin_after）</label><input id="clip_margin_after" type="number" step="0.1"></div>
+            </div>
+        </div>
+
+        <div class="panel">
             <h2>基本検出</h2>
             <div class="grid">
-                <div><label>diff_threshold</label><input id="diff_threshold" type="number" step="1"></div>
-                <div><label>min_brightness</label><input id="min_brightness" type="number" step="1"></div>
-                <div><label>min_brightness_tracking</label><input id="min_brightness_tracking" type="number" step="1"></div>
-                <div><label>min_length</label><input id="min_length" type="number" step="1"></div>
-                <div><label>max_length</label><input id="max_length" type="number" step="1"></div>
-                <div><label>min_duration</label><input id="min_duration" type="number" step="0.01"></div>
-                <div><label>max_duration</label><input id="max_duration" type="number" step="0.01"></div>
-                <div><label>min_speed</label><input id="min_speed" type="number" step="0.1"></div>
-                <div><label>min_linearity</label><input id="min_linearity" type="number" step="0.01"></div>
-                <div><label>exclude_bottom_ratio</label><input id="exclude_bottom_ratio" type="number" step="0.01"></div>
+                <div><label>差分しきい値（diff_threshold）</label><input id="diff_threshold" type="number" step="1"></div>
+                <div><label>最小輝度（min_brightness）</label><input id="min_brightness" type="number" step="1"></div>
+                <div><label>追跡中の最小輝度（min_brightness_tracking）</label><input id="min_brightness_tracking" type="number" step="1"></div>
+                <div><label>最小軌跡長(px)（min_length）</label><input id="min_length" type="number" step="1"></div>
+                <div><label>最大軌跡長(px)（max_length）</label><input id="max_length" type="number" step="1"></div>
+                <div><label>最小継続時間(秒)（min_duration）</label><input id="min_duration" type="number" step="0.01"></div>
+                <div><label>最大継続時間(秒)（max_duration）</label><input id="max_duration" type="number" step="0.01"></div>
+                <div><label>最小速度(px/秒)（min_speed）</label><input id="min_speed" type="number" step="0.1"></div>
+                <div><label>最小直線性（min_linearity）</label><input id="min_linearity" type="number" step="0.01"></div>
+                <div><label>画面下部除外率（exclude_bottom_ratio）</label><input id="exclude_bottom_ratio" type="number" step="0.01"></div>
             </div>
         </div>
 
         <div class="panel">
             <h2>追跡・結合</h2>
             <div class="grid">
-                <div><label>min_area</label><input id="min_area" type="number" step="1"></div>
-                <div><label>max_area</label><input id="max_area" type="number" step="1"></div>
-                <div><label>max_gap_time</label><input id="max_gap_time" type="number" step="0.1"></div>
-                <div><label>max_distance</label><input id="max_distance" type="number" step="0.1"></div>
-                <div><label>merge_max_gap_time</label><input id="merge_max_gap_time" type="number" step="0.1"></div>
-                <div><label>merge_max_distance</label><input id="merge_max_distance" type="number" step="0.1"></div>
-                <div><label>merge_max_speed_ratio</label><input id="merge_max_speed_ratio" type="number" step="0.01"></div>
+                <div><label>最小面積(px²)（min_area）</label><input id="min_area" type="number" step="1"></div>
+                <div><label>最大面積(px²)（max_area）</label><input id="max_area" type="number" step="1"></div>
+                <div><label>追跡切れ許容時間(秒)（max_gap_time）</label><input id="max_gap_time" type="number" step="0.1"></div>
+                <div><label>追跡最大距離(px)（max_distance）</label><input id="max_distance" type="number" step="0.1"></div>
+                <div><label>結合最大ギャップ(秒)（merge_max_gap_time）</label><input id="merge_max_gap_time" type="number" step="0.1"></div>
+                <div><label>結合最大距離(px)（merge_max_distance）</label><input id="merge_max_distance" type="number" step="0.1"></div>
+                <div><label>結合速度差比率（merge_max_speed_ratio）</label><input id="merge_max_speed_ratio" type="number" step="0.01"></div>
             </div>
         </div>
 
         <div class="panel">
             <h2>誤検出抑制（電線・部分照明）</h2>
             <div class="grid">
-                <div><label>nuisance_overlap_threshold</label><input id="nuisance_overlap_threshold" type="number" step="0.01"></div>
-                <div><label>nuisance_path_overlap_threshold</label><input id="nuisance_path_overlap_threshold" type="number" step="0.01"></div>
-                <div><label>min_track_points</label><input id="min_track_points" type="number" step="1"></div>
-                <div><label>max_stationary_ratio</label><input id="max_stationary_ratio" type="number" step="0.01"></div>
-                <div><label>small_area_threshold</label><input id="small_area_threshold" type="number" step="1"></div>
-                <div><label>mask_dilate</label><input id="mask_dilate" type="number" step="1"></div>
-                <div><label>nuisance_dilate</label><input id="nuisance_dilate" type="number" step="1"></div>
-                <div><label>mask_image (任意パス)</label><input id="mask_image" type="text"></div>
-                <div><label>mask_from_day (任意パス)</label><input id="mask_from_day" type="text"></div>
-                <div><label>nuisance_mask_image (任意パス)</label><input id="nuisance_mask_image" type="text"></div>
-                <div><label>nuisance_from_night (任意パス)</label><input id="nuisance_from_night" type="text"></div>
+                <div><label>ノイズ帯重なり閾値（nuisance_overlap_threshold）</label><input id="nuisance_overlap_threshold" type="number" step="0.01"></div>
+                <div><label>経路のノイズ帯重なり閾値（nuisance_path_overlap_threshold）</label><input id="nuisance_path_overlap_threshold" type="number" step="0.01"></div>
+                <div><label>最小追跡点数（min_track_points）</label><input id="min_track_points" type="number" step="1"></div>
+                <div><label>静止率上限（max_stationary_ratio）</label><input id="max_stationary_ratio" type="number" step="0.01"></div>
+                <div><label>小領域判定しきい値（small_area_threshold）</label><input id="small_area_threshold" type="number" step="1"></div>
+                <div><label>除外マスク膨張px（mask_dilate）</label><input id="mask_dilate" type="number" step="1"></div>
+                <div><label>ノイズ帯マスク膨張px（nuisance_dilate）</label><input id="nuisance_dilate" type="number" step="1"></div>
+                <div><label>除外マスク画像パス（mask_image）</label><input id="mask_image" type="text"></div>
+                <div><label>昼間画像マスク元パス（mask_from_day）</label><input id="mask_from_day" type="text"></div>
+                <div><label>ノイズ帯マスク画像パス（nuisance_mask_image）</label><input id="nuisance_mask_image" type="text"></div>
+                <div><label>夜間画像ノイズ帯元パス（nuisance_from_night）</label><input id="nuisance_from_night" type="text"></div>
             </div>
         </div>
 
@@ -1748,6 +1765,8 @@ def render_settings_html(cameras, version):
     </div>
     <script>
         const fields = [
+            'sensitivity', 'scale', 'buffer', 'extract_clips', 'fb_normalize', 'fb_delete_mov',
+            'clip_margin_before', 'clip_margin_after',
             'diff_threshold', 'min_brightness', 'min_brightness_tracking',
             'min_length', 'max_length', 'min_duration', 'max_duration', 'min_speed',
             'min_linearity', 'exclude_bottom_ratio',
@@ -1768,7 +1787,11 @@ def render_settings_html(cameras, version):
                 const el = document.getElementById(name);
                 if (!el) return;
                 if (Object.prototype.hasOwnProperty.call(data, name) && data[name] !== null && data[name] !== undefined) {{
-                    el.value = data[name];
+                    if (el.type === 'checkbox') {{
+                        el.checked = data[name] === true || String(data[name]).toLowerCase() === 'true';
+                    }} else {{
+                        el.value = data[name];
+                    }}
                 }}
             }});
         }}
@@ -1778,6 +1801,10 @@ def render_settings_html(cameras, version):
             fields.forEach((name) => {{
                 const el = document.getElementById(name);
                 if (!el) return;
+                if (el.type === 'checkbox') {{
+                    payload[name] = el.checked;
+                    return;
+                }}
                 const value = String(el.value ?? '').trim();
                 if (value !== '') {{
                     payload[name] = value;

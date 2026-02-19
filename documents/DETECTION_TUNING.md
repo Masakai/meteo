@@ -76,6 +76,7 @@ python meteor_detector.py input.mp4 \
 ## RTSP検出の調整ポイント
 
 RTSP版は CLI から調整できる項目が限定されています。
+また、ダッシュボードの `/settings` から全カメラへ一括設定することも可能です。
 
 **有効な調整**
 - `--sensitivity`（low / medium / high / fireball）
@@ -113,6 +114,21 @@ RTSP版には以下の抑制が追加されています。
 3. 誤検出が多い場合は `--nuisance-overlap-threshold` を `0.55` へ下げる
 4. 見逃しが増える場合は `--nuisance-overlap-threshold` を `0.65` へ上げる
 
+## ダッシュボード一括設定での反映タイミング
+
+`/settings` で反映する場合、項目によって適用タイミングが異なります。
+
+- 即時反映（再起動不要）:
+  - `diff_threshold`, `min_brightness`, `min_linearity`
+  - `nuisance_overlap_threshold`, `nuisance_path_overlap_threshold`
+  - `min_track_points`, `max_stationary_ratio`, `small_area_threshold`
+  - `mask_dilate`, `nuisance_dilate`, `mask_image`, `mask_from_day`, `nuisance_mask_image`, `nuisance_from_night`
+- 自動再起動で反映（再ビルド不要）:
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+
+起動時設定は `output/runtime_settings/<camera>.json` に保存されるため、
+コンテナ再起動後も有効です。
+
 ## Docker環境での調整例
 
 `generate_compose.py` で設定を変更して再生成してください。
@@ -137,7 +153,8 @@ docker compose up -d
 - `min_linearity` を下げる（曲がった軌道を許容）
 - `max_gap_frames` を増やす（明滅に強くする）
 
-コード変更後は `./meteor-docker.sh rebuild` で反映してください。
+コード変更後のみ `./meteor-docker.sh rebuild` が必要です。
+設定値の変更だけであれば、`/settings` または `/apply_settings` で再ビルド不要で反映できます。
 
 ## よくあるパターン
 

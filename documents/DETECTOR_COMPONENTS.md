@@ -212,11 +212,18 @@ RTSP Web版では `buffer_seconds` が `max_duration + 2.0` 秒を上限に自�
 
 ```python
 class RealtimeMeteorDetector:
-    def __init__(self, params: DetectionParams, fps: float = 30, exclusion_mask: Optional[np.ndarray] = None)
+    def __init__(
+        self,
+        params: DetectionParams,
+        fps: float = 30,
+        exclusion_mask: Optional[np.ndarray] = None,
+        nuisance_mask: Optional[np.ndarray] = None,
+    )
     def detect_bright_objects(self, frame, prev_frame) -> List[dict]
     def track_objects(self, objects, timestamp) -> List[MeteorEvent]
     def finalize_all(self) -> List[MeteorEvent]
     def update_exclusion_mask(self, new_mask: Optional[np.ndarray]) -> None
+    def update_nuisance_mask(self, new_mask: Optional[np.ndarray]) -> None
 ```
 
 #### 検出アルゴリズムフロー
@@ -232,6 +239,7 @@ flowchart TD
 
     Filter1{"面積フィルタ<br/>5 ≤ area ≤ 10000"}
     Filter2{"輝度フィルタ<br/>brightness ≥ min_brightness"}
+    Filter2b{"ノイズ帯重なり除外<br/>small_area & overlap高"}
     Filter3{"画面下部除外<br/>y < height×15/16"}
 
     Objects["検出物体リスト<br/>{centroid, brightness, area}"]
@@ -250,7 +258,9 @@ flowchart TD
     Filter1 -->|"No"| End
     Filter1 -->|"Yes"| Filter2
     Filter2 -->|"No"| End
-    Filter2 -->|"Yes"| Filter3
+    Filter2 -->|"Yes"| Filter2b
+    Filter2b -->|"除外"| End
+    Filter2b -->|"通過"| Filter3
     Filter3 -->|"No"| End
     Filter3 -->|"Yes"| Objects
     Objects --> Track
@@ -288,6 +298,9 @@ stateDiagram-v2
         - 20px ≤ length ≤ 5000px
         - speed ≥ 50 px/s
         - linearity ≥ 0.7
+        - track_points ≥ min_track_points
+        - stationary_ratio ≤ max_stationary_ratio
+        - nuisance_path_overlap ≤ nuisance_path_overlap_threshold
     end note
 ```
 
@@ -312,12 +325,26 @@ stateDiagram-v2
 | `merge_max_distance` | 80 px | イベント結合の最大距離 |
 | `merge_max_speed_ratio` | 0.5 | イベント結合の最大速度比 |
 | `exclude_bottom_ratio` | 1/16 | 画面下部除外率 |
+| `nuisance_overlap_threshold` | 0.60 | ノイズ帯重なり閾値 |
+| `nuisance_path_overlap_threshold` | 0.70 | ノイズ帯経路重なり閾値 |
+| `min_track_points` | 4 | 最小追跡点数 |
+| `max_stationary_ratio` | 0.40 | 静止率上限 |
+| `small_area_threshold` | 40 | 小領域判定閾値 |
 
 #### 除外マスク（固定カメラ向け）
 
 - 事前生成済みマスク（`MASK_IMAGE`）がある場合は優先して適用
 - `MASK_FROM_DAY` が設定されている場合は、昼間画像からマスクを生成
 - ダッシュボードの「マスク更新」ボタンで現在フレームから再生成（永続化）
+
+#### ノイズ帯マスク（電線・部分照明対策）
+
+- `nuisance_mask` は除外マスクとは別の誤検出抑制マスク
+- 設定方法:
+  - `nuisance_mask_image`: 手動マスク画像
+  - `nuisance_from_night`: 夜間基準画像から `Canny + HoughLinesP + dilate` で自動生成
+- 小領域候補で `nuisance_overlap_threshold` を超える場合は候補段階で除外
+- トラック確定時に `nuisance_path_overlap_threshold` を超える場合はイベント除外
 
 #### 感度プリセット
 
@@ -538,16 +565,35 @@ sequenceDiagram
     "scale": 0.5,
     "buffer": 12.0,
     "extract_clips": true,
+    "fb_normalize": false,
+    "fb_delete_mov": false,
     "exclude_bottom": 0.0625,
+    "nuisance_overlap_threshold": 0.6,
+    "nuisance_path_overlap_threshold": 0.7,
+    "min_track_points": 4,
+    "max_stationary_ratio": 0.4,
+    "small_area_threshold": 40,
     "mask_image": "",
     "mask_from_day": "",
-    "mask_dilate": 5
+    "mask_dilate": 5,
+    "nuisance_mask_image": "",
+    "nuisance_from_night": "",
+    "nuisance_dilate": 3
   },
   "stream_alive": true,
   "time_since_last_frame": 0.03,
   "is_detecting": true
 }
 ```
+
+#### /apply_settings による運用時設定反映
+
+- ダッシュボード設定ページまたはAPIから `POST /apply_settings` で反映可能
+- 即時反映:
+  - しきい値群、誤検出抑制パラメータ、マスク更新系
+- 自動再起動で反映:
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+- 起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、再起動後も維持
 
 ---
 

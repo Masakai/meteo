@@ -393,8 +393,17 @@ curl -s http://localhost:8080/camera_settings/current | jq
   "applied_count": 3,
   "total": 3,
   "results": [
-    { "camera": "camera1", "success": true },
-    { "camera": "camera2", "success": true },
+    {
+      "camera": "camera1",
+      "success": true,
+      "response": {
+        "success": true,
+        "restart_required": true,
+        "restart_requested": true,
+        "restart_triggers": ["sensitivity", "scale"]
+      }
+    },
+    { "camera": "camera2", "success": true, "response": { "success": true } },
     { "camera": "camera3", "success": false, "error": "timeout" }
   ]
 }
@@ -582,11 +591,18 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
     "scale": 0.5,
     "buffer": 15.0,
     "extract_clips": true,
+    "fb_normalize": false,
+    "fb_delete_mov": false,
     "source_fps": 20.0,
     "exclude_bottom": 0.0625,
+    "exclude_bottom_ratio": 0.0625,
     "mask_image": "/app/mask_image.png",
     "mask_from_day": "",
-    "mask_dilate": 5
+    "mask_dilate": 5,
+    "nuisance_mask_image": "",
+    "nuisance_from_night": "",
+    "nuisance_dilate": 3,
+    "nuisance_overlap_threshold": 0.6
   },
   "runtime_fps": 19.83,
   "stream_alive": true,
@@ -607,8 +623,11 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.scale` | float | 処理スケール |
 | `settings.buffer` | float | バッファ秒数 |
 | `settings.extract_clips` | boolean | 動画保存の有効/無効 |
+| `settings.fb_normalize` | boolean | Facebook向けMP4正規化 |
+| `settings.fb_delete_mov` | boolean | 正規化後に元MOVを削除するか |
 | `settings.source_fps` | float | 接続時に取得した入力ストリームFPS |
 | `settings.exclude_bottom` | float | 画面下部除外率 |
+| `settings.exclude_bottom_ratio` | float | 画面下部除外率（内部キー） |
 | `settings.mask_image` | string | マスク画像（優先） |
 | `settings.mask_from_day` | string | 昼間画像から生成するマスク |
 | `settings.mask_dilate` | integer | マスク拡張ピクセル数 |
@@ -706,11 +725,17 @@ curl -X POST http://localhost:8081/update_mask | jq
 
 ### POST /apply_settings
 
-**説明**: 検出パラメータをランタイムで反映（再起動不要）
+**説明**: 設定をランタイム反映。起動時依存の項目は設定保存後に自動再起動を要求
 
 **リクエストボディ（例）**:
 ```json
 {
+  "sensitivity": "medium",
+  "scale": 0.5,
+  "buffer": 15,
+  "extract_clips": true,
+  "fb_normalize": false,
+  "fb_delete_mov": false,
   "diff_threshold": 20,
   "min_brightness": 180,
   "min_linearity": 0.7,
@@ -729,12 +754,21 @@ curl -X POST http://localhost:8081/update_mask | jq
 {
   "success": true,
   "applied": {
-    "diff_threshold": 20,
-    "nuisance_overlap_threshold": 0.6
+    "sensitivity": "medium",
+    "scale": 0.5,
+    "diff_threshold": 20
   },
-  "errors": []
+  "errors": [],
+  "restart_required": true,
+  "restart_requested": true,
+  "restart_triggers": ["sensitivity", "scale"]
 }
 ```
+
+**反映ルール**:
+- 再起動不要: `diff_threshold` など検出ロジック/誤検出抑制の閾値群
+- 自動再起動で反映: `sensitivity` / `scale` / `buffer` / `extract_clips` / `fb_normalize` / `fb_delete_mov`
+- 設定は `output/runtime_settings/<camera>.json` に永続化され、再起動後も維持
 
 **使用例**:
 ```bash
@@ -774,7 +808,7 @@ curl -X POST http://localhost:8081/restart | jq
 
 **現在の設定**:
 ```python
-# /stats /update_mask /restart はCORS許可
+# /stats /update_mask /apply_settings /restart はCORS許可
 self.send_header('Access-Control-Allow-Origin', '*')
 ```
 

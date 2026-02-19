@@ -39,7 +39,7 @@ from meteor_detector_realtime import (
     sanitize_fps,
 )
 
-VERSION = "1.13.0"
+VERSION = "1.14.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -62,10 +62,13 @@ current_proc_size = (0, 0)
 current_mask_dilate = 20
 current_mask_save = None
 current_nuisance_dilate = 3
+current_clip_margin_before = 1.0
+current_clip_margin_after = 1.0
 current_output_dir = None
 current_camera_name = ""
 current_stop_flag = None
 current_runtime_fps = 0.0
+current_runtime_overrides_path = None
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -79,7 +82,43 @@ current_settings = {
     "nuisance_from_night": "",
     "nuisance_dilate": 3,
     "nuisance_overlap_threshold": 0.60,
+    "clip_margin_before": 1.0,
+    "clip_margin_after": 1.0,
 }
+
+
+def _to_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _runtime_override_path(output_dir: str, cam_name: str) -> Path:
+    safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in cam_name).strip("_") or "camera"
+    return Path(output_dir) / "runtime_settings" / f"{safe}.json"
+
+
+def _load_runtime_overrides(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception as e:
+        print(f"[WARN] ランタイム設定の読み込みに失敗: {path} ({e})")
+    return {}
+
+
+def _save_runtime_overrides(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
+    tmp_path.replace(path)
 
 
 def fb_normalize_clip(
@@ -492,6 +531,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global current_mask_dilate, current_nuisance_dilate
+        global current_clip_margin_before, current_clip_margin_after
         if self.path == '/restart':
             self.send_response(202)
             self.send_header('Content-type', 'application/json')
@@ -607,6 +647,11 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                     raise ValueError(f"{name} must be <= {maximum}")
                 return value
 
+            def _to_bool_field(name):
+                if name not in payload or payload.get(name) in ("", None):
+                    return None
+                return _to_bool(payload.get(name))
+
             int_fields = [
                 ("diff_threshold", 1, 255),
                 ("min_brightness", 0, 255),
@@ -634,11 +679,23 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 ("nuisance_overlap_threshold", 0.0, 1.0),
                 ("nuisance_path_overlap_threshold", 0.0, 1.0),
                 ("max_stationary_ratio", 0.0, 1.0),
+                ("clip_margin_before", 0.0, 10.0),
+                ("clip_margin_after", 0.0, 10.0),
             ]
+            startup_float_fields = [
+                ("scale", 0.05, 1.0),
+                ("buffer", 1.0, 120.0),
+            ]
+            startup_bool_fields = ("extract_clips", "fb_normalize", "fb_delete_mov")
+            startup_text_fields = ("sensitivity",)
+            startup_path_fields = ("mask_image", "mask_from_day", "nuisance_mask_image", "nuisance_from_night")
 
             applied = {}
             errors = []
             params = current_detector.params
+            restart_required = False
+            restart_triggers = []
+            overrides_update = {}
 
             try:
                 with current_detector.lock:
@@ -673,10 +730,22 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 if new_mask_dilate is not None:
                     current_mask_dilate = new_mask_dilate
                     applied["mask_dilate"] = new_mask_dilate
+                    overrides_update["mask_dilate"] = new_mask_dilate
                 new_nuisance_dilate = _to_int("nuisance_dilate", 0, 255)
                 if new_nuisance_dilate is not None:
                     current_nuisance_dilate = new_nuisance_dilate
                     applied["nuisance_dilate"] = new_nuisance_dilate
+                    overrides_update["nuisance_dilate"] = new_nuisance_dilate
+                new_clip_margin_before = _to_float("clip_margin_before", 0.0, 10.0)
+                if new_clip_margin_before is not None:
+                    current_clip_margin_before = new_clip_margin_before
+                    applied["clip_margin_before"] = new_clip_margin_before
+                    overrides_update["clip_margin_before"] = new_clip_margin_before
+                new_clip_margin_after = _to_float("clip_margin_after", 0.0, 10.0)
+                if new_clip_margin_after is not None:
+                    current_clip_margin_after = new_clip_margin_after
+                    applied["clip_margin_after"] = new_clip_margin_after
+                    overrides_update["clip_margin_after"] = new_clip_margin_after
             except Exception as e:
                 errors.append(str(e))
 
@@ -696,6 +765,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                     _, new_mask = cv2.threshold(mask_img, 1, 255, cv2.THRESH_BINARY)
                     current_detector.update_exclusion_mask(new_mask)
                     applied["mask_image"] = mask_image
+                    overrides_update["mask_image"] = mask_image
                 elif mask_from_day:
                     new_mask = build_exclusion_mask(
                         mask_from_day,
@@ -707,6 +777,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                         raise ValueError(f"mask_from_day not readable: {mask_from_day}")
                     current_detector.update_exclusion_mask(new_mask)
                     applied["mask_from_day"] = mask_from_day
+                    overrides_update["mask_from_day"] = mask_from_day
             except Exception as e:
                 errors.append(str(e))
 
@@ -720,6 +791,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                         nuisance_img = cv2.resize(nuisance_img, (proc_w, proc_h), interpolation=cv2.INTER_NEAREST)
                     _, new_nuisance_mask = cv2.threshold(nuisance_img, 1, 255, cv2.THRESH_BINARY)
                     applied["nuisance_mask_image"] = nuisance_mask_image
+                    overrides_update["nuisance_mask_image"] = nuisance_mask_image
 
                 if nuisance_from_night:
                     auto_nuisance = build_nuisance_mask_from_night(
@@ -733,11 +805,92 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                         new_nuisance_mask, auto_nuisance
                     )
                     applied["nuisance_from_night"] = nuisance_from_night
+                    overrides_update["nuisance_from_night"] = nuisance_from_night
 
                 if new_nuisance_mask is not None:
                     current_detector.update_nuisance_mask(new_nuisance_mask)
             except Exception as e:
                 errors.append(str(e))
+
+            for field, min_v, max_v in startup_float_fields:
+                try:
+                    value = _to_float(field, min_v, max_v)
+                    if value is not None:
+                        overrides_update[field] = value
+                        applied[field] = value
+                        restart_required = True
+                        restart_triggers.append(field)
+                except Exception as e:
+                    errors.append(str(e))
+
+            for field in startup_bool_fields:
+                try:
+                    value = _to_bool_field(field)
+                    if value is not None:
+                        overrides_update[field] = value
+                        applied[field] = value
+                        restart_required = True
+                        restart_triggers.append(field)
+                except Exception as e:
+                    errors.append(str(e))
+
+            for field in startup_text_fields:
+                if field not in payload:
+                    continue
+                value = str(payload.get(field, "")).strip().lower()
+                if not value:
+                    continue
+                if field == "sensitivity" and value not in ("low", "medium", "high", "fireball"):
+                    errors.append("sensitivity must be one of low/medium/high/fireball")
+                    continue
+                overrides_update[field] = value
+                applied[field] = value
+                restart_required = True
+                restart_triggers.append(field)
+
+            for field in startup_path_fields:
+                if field not in payload:
+                    continue
+                value = str(payload.get(field, "")).strip()
+                overrides_update[field] = value
+                applied[field] = value
+                restart_required = True
+                restart_triggers.append(field)
+
+            for field in (
+                "exclude_bottom_ratio",
+                "diff_threshold",
+                "min_brightness",
+                "min_brightness_tracking",
+                "min_length",
+                "max_length",
+                "min_duration",
+                "max_duration",
+                "min_speed",
+                "min_linearity",
+                "min_area",
+                "max_area",
+                "max_gap_time",
+                "max_distance",
+                "merge_max_gap_time",
+                "merge_max_distance",
+                "merge_max_speed_ratio",
+                "nuisance_overlap_threshold",
+                "nuisance_path_overlap_threshold",
+                "min_track_points",
+                "max_stationary_ratio",
+                "small_area_threshold",
+            ):
+                if field in applied:
+                    overrides_update[field] = applied[field]
+
+            if current_runtime_overrides_path is not None:
+                try:
+                    persisted = _load_runtime_overrides(current_runtime_overrides_path)
+                    persisted.update(overrides_update)
+                    _save_runtime_overrides(current_runtime_overrides_path, persisted)
+                except Exception as e:
+                    errors.append(f"failed to save runtime overrides: {e}")
 
             settings_updates = {}
             for key in (
@@ -763,8 +916,16 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "min_track_points",
                 "max_stationary_ratio",
                 "small_area_threshold",
+                "sensitivity",
+                "scale",
+                "buffer",
+                "extract_clips",
+                "fb_normalize",
+                "fb_delete_mov",
                 "mask_dilate",
                 "nuisance_dilate",
+                "clip_margin_before",
+                "clip_margin_after",
                 "mask_image",
                 "mask_from_day",
                 "nuisance_mask_image",
@@ -775,10 +936,23 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             if settings_updates:
                 current_settings.update(settings_updates)
 
+            restart_requested = False
+            if restart_required and current_stop_flag is not None:
+                restart_requested = True
+
+                def _request_restart():
+                    time.sleep(0.2)
+                    current_stop_flag.set()
+
+                Thread(target=_request_restart, daemon=True).start()
+
             self.wfile.write(json.dumps({
                 "success": len(errors) == 0,
                 "applied": applied,
                 "errors": errors,
+                "restart_required": restart_required,
+                "restart_requested": restart_requested,
+                "restart_triggers": sorted(set(restart_triggers)),
             }).encode())
             return
 
@@ -966,6 +1140,8 @@ def detection_thread_worker(
     nuisance_mask_image=None,
     nuisance_from_night=None,
     nuisance_dilate=3,
+    clip_margin_before=1.0,
+    clip_margin_after=1.0,
     enable_time_window=False,
     latitude=35.3606,
     longitude=138.7274,
@@ -977,6 +1153,7 @@ def detection_thread_worker(
     global current_frame, detection_count, last_frame_time, is_detecting_now, current_runtime_fps
     global current_detector, current_proc_size, current_mask_dilate, current_mask_save
     global current_nuisance_dilate
+    global current_clip_margin_before, current_clip_margin_after
     global current_output_dir, current_camera_name
 
     width, height = reader.frame_size
@@ -1042,6 +1219,8 @@ def detection_thread_worker(
     current_proc_size = (proc_width, proc_height)
     current_mask_dilate = mask_dilate
     current_nuisance_dilate = nuisance_dilate
+    current_clip_margin_before = clip_margin_before
+    current_clip_margin_after = clip_margin_after
     current_mask_save = mask_save
     current_output_dir = Path(output_path)
     current_camera_name = camera_name
@@ -1124,9 +1303,9 @@ def detection_thread_worker(
                         output_path,
                         fps=fps,
                         extract_clips=extract_clips,
-                        clip_margin_before=1.0,
-                        clip_margin_after=1.0,
-                        composite_after=1.0,
+                        clip_margin_before=current_clip_margin_before,
+                        clip_margin_after=current_clip_margin_after,
+                        composite_after=current_clip_margin_after,
                     )
                     if fb_normalize and clip_path is not None:
                         fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
@@ -1142,9 +1321,9 @@ def detection_thread_worker(
                     output_path,
                     fps=fps,
                     extract_clips=extract_clips,
-                    clip_margin_before=1.0,
-                    clip_margin_after=1.0,
-                    composite_after=1.0,
+                    clip_margin_before=current_clip_margin_before,
+                    clip_margin_after=current_clip_margin_after,
+                    composite_after=current_clip_margin_after,
                 )
                 if fb_normalize and clip_path is not None:
                     fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
@@ -1190,9 +1369,9 @@ def detection_thread_worker(
                 output_path,
                 fps=fps,
                 extract_clips=extract_clips,
-                clip_margin_before=1.0,
-                clip_margin_after=1.0,
-                composite_after=1.0,
+                clip_margin_before=current_clip_margin_before,
+                clip_margin_after=current_clip_margin_after,
+                composite_after=current_clip_margin_after,
             )
             if fb_normalize and clip_path is not None:
                 fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
@@ -1205,9 +1384,9 @@ def detection_thread_worker(
             output_path,
             fps=fps,
             extract_clips=extract_clips,
-            clip_margin_before=1.0,
-            clip_margin_after=1.0,
-            composite_after=1.0,
+            clip_margin_before=current_clip_margin_before,
+            clip_margin_after=current_clip_margin_after,
+            composite_after=current_clip_margin_after,
         )
         if fb_normalize and clip_path is not None:
             fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
@@ -1231,15 +1410,68 @@ def process_rtsp_stream(
     nuisance_from_night: Optional[str] = None,
     nuisance_dilate: int = 3,
     nuisance_overlap_threshold: float = 0.60,
+    clip_margin_before: float = 1.0,
+    clip_margin_after: float = 1.0,
     fb_normalize: bool = False,
     fb_delete_mov: bool = False,
 ):
     global current_frame, detection_count, start_time_global, camera_name, current_settings
-    global current_runtime_fps
+    global current_runtime_fps, current_runtime_overrides_path
     global current_stop_flag
 
     params = params or DetectionParams()
     camera_name = cam_name
+
+    overrides_path = _runtime_override_path(output_dir, cam_name)
+    current_runtime_overrides_path = overrides_path
+    runtime_overrides = _load_runtime_overrides(overrides_path)
+    if runtime_overrides:
+        print(f"ランタイム設定を適用: {overrides_path}")
+
+    sensitivity = str(runtime_overrides.get("sensitivity", sensitivity))
+    process_scale = float(runtime_overrides.get("scale", process_scale))
+    buffer_seconds = float(runtime_overrides.get("buffer", buffer_seconds))
+    extract_clips = _to_bool(runtime_overrides.get("extract_clips", extract_clips), default=extract_clips)
+    fb_normalize = _to_bool(runtime_overrides.get("fb_normalize", fb_normalize), default=fb_normalize)
+    fb_delete_mov = _to_bool(runtime_overrides.get("fb_delete_mov", fb_delete_mov), default=fb_delete_mov)
+    mask_image = runtime_overrides.get("mask_image", mask_image) or None
+    mask_from_day = runtime_overrides.get("mask_from_day", mask_from_day) or None
+    mask_dilate = int(runtime_overrides.get("mask_dilate", mask_dilate))
+    nuisance_mask_image = runtime_overrides.get("nuisance_mask_image", nuisance_mask_image) or None
+    nuisance_from_night = runtime_overrides.get("nuisance_from_night", nuisance_from_night) or None
+    nuisance_dilate = int(runtime_overrides.get("nuisance_dilate", nuisance_dilate))
+    nuisance_overlap_threshold = float(
+        runtime_overrides.get("nuisance_overlap_threshold", nuisance_overlap_threshold)
+    )
+    clip_margin_before = float(runtime_overrides.get("clip_margin_before", clip_margin_before))
+    clip_margin_after = float(runtime_overrides.get("clip_margin_after", clip_margin_after))
+
+    params.exclude_bottom_ratio = float(runtime_overrides.get("exclude_bottom_ratio", params.exclude_bottom_ratio))
+    pending_param_overrides = {}
+    for field in (
+        "diff_threshold",
+        "min_brightness",
+        "min_brightness_tracking",
+        "min_length",
+        "max_length",
+        "min_duration",
+        "max_duration",
+        "min_speed",
+        "min_linearity",
+        "min_area",
+        "max_area",
+        "max_gap_time",
+        "max_distance",
+        "merge_max_gap_time",
+        "merge_max_distance",
+        "merge_max_speed_ratio",
+        "nuisance_path_overlap_threshold",
+        "min_track_points",
+        "max_stationary_ratio",
+        "small_area_threshold",
+    ):
+        if field in runtime_overrides:
+            pending_param_overrides[field] = runtime_overrides[field]
 
     if sensitivity == "low":
         params.diff_threshold = 40
@@ -1254,8 +1486,12 @@ def process_rtsp_stream(
         params.min_speed = 20.0
         params.min_linearity = 0.6
 
+    for field, value in pending_param_overrides.items():
+        setattr(params, field, value)
+
     # 追跡中は検出閾値より低めにして追跡継続を優先
-    params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+    if "min_brightness_tracking" not in runtime_overrides:
+        params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
     params.nuisance_overlap_threshold = nuisance_overlap_threshold
 
     required_buffer = params.max_duration + 2.0
@@ -1270,7 +1506,9 @@ def process_rtsp_stream(
         "buffer": effective_buffer_seconds,
         "extract_clips": extract_clips,
         "exclude_bottom": params.exclude_bottom_ratio,
+        "exclude_bottom_ratio": params.exclude_bottom_ratio,
         "fb_normalize": fb_normalize,
+        "fb_delete_mov": fb_delete_mov,
         "source_fps": 30.0,
         "mask_image": mask_image or "",
         "mask_from_day": mask_from_day or "",
@@ -1279,6 +1517,8 @@ def process_rtsp_stream(
         "nuisance_from_night": nuisance_from_night or "",
         "nuisance_dilate": nuisance_dilate,
         "nuisance_overlap_threshold": nuisance_overlap_threshold,
+        "clip_margin_before": clip_margin_before,
+        "clip_margin_after": clip_margin_after,
         "diff_threshold": params.diff_threshold,
         "min_brightness": params.min_brightness,
         "min_brightness_tracking": params.min_brightness_tracking,
@@ -1369,6 +1609,8 @@ def process_rtsp_stream(
             'nuisance_mask_image': nuisance_mask_image,
             'nuisance_from_night': nuisance_from_night,
             'nuisance_dilate': nuisance_dilate,
+            'clip_margin_before': clip_margin_before,
+            'clip_margin_after': clip_margin_after,
             'enable_time_window': enable_time_window,
             'latitude': latitude,
             'longitude': longitude,
@@ -1427,6 +1669,8 @@ def main():
         default=0.60,
         help="小領域候補を除外するノイズ帯重なり率の閾値",
     )
+    parser.add_argument("--clip-margin-before", type=float, default=1.0, help="検出前の記録秒数")
+    parser.add_argument("--clip-margin-after", type=float, default=1.0, help="検出後の記録秒数")
     parser.add_argument("--fb-normalize", action="store_true",
                         help="Facebook向けにH.264 MP4へ正規化")
     parser.add_argument("--fb-delete-mov", action="store_true",
@@ -1470,6 +1714,8 @@ def main():
         nuisance_from_night=nuisance_from_night,
         nuisance_dilate=args.nuisance_dilate,
         nuisance_overlap_threshold=args.nuisance_overlap_threshold,
+        clip_margin_before=args.clip_margin_before,
+        clip_margin_after=args.clip_margin_after,
         fb_normalize=args.fb_normalize,
         fb_delete_mov=args.fb_delete_mov,
     )

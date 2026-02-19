@@ -246,6 +246,7 @@ sequenceDiagram
 | `/snapshot` | GET | 現在フレームJPEG取得 | `image/jpeg` |
 | `/stats` | GET | 統計情報 | `application/json` |
 | `/update_mask` | POST | 現在フレームからマスク更新 | `application/json` |
+| `/apply_settings` | POST | 設定をランタイム反映（必要時自動再起動） | `application/json` |
 | `/restart` | POST | プロセス再起動要求 | `application/json` |
 
 #### /stats レスポンス例
@@ -260,11 +261,18 @@ sequenceDiagram
     "scale": 0.5,
     "buffer": 15.0,
     "extract_clips": true,
+    "fb_normalize": false,
+    "fb_delete_mov": false,
     "source_fps": 20.0,
     "exclude_bottom": 0.0625,
     "mask_image": "/app/mask_image.png",
     "mask_from_day": "",
-    "mask_dilate": 5
+    "mask_dilate": 5,
+    "nuisance_overlap_threshold": 0.6,
+    "nuisance_path_overlap_threshold": 0.7,
+    "nuisance_mask_image": "",
+    "nuisance_from_night": "",
+    "nuisance_dilate": 3
   },
   "runtime_fps": 19.83,
   "stream_alive": true,
@@ -280,6 +288,9 @@ sequenceDiagram
 | `/` | GET | ダッシュボードHTML | `text/html` |
 | `/detection_window` | GET | 検出時間帯取得 | `application/json` |
 | `/detections` | GET | 検出リスト取得 | `application/json` |
+| `/settings` | GET | 全カメラ設定ページ | `text/html` |
+| `/camera_settings/current` | GET | 設定の現在値取得 | `application/json` |
+| `/camera_settings/apply_all` | POST | 設定を全カメラへ一括反映 | `application/json` |
 | `/camera_snapshot/{index}` | GET | カメラスナップショット取得 | `image/jpeg` |
 | `/camera_restart/{index}` | POST | カメラ再起動要求 | `application/json` |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 | `image/jpeg` |
@@ -324,10 +335,17 @@ sequenceDiagram
 - MJPEGストリーミングによる低遅延プレビュー
 - 検出処理と配信処理の分離
 
-### 5. 位置情報ベースの時間帯制御
-- ブラウザのGeolocation APIで自動取得
+### 5. サーバー座標ベースの時間帯制御
+- サーバー設定（`LATITUDE` / `LONGITUDE` / `TIMEZONE`）を使用
 - 天文薄明時間帯の自動計算
 - 検出時間の最適化
+
+### 6. 設定反映アーキテクチャ（再ビルド不要）
+- ダッシュボード `/settings` から全カメラへ一括設定を送信
+- ダッシュボードは各カメラの `POST /apply_settings` を呼び出し
+- 即時反映可能項目はその場で更新
+- `sensitivity` / `scale` / `buffer` など起動時依存項目は自動再起動で反映
+- 起動時依存項目は `output/runtime_settings/<camera>.json` に保存し、再起動後も維持
 
 ## 関連ファイル
 
