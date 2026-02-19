@@ -71,6 +71,22 @@ def render_dashboard_html(cameras, version, server_start_time):
             color: #888;
             font-size: 0.9em;
         }}
+        .header-actions {{
+            margin-top: 12px;
+        }}
+        .settings-link {{
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            text-decoration: none;
+            font-size: 0.9em;
+        }}
+        .settings-link:hover {{
+            background: #00d4ff;
+            color: #10203c;
+        }}
         .stats-bar {{
             display: flex;
             justify-content: center;
@@ -598,6 +614,9 @@ def render_dashboard_html(cameras, version, server_start_time):
     <div class="header">
         <h1>Meteor Detection Dashboard</h1>
         <div class="subtitle">リアルタイム流星検出システム</div>
+        <div class="header-actions">
+            <a class="settings-link" href="/settings">全カメラ設定</a>
+        </div>
     </div>
 
     <div class="stats-bar">
@@ -1568,6 +1587,244 @@ def render_dashboard_html(cameras, version, server_start_time):
                 closeChangelog();
             }}
         }};
+    </script>
+</body>
+</html>'''
+
+
+def render_settings_html(cameras, version):
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Camera Settings</title>
+    <style>
+        * {{ box-sizing: border-box; }}
+        body {{
+            margin: 0;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+        }}
+        .wrap {{
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 24px;
+        }}
+        h1 {{
+            margin: 0 0 8px;
+            color: #00d4ff;
+        }}
+        .sub {{
+            color: #9ab;
+            margin-bottom: 18px;
+        }}
+        .toolbar {{
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }}
+        .btn {{
+            border: 1px solid #00d4ff;
+            background: #20335b;
+            color: #d7f8ff;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            text-decoration: none;
+        }}
+        .btn:hover {{
+            background: #00d4ff;
+            color: #0f1530;
+        }}
+        .panel {{
+            background: #1f2a48;
+            border: 1px solid #2d406d;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }}
+        .panel h2 {{
+            margin: 0 0 10px;
+            font-size: 1rem;
+            color: #7dd9ff;
+        }}
+        .grid {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(200px, 1fr));
+            gap: 10px 14px;
+        }}
+        label {{
+            display: block;
+            font-size: 0.82rem;
+            color: #bfd1ee;
+            margin-bottom: 4px;
+        }}
+        input {{
+            width: 100%;
+            background: #13203c;
+            border: 1px solid #34507f;
+            color: #e6f2ff;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }}
+        .status {{
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #13203c;
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            border: 1px solid #34507f;
+        }}
+        @media (max-width: 740px) {{
+            .grid {{
+                grid-template-columns: 1fr;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>全カメラ設定</h1>
+        <div class="sub">検出パラメータを一括適用します（対象: {len(cameras)} カメラ） / v{version}</div>
+        <div class="toolbar">
+            <a class="btn" href="/">ダッシュボードへ戻る</a>
+            <button class="btn" type="button" onclick="loadCurrent()">現在値を取得</button>
+            <button class="btn" type="button" onclick="applyAll()">全カメラに適用</button>
+        </div>
+
+        <div class="panel">
+            <h2>基本検出</h2>
+            <div class="grid">
+                <div><label>diff_threshold</label><input id="diff_threshold" type="number" step="1"></div>
+                <div><label>min_brightness</label><input id="min_brightness" type="number" step="1"></div>
+                <div><label>min_brightness_tracking</label><input id="min_brightness_tracking" type="number" step="1"></div>
+                <div><label>min_length</label><input id="min_length" type="number" step="1"></div>
+                <div><label>max_length</label><input id="max_length" type="number" step="1"></div>
+                <div><label>min_duration</label><input id="min_duration" type="number" step="0.01"></div>
+                <div><label>max_duration</label><input id="max_duration" type="number" step="0.01"></div>
+                <div><label>min_speed</label><input id="min_speed" type="number" step="0.1"></div>
+                <div><label>min_linearity</label><input id="min_linearity" type="number" step="0.01"></div>
+                <div><label>exclude_bottom_ratio</label><input id="exclude_bottom_ratio" type="number" step="0.01"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>追跡・結合</h2>
+            <div class="grid">
+                <div><label>min_area</label><input id="min_area" type="number" step="1"></div>
+                <div><label>max_area</label><input id="max_area" type="number" step="1"></div>
+                <div><label>max_gap_time</label><input id="max_gap_time" type="number" step="0.1"></div>
+                <div><label>max_distance</label><input id="max_distance" type="number" step="0.1"></div>
+                <div><label>merge_max_gap_time</label><input id="merge_max_gap_time" type="number" step="0.1"></div>
+                <div><label>merge_max_distance</label><input id="merge_max_distance" type="number" step="0.1"></div>
+                <div><label>merge_max_speed_ratio</label><input id="merge_max_speed_ratio" type="number" step="0.01"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>誤検出抑制（電線・部分照明）</h2>
+            <div class="grid">
+                <div><label>nuisance_overlap_threshold</label><input id="nuisance_overlap_threshold" type="number" step="0.01"></div>
+                <div><label>nuisance_path_overlap_threshold</label><input id="nuisance_path_overlap_threshold" type="number" step="0.01"></div>
+                <div><label>min_track_points</label><input id="min_track_points" type="number" step="1"></div>
+                <div><label>max_stationary_ratio</label><input id="max_stationary_ratio" type="number" step="0.01"></div>
+                <div><label>small_area_threshold</label><input id="small_area_threshold" type="number" step="1"></div>
+                <div><label>mask_dilate</label><input id="mask_dilate" type="number" step="1"></div>
+                <div><label>nuisance_dilate</label><input id="nuisance_dilate" type="number" step="1"></div>
+                <div><label>mask_image (任意パス)</label><input id="mask_image" type="text"></div>
+                <div><label>mask_from_day (任意パス)</label><input id="mask_from_day" type="text"></div>
+                <div><label>nuisance_mask_image (任意パス)</label><input id="nuisance_mask_image" type="text"></div>
+                <div><label>nuisance_from_night (任意パス)</label><input id="nuisance_from_night" type="text"></div>
+            </div>
+        </div>
+
+        <div class="status" id="status">準備完了</div>
+    </div>
+    <script>
+        const fields = [
+            'diff_threshold', 'min_brightness', 'min_brightness_tracking',
+            'min_length', 'max_length', 'min_duration', 'max_duration', 'min_speed',
+            'min_linearity', 'exclude_bottom_ratio',
+            'min_area', 'max_area', 'max_gap_time', 'max_distance',
+            'merge_max_gap_time', 'merge_max_distance', 'merge_max_speed_ratio',
+            'nuisance_overlap_threshold', 'nuisance_path_overlap_threshold',
+            'min_track_points', 'max_stationary_ratio', 'small_area_threshold',
+            'mask_dilate', 'nuisance_dilate',
+            'mask_image', 'mask_from_day', 'nuisance_mask_image', 'nuisance_from_night'
+        ];
+
+        function setStatus(message) {{
+            document.getElementById('status').textContent = message;
+        }}
+
+        function fillForm(data) {{
+            fields.forEach((name) => {{
+                const el = document.getElementById(name);
+                if (!el) return;
+                if (Object.prototype.hasOwnProperty.call(data, name) && data[name] !== null && data[name] !== undefined) {{
+                    el.value = data[name];
+                }}
+            }});
+        }}
+
+        function collectPayload() {{
+            const payload = {{}};
+            fields.forEach((name) => {{
+                const el = document.getElementById(name);
+                if (!el) return;
+                const value = String(el.value ?? '').trim();
+                if (value !== '') {{
+                    payload[name] = value;
+                }}
+            }});
+            return payload;
+        }}
+
+        async function loadCurrent() {{
+            setStatus('現在値を取得中...');
+            try {{
+                const res = await fetch('/camera_settings/current', {{ cache: 'no-store' }});
+                const data = await res.json();
+                if (!res.ok || data.success === false) {{
+                    throw new Error(data.error || ('HTTP ' + res.status));
+                }}
+                fillForm(data.settings || {{}});
+                setStatus('現在値を取得しました');
+            }} catch (e) {{
+                setStatus('取得失敗: ' + e);
+            }}
+        }}
+
+        async function applyAll() {{
+            const payload = collectPayload();
+            setStatus('全カメラへ適用中...');
+            try {{
+                const res = await fetch('/camera_settings/apply_all', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(payload),
+                }});
+                const data = await res.json();
+                if (!res.ok || data.success === false) {{
+                    throw new Error(data.error || ('HTTP ' + res.status));
+                }}
+                setStatus(
+                    '適用完了\\n' +
+                    '成功: ' + data.applied_count + '/' + data.total + '\\n' +
+                    JSON.stringify(data.results, null, 2)
+                );
+            }} catch (e) {{
+                setStatus('適用失敗: ' + e);
+            }}
+        }}
+
+        loadCurrent();
     </script>
 </body>
 </html>'''

@@ -22,3 +22,12 @@ def test_render_dashboard_includes_stream_toggle_controls():
     )
     assert "常時表示" in html
     assert "toggleStreamEnabled(0, this.checked)" in html
+
+
+def test_render_dashboard_includes_settings_link():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+    )
+    assert 'href="/settings"' in html

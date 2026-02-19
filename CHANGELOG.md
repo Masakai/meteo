@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-02-19
+### Added
+- ダッシュボードに全カメラ設定ページ `GET /settings` を追加し、検出パラメータを一括編集できるUIを実装。
+- ダッシュボードに設定APIを追加:
+  - `GET /camera_settings/current`（現在値取得）
+  - `POST /camera_settings/apply_all`（全カメラへ一括適用）
+- カメラ側にランタイム設定反映API `POST /apply_settings` を追加。
+- ダッシュボードの設定機能に関するルート/テンプレートテストを追加。
+
+### Changed
+- ダッシュボードのヘッダーに「全カメラ設定」への導線を追加。
+- `POST /apply_settings` で、基本検出・追跡/結合・誤検出抑制（nuisance関連）・マスク系パスの即時反映に対応。
+- `/stats` の `settings` に、一括設定UIで扱う主要パラメータ（`diff_threshold`、`min_linearity`、`nuisance_*` など）を含めるよう拡張。
+
 ## [1.12.0] - 2026-02-18
 ### Added
 - RTSP検出に電線・部分照明向けのノイズ帯マスク機能を追加（`nuisance_mask`）。

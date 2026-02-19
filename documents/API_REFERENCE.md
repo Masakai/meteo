@@ -32,9 +32,12 @@ Licensed under the MIT License
 | エンドポイント | メソッド | 説明 |
 |--------------|---------|------|
 | `/` | GET | ダッシュボードHTML |
+| `/settings` | GET | 全カメラ設定ページ |
 | `/detection_window` | GET | 検出時間帯取得 |
 | `/detections` | GET | 検出一覧取得 |
 | `/detections_mtime` | GET | 検出ログ更新時刻取得 |
+| `/camera_settings/current` | GET | カメラ設定の現在値取得 |
+| `/camera_settings/apply_all` | POST | 設定を全カメラへ一括適用 |
 | `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） |
 | `/camera_restart/{index}` | POST | カメラ再起動要求 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
@@ -54,6 +57,21 @@ Licensed under the MIT License
 **使用例**:
 ```bash
 curl http://localhost:8080/
+```
+
+---
+
+### GET /settings
+
+**説明**: 全カメラ設定UIページを返す
+
+**レスポンス**:
+- Content-Type: `text/html; charset=utf-8`
+- Status: 200 OK
+
+**使用例**:
+```bash
+curl http://localhost:8080/settings
 ```
 
 ---
@@ -311,6 +329,86 @@ curl -X POST "http://localhost:8080/camera_restart/1" | jq
 
 ---
 
+### GET /camera_settings/current
+
+**説明**: 各カメラの `/stats.settings` を取得し、設定ページ表示用に返す
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ（例）**:
+```json
+{
+  "success": true,
+  "settings": {
+    "diff_threshold": 20,
+    "nuisance_overlap_threshold": 0.6
+  },
+  "results": [
+    {
+      "camera": "camera1",
+      "success": true,
+      "settings": {
+        "diff_threshold": 20
+      }
+    }
+  ],
+  "ok_count": 1,
+  "total": 1
+}
+```
+
+**使用例**:
+```bash
+curl -s http://localhost:8080/camera_settings/current | jq
+```
+
+---
+
+### POST /camera_settings/apply_all
+
+**説明**: 指定した設定値を全カメラへ一括適用（各カメラの `POST /apply_settings` を呼び出し）
+
+**リクエストボディ（例）**:
+```json
+{
+  "diff_threshold": 20,
+  "min_brightness": 180,
+  "nuisance_overlap_threshold": 0.60,
+  "nuisance_path_overlap_threshold": 0.70,
+  "min_track_points": 4,
+  "max_stationary_ratio": 0.40
+}
+```
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ（例）**:
+```json
+{
+  "success": true,
+  "applied_count": 3,
+  "total": 3,
+  "results": [
+    { "camera": "camera1", "success": true },
+    { "camera": "camera2", "success": true },
+    { "camera": "camera3", "success": false, "error": "timeout" }
+  ]
+}
+```
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/camera_settings/apply_all" \
+  -H "Content-Type: application/json" \
+  -d '{"diff_threshold":20,"nuisance_overlap_threshold":0.60}' | jq
+```
+
+---
+
 ### DELETE /detection/{camera}/{timestamp}
 
 **説明**: 検出結果を削除（動画、画像、JSONLエントリ）
@@ -397,6 +495,7 @@ curl http://localhost:8080/changelog
 | `/snapshot` | GET | 現在フレームJPEG |
 | `/stats` | GET | 統計情報 |
 | `/update_mask` | POST | 現在フレームからマスク再生成 |
+| `/apply_settings` | POST | 設定値をランタイム反映 |
 | `/restart` | POST | プロセス再起動要求 |
 
 ---
@@ -513,6 +612,14 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.mask_image` | string | マスク画像（優先） |
 | `settings.mask_from_day` | string | 昼間画像から生成するマスク |
 | `settings.mask_dilate` | integer | マスク拡張ピクセル数 |
+| `settings.nuisance_overlap_threshold` | float | ノイズ帯重なり閾値 |
+| `settings.nuisance_path_overlap_threshold` | float | ノイズ帯経路重なり閾値 |
+| `settings.min_track_points` | integer | 最小追跡点数 |
+| `settings.max_stationary_ratio` | float | 静止率上限 |
+| `settings.small_area_threshold` | integer | 小領域判定閾値 |
+| `settings.nuisance_mask_image` | string | ノイズ帯マスク画像 |
+| `settings.nuisance_from_night` | string | 夜間画像からのノイズ帯生成元 |
+| `settings.nuisance_dilate` | integer | ノイズ帯マスク拡張ピクセル数 |
 | `runtime_fps` | float | 直近フレームから算出した実効FPS |
 | `stream_alive` | boolean | ストリーム生存確認 |
 | `time_since_last_frame` | float | 最終フレームからの経過時間（秒） |
@@ -593,6 +700,47 @@ curl "http://localhost:8081/snapshot" --output camera1_snapshot.jpg
 ```bash
 # マスク更新
 curl -X POST http://localhost:8081/update_mask | jq
+```
+
+---
+
+### POST /apply_settings
+
+**説明**: 検出パラメータをランタイムで反映（再起動不要）
+
+**リクエストボディ（例）**:
+```json
+{
+  "diff_threshold": 20,
+  "min_brightness": 180,
+  "min_linearity": 0.7,
+  "nuisance_overlap_threshold": 0.6,
+  "nuisance_path_overlap_threshold": 0.7,
+  "min_track_points": 4,
+  "max_stationary_ratio": 0.4,
+  "small_area_threshold": 40,
+  "mask_dilate": 20,
+  "nuisance_dilate": 3
+}
+```
+
+**レスポンスボディ（例）**:
+```json
+{
+  "success": true,
+  "applied": {
+    "diff_threshold": 20,
+    "nuisance_overlap_threshold": 0.6
+  },
+  "errors": []
+}
+```
+
+**使用例**:
+```bash
+curl -X POST http://localhost:8081/apply_settings \
+  -H "Content-Type: application/json" \
+  -d '{"diff_threshold":20,"nuisance_overlap_threshold":0.60}' | jq
 ```
 
 ---

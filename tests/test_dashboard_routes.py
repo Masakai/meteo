@@ -212,3 +212,46 @@ def test_camera_monitor_triggers_restart_on_timeout(monkeypatch):
     snap = dr.get_camera_monitor_snapshot(0)
     assert snap["monitor_stop_reason"] == "timeout"
     assert snap["monitor_restart_count"] == 1
+
+
+def test_handle_settings_page(monkeypatch):
+    monkeypatch.setattr(dr, "render_settings_html", lambda cameras, version: "<html>settings</html>")
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+    monkeypatch.setattr(dr, "VERSION", "0.0.0")
+    handler = _DummyHandler("/settings")
+    assert dr.handle_settings_page(handler) is True
+    assert handler.status == 200
+    assert b"settings" in handler.wfile.getvalue()
+
+
+def test_handle_camera_settings_current(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        assert req.full_url.endswith("/stats")
+        assert timeout == 5
+        return _DummyResponse(b'{"settings":{"diff_threshold":20,"nuisance_overlap_threshold":0.6}}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    handler = _DummyHandler("/camera_settings/current")
+    assert dr.handle_camera_settings_current(handler) is True
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["settings"]["diff_threshold"] == 20
+
+
+def test_handle_camera_settings_apply_all(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        assert req.full_url.endswith("/apply_settings")
+        assert req.get_method() == "POST"
+        return _DummyResponse(b'{"success": true, "applied": {"diff_threshold": 20}}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps({"diff_threshold": 20}).encode("utf-8")
+    handler = _DummyHandler("/camera_settings/apply_all", body=body, headers={"Content-Type": "application/json"})
+    assert dr.handle_camera_settings_apply_all(handler) is True
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["applied_count"] == 1

@@ -39,7 +39,7 @@ from meteor_detector_realtime import (
     sanitize_fps,
 )
 
-VERSION = "1.12.0"
+VERSION = "1.13.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -61,6 +61,7 @@ current_detector = None
 current_proc_size = (0, 0)
 current_mask_dilate = 20
 current_mask_save = None
+current_nuisance_dilate = 3
 current_output_dir = None
 current_camera_name = ""
 current_stop_flag = None
@@ -490,6 +491,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
+        global current_mask_dilate, current_nuisance_dilate
         if self.path == '/restart':
             self.send_response(202)
             self.send_header('Content-type', 'application/json')
@@ -556,6 +558,227 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "success": mask is not None,
                 "message": "mask updated" if mask is not None else "mask update failed",
                 "saved": str(save_path) if save_path else ""
+            }).encode())
+            return
+
+        if self.path == '/apply_settings':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            if current_detector is None or current_proc_size == (0, 0):
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "detector not ready"
+                }).encode())
+                return
+
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                raw_body = self.rfile.read(length)
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                if not isinstance(payload, dict):
+                    raise ValueError("payload must be object")
+            except Exception as e:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": f"invalid payload: {e}"
+                }).encode())
+                return
+
+            def _to_int(name, minimum=None, maximum=None):
+                if name not in payload or payload.get(name) in ("", None):
+                    return None
+                value = int(payload[name])
+                if minimum is not None and value < minimum:
+                    raise ValueError(f"{name} must be >= {minimum}")
+                if maximum is not None and value > maximum:
+                    raise ValueError(f"{name} must be <= {maximum}")
+                return value
+
+            def _to_float(name, minimum=None, maximum=None):
+                if name not in payload or payload.get(name) in ("", None):
+                    return None
+                value = float(payload[name])
+                if minimum is not None and value < minimum:
+                    raise ValueError(f"{name} must be >= {minimum}")
+                if maximum is not None and value > maximum:
+                    raise ValueError(f"{name} must be <= {maximum}")
+                return value
+
+            int_fields = [
+                ("diff_threshold", 1, 255),
+                ("min_brightness", 0, 255),
+                ("min_brightness_tracking", 0, 255),
+                ("min_length", 1, None),
+                ("max_length", 1, None),
+                ("min_area", 1, None),
+                ("max_area", 1, None),
+                ("min_track_points", 2, None),
+                ("small_area_threshold", 1, None),
+                ("mask_dilate", 0, 255),
+                ("nuisance_dilate", 0, 255),
+            ]
+            float_fields = [
+                ("min_duration", 0.0, None),
+                ("max_duration", 0.0, None),
+                ("min_speed", 0.0, None),
+                ("min_linearity", 0.0, 1.0),
+                ("max_gap_time", 0.0, None),
+                ("max_distance", 0.0, None),
+                ("merge_max_gap_time", 0.0, None),
+                ("merge_max_distance", 0.0, None),
+                ("merge_max_speed_ratio", 0.0, 1.0),
+                ("exclude_bottom_ratio", 0.0, 1.0),
+                ("nuisance_overlap_threshold", 0.0, 1.0),
+                ("nuisance_path_overlap_threshold", 0.0, 1.0),
+                ("max_stationary_ratio", 0.0, 1.0),
+            ]
+
+            applied = {}
+            errors = []
+            params = current_detector.params
+
+            try:
+                with current_detector.lock:
+                    for field, min_v, max_v in int_fields:
+                        if field in ("mask_dilate", "nuisance_dilate"):
+                            continue
+                        value = _to_int(field, min_v, max_v)
+                        if value is not None:
+                            setattr(params, field, value)
+                            applied[field] = value
+
+                    for field, min_v, max_v in float_fields:
+                        value = _to_float(field, min_v, max_v)
+                        if value is not None:
+                            setattr(params, field, value)
+                            applied[field] = value
+
+                    if params.max_length < params.min_length:
+                        params.max_length = params.min_length
+                        applied["max_length"] = params.max_length
+                    if params.max_duration < params.min_duration:
+                        params.max_duration = params.min_duration
+                        applied["max_duration"] = params.max_duration
+                    if params.max_area < params.min_area:
+                        params.max_area = params.min_area
+                        applied["max_area"] = params.max_area
+            except Exception as e:
+                errors.append(str(e))
+
+            try:
+                new_mask_dilate = _to_int("mask_dilate", 0, 255)
+                if new_mask_dilate is not None:
+                    current_mask_dilate = new_mask_dilate
+                    applied["mask_dilate"] = new_mask_dilate
+                new_nuisance_dilate = _to_int("nuisance_dilate", 0, 255)
+                if new_nuisance_dilate is not None:
+                    current_nuisance_dilate = new_nuisance_dilate
+                    applied["nuisance_dilate"] = new_nuisance_dilate
+            except Exception as e:
+                errors.append(str(e))
+
+            proc_w, proc_h = current_proc_size
+            mask_image = str(payload.get("mask_image", "")).strip()
+            mask_from_day = str(payload.get("mask_from_day", "")).strip()
+            nuisance_mask_image = str(payload.get("nuisance_mask_image", "")).strip()
+            nuisance_from_night = str(payload.get("nuisance_from_night", "")).strip()
+
+            try:
+                if mask_image:
+                    mask_img = cv2.imread(mask_image, cv2.IMREAD_GRAYSCALE)
+                    if mask_img is None:
+                        raise ValueError(f"mask_image not readable: {mask_image}")
+                    if (mask_img.shape[1], mask_img.shape[0]) != (proc_w, proc_h):
+                        mask_img = cv2.resize(mask_img, (proc_w, proc_h), interpolation=cv2.INTER_NEAREST)
+                    _, new_mask = cv2.threshold(mask_img, 1, 255, cv2.THRESH_BINARY)
+                    current_detector.update_exclusion_mask(new_mask)
+                    applied["mask_image"] = mask_image
+                elif mask_from_day:
+                    new_mask = build_exclusion_mask(
+                        mask_from_day,
+                        (proc_w, proc_h),
+                        dilate_px=current_mask_dilate,
+                        save_path=current_mask_save,
+                    )
+                    if new_mask is None:
+                        raise ValueError(f"mask_from_day not readable: {mask_from_day}")
+                    current_detector.update_exclusion_mask(new_mask)
+                    applied["mask_from_day"] = mask_from_day
+            except Exception as e:
+                errors.append(str(e))
+
+            try:
+                new_nuisance_mask = None
+                if nuisance_mask_image:
+                    nuisance_img = cv2.imread(nuisance_mask_image, cv2.IMREAD_GRAYSCALE)
+                    if nuisance_img is None:
+                        raise ValueError(f"nuisance_mask_image not readable: {nuisance_mask_image}")
+                    if (nuisance_img.shape[1], nuisance_img.shape[0]) != (proc_w, proc_h):
+                        nuisance_img = cv2.resize(nuisance_img, (proc_w, proc_h), interpolation=cv2.INTER_NEAREST)
+                    _, new_nuisance_mask = cv2.threshold(nuisance_img, 1, 255, cv2.THRESH_BINARY)
+                    applied["nuisance_mask_image"] = nuisance_mask_image
+
+                if nuisance_from_night:
+                    auto_nuisance = build_nuisance_mask_from_night(
+                        nuisance_from_night,
+                        (proc_w, proc_h),
+                        dilate_px=current_nuisance_dilate,
+                    )
+                    if auto_nuisance is None:
+                        raise ValueError(f"nuisance_from_night not readable: {nuisance_from_night}")
+                    new_nuisance_mask = auto_nuisance if new_nuisance_mask is None else cv2.bitwise_or(
+                        new_nuisance_mask, auto_nuisance
+                    )
+                    applied["nuisance_from_night"] = nuisance_from_night
+
+                if new_nuisance_mask is not None:
+                    current_detector.update_nuisance_mask(new_nuisance_mask)
+            except Exception as e:
+                errors.append(str(e))
+
+            settings_updates = {}
+            for key in (
+                "diff_threshold",
+                "min_brightness",
+                "min_brightness_tracking",
+                "min_length",
+                "max_length",
+                "min_duration",
+                "max_duration",
+                "min_speed",
+                "min_linearity",
+                "min_area",
+                "max_area",
+                "max_gap_time",
+                "max_distance",
+                "merge_max_gap_time",
+                "merge_max_distance",
+                "merge_max_speed_ratio",
+                "exclude_bottom_ratio",
+                "nuisance_overlap_threshold",
+                "nuisance_path_overlap_threshold",
+                "min_track_points",
+                "max_stationary_ratio",
+                "small_area_threshold",
+                "mask_dilate",
+                "nuisance_dilate",
+                "mask_image",
+                "mask_from_day",
+                "nuisance_mask_image",
+                "nuisance_from_night",
+            ):
+                if key in applied:
+                    settings_updates[key] = applied[key]
+            if settings_updates:
+                current_settings.update(settings_updates)
+
+            self.wfile.write(json.dumps({
+                "success": len(errors) == 0,
+                "applied": applied,
+                "errors": errors,
             }).encode())
             return
 
@@ -753,6 +976,7 @@ def detection_thread_worker(
     """検出処理を行うワーカースレッド"""
     global current_frame, detection_count, last_frame_time, is_detecting_now, current_runtime_fps
     global current_detector, current_proc_size, current_mask_dilate, current_mask_save
+    global current_nuisance_dilate
     global current_output_dir, current_camera_name
 
     width, height = reader.frame_size
@@ -817,6 +1041,7 @@ def detection_thread_worker(
     current_detector = detector
     current_proc_size = (proc_width, proc_height)
     current_mask_dilate = mask_dilate
+    current_nuisance_dilate = nuisance_dilate
     current_mask_save = mask_save
     current_output_dir = Path(output_path)
     current_camera_name = camera_name
@@ -1054,6 +1279,26 @@ def process_rtsp_stream(
         "nuisance_from_night": nuisance_from_night or "",
         "nuisance_dilate": nuisance_dilate,
         "nuisance_overlap_threshold": nuisance_overlap_threshold,
+        "diff_threshold": params.diff_threshold,
+        "min_brightness": params.min_brightness,
+        "min_brightness_tracking": params.min_brightness_tracking,
+        "min_length": params.min_length,
+        "max_length": params.max_length,
+        "min_duration": params.min_duration,
+        "max_duration": params.max_duration,
+        "min_speed": params.min_speed,
+        "min_linearity": params.min_linearity,
+        "min_area": params.min_area,
+        "max_area": params.max_area,
+        "max_gap_time": params.max_gap_time,
+        "max_distance": params.max_distance,
+        "merge_max_gap_time": params.merge_max_gap_time,
+        "merge_max_distance": params.merge_max_distance,
+        "merge_max_speed_ratio": params.merge_max_speed_ratio,
+        "nuisance_path_overlap_threshold": params.nuisance_path_overlap_threshold,
+        "min_track_points": params.min_track_points,
+        "max_stationary_ratio": params.max_stationary_ratio,
+        "small_area_threshold": params.small_area_threshold,
     })
 
     output_path = Path(output_dir)
