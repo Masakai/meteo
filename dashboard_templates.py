@@ -12,9 +12,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                     <div class="camera-header">
                         <span class="camera-name">{cam['name']}</span>
                         <div class="status-indicators">
-                            <span class="camera-status" id="status{i}" title="ストリーム接続">●</span>
-                            <span class="detection-status" id="detection{i}" title="検出処理">●</span>
-                            <span class="mask-status" id="mask-status{i}" title="マスク適用">MASK</span>
+                            <span class="camera-status indicator-help" id="status{i}" title="ストリーム接続" data-help="ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）">●</span>
+                            <span class="server-status unknown indicator-help" id="server-status{i}" title="カメラサーバ生存" data-help="カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）">●</span>
+                            <span class="detection-status indicator-help" id="detection{i}" title="検出処理" data-help="検出処理状態（赤点滅: 検出中 / 灰: 待機中）">●</span>
+                            <span class="mask-status indicator-help" id="mask-status{i}" title="マスク適用" data-help="マスク適用状態（赤: マスク有効 / 灰: マスク無効）">MASK</span>
                         </div>
                     </div>
                     <div class="camera-actions">
@@ -151,6 +152,29 @@ def render_dashboard_html(cameras, version, server_start_time):
             display: flex;
             gap: 8px;
         }}
+        .indicator-help {{
+            position: relative;
+            cursor: help;
+        }}
+        .indicator-help:hover::after {{
+            content: attr(data-help);
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 220px;
+            max-width: 320px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: rgba(10, 16, 30, 0.96);
+            border: 1px solid #3b5f9d;
+            color: #dce8ff;
+            font-size: 12px;
+            line-height: 1.45;
+            white-space: normal;
+            z-index: 20;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
+        }}
         .camera-status {{
             color: #00ff88;
             font-size: 0.8em;
@@ -159,6 +183,16 @@ def render_dashboard_html(cameras, version, server_start_time):
             color: #ff4444;
         }}
         .camera-status.paused {{
+            color: #888;
+        }}
+        .server-status {{
+            color: #00ff88;
+            font-size: 0.8em;
+        }}
+        .server-status.offline {{
+            color: #ff4444;
+        }}
+        .server-status.unknown {{
             color: #888;
         }}
         .detection-status {{
@@ -995,6 +1029,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 const img = document.getElementById('stream' + i);
                 const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
+                const serverStatusEl = document.getElementById('server-status' + i);
                 if (img) {{
                     img.src = streamPlaceholderSrc;
                     img.style.display = 'none';
@@ -1004,6 +1039,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }}
                 if (statusEl) {{
                     statusEl.className = 'camera-status paused';
+                }}
+                if (serverStatusEl) {{
+                    serverStatusEl.className = 'server-status unknown';
                 }}
                 setStreamErrorMessage(i, 'バックグラウンド一時停止');
             }});
@@ -1024,6 +1062,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 const img = document.getElementById('stream' + i);
                 const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
+                const serverStatusEl = document.getElementById('server-status' + i);
                 if (img) {{
                     const base = img.dataset.streamSrc || ('/camera_stream/' + i);
                     img.src = base + '?t=' + Date.now();
@@ -1034,6 +1073,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }}
                 if (statusEl) {{
                     statusEl.className = 'camera-status';
+                }}
+                if (serverStatusEl) {{
+                    serverStatusEl.className = 'server-status unknown';
                 }}
                 setStreamErrorMessage(i, '接続中...');
                 scheduleStreamRetry(i, 0);
@@ -1097,6 +1139,17 @@ def render_dashboard_html(cameras, version, server_start_time):
                     cameraStatsState[i].delay = baseDelay;
                     document.getElementById('count' + i).textContent = data.detections;
                     renderCameraParams(i, data);
+                    const serverStatusEl = document.getElementById('server-status' + i);
+                    const monitorStopReason = String(data.monitor_stop_reason || '');
+                    if (serverStatusEl) {{
+                        if (monitorStopReason === 'stats_unreachable') {{
+                            serverStatusEl.className = 'server-status offline';
+                        }} else if (monitorStopReason === 'unknown') {{
+                            serverStatusEl.className = 'server-status unknown';
+                        }} else {{
+                            serverStatusEl.className = 'server-status';
+                        }}
+                    }}
                     const streamEnabled = isStreamEnabled(i);
                     const streamAlive = data.stream_alive !== false;
                     if (!streamEnabled) {{
@@ -1133,6 +1186,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                         return;
                     }}
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
+                    const serverStatusEl = document.getElementById('server-status' + i);
+                    if (serverStatusEl) {{
+                        serverStatusEl.className = 'server-status offline';
+                    }}
                     if (isStreamEnabled(i)) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
                     }} else {{
