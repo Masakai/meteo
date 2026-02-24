@@ -34,6 +34,7 @@ from dashboard_routes import (
     handle_settings_page,
     handle_camera_settings_current,
     handle_camera_settings_apply_all,
+    handle_bulk_delete_non_meteor,
 )
 
 
@@ -108,6 +109,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if self.path == '/camera_settings/apply_all':
             handle_camera_settings_apply_all(self)
+            return
+        if self.path.startswith('/bulk_delete_non_meteor/'):
+            handle_bulk_delete_non_meteor(self)
             return
 
         self.send_response(404)

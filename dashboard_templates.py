@@ -399,6 +399,27 @@ def render_dashboard_html(cameras, version, server_start_time):
             margin-bottom: 8px;
             padding-bottom: 6px;
             border-bottom: 1px solid #2a3f6f;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        .bulk-delete-btn {{
+            background: #ff6b6b;
+            border: 1px solid #ff4444;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75em;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }}
+        .bulk-delete-btn:hover {{
+            background: #ff4444;
+        }}
+        .bulk-delete-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
         }}
         .detection-group-grid {{
             display: grid;
@@ -1413,12 +1434,78 @@ def render_dashboard_html(cameras, version, server_start_time):
             }});
         }}
 
+        // それ以外を一括削除
+        function bulkDeleteNonMeteor(camera, event) {{
+            event.stopPropagation();
+
+            if (!confirm(`${{camera}}の「それ以外」をすべて削除しますか?\n\nこの操作は取り消せません。`)) {{
+                return;
+            }}
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '削除中...';
+
+            fetch(`/bulk_delete_non_meteor/${{encodeURIComponent(camera)}}`, {{
+                method: 'POST'
+            }})
+            .then(r => r.json())
+            .then(data => {{
+                if (data.success) {{
+                    updateDetections();
+                }} else {{
+                    alert('一括削除に失敗しました: ' + (data.error || '不明なエラー'));
+                }}
+            }})
+            .catch(err => {{
+                alert('一括削除に失敗しました: ' + err.message);
+            }})
+            .finally(() => {{
+                btn.disabled = false;
+                btn.textContent = 'それ以外を一括削除';
+            }});
+        }}
+
         function setDetectionLabelSelection(groupEl, label) {{
             const normalized = label === 'post_detected' ? 'post_detected' : 'detected';
             groupEl.dataset.label = normalized;
             groupEl.querySelectorAll('input[type="radio"]').forEach((radio) => {{
                 radio.checked = radio.value === normalized;
             }});
+        }}
+
+        function updateBulkDeleteButton(camera) {{
+            const groupEl = document.querySelector('.detection-group-title span');
+            if (!groupEl) return;
+
+            const detectionGroups = document.querySelectorAll('.detection-group');
+            for (const group of detectionGroups) {{
+                const titleSpan = group.querySelector('.detection-group-title span');
+                if (titleSpan && titleSpan.textContent === camera) {{
+                    const items = group.querySelectorAll('.detection-item');
+                    let nonMeteorCount = 0;
+                    items.forEach(item => {{
+                        const labelRadios = item.querySelector('.label-radios');
+                        if (labelRadios && labelRadios.dataset.label === 'post_detected') {{
+                            nonMeteorCount++;
+                        }}
+                    }});
+
+                    const existingBtn = group.querySelector('.bulk-delete-btn');
+                    if (existingBtn) {{
+                        existingBtn.remove();
+                    }}
+
+                    if (nonMeteorCount > 0) {{
+                        const newBtn = document.createElement('button');
+                        newBtn.className = 'bulk-delete-btn';
+                        newBtn.textContent = `それ以外を一括削除 (${{nonMeteorCount}}件)`;
+                        newBtn.onclick = (event) => bulkDeleteNonMeteor(camera, event);
+                        group.querySelector('.detection-group-title').appendChild(newBtn);
+                    }}
+                    break;
+                }}
+            }}
         }}
 
         function updateDetectionLabel(camera, time, label, radioEl) {{
@@ -1440,6 +1527,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                     throw new Error(data.error || 'update failed');
                 }}
                 setDetectionLabelSelection(groupEl, normalized);
+                updateBulkDeleteButton(camera);
                 lastDetectionsKey = '';
             }})
             .catch((err) => {{
@@ -1514,7 +1602,8 @@ def render_dashboard_html(cameras, version, server_start_time):
                         }});
 
                         const html = cameraOrder.map(camera => {{
-                            const items = grouped[camera].map((d, idx) => {{
+                            const cameraItems = grouped[camera];
+                            const items = cameraItems.map((d, idx) => {{
                                 const thumb = d.image
                                     ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{camera}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">`
                                     : '';
@@ -1550,9 +1639,16 @@ def render_dashboard_html(cameras, version, server_start_time):
                                     </div>
                                 `;
                             }}).join('');
+                            const nonMeteorCount = cameraItems.filter(d => d.label === 'post_detected').length;
+                            const bulkDeleteBtn = nonMeteorCount > 0
+                                ? `<button class="bulk-delete-btn" onclick="bulkDeleteNonMeteor('${{camera}}', event)">それ以外を一括削除 (${{nonMeteorCount}}件)</button>`
+                                : '';
                             return `
                                 <div class="detection-group">
-                                    <div class="detection-group-title">${{camera}}</div>
+                                    <div class="detection-group-title">
+                                        <span>${{camera}}</span>
+                                        ${{bulkDeleteBtn}}
+                                    </div>
                                     <div class="detection-group-grid">
                                         ${{items}}
                                     </div>

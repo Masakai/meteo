@@ -1103,3 +1103,92 @@ def handle_camera_settings_apply_all(handler):
         ).encode("utf-8")
     )
     return True
+
+
+def handle_bulk_delete_non_meteor(handler):
+    if not handler.path.startswith("/bulk_delete_non_meteor/"):
+        return False
+
+    try:
+        parts = handler.path[25:].split("/", 1)
+        if len(parts) != 1:
+            raise ValueError("invalid path")
+        camera_name = unquote(parts[0])
+
+        labels = _load_detection_labels()
+        cam_dir = Path(DETECTIONS_DIR) / camera_name
+        if not cam_dir.is_dir():
+            raise ValueError(f"camera directory not found: {camera_name}")
+
+        deleted_count = 0
+        deleted_detections = []
+
+        jsonl_file = cam_dir / "detections.jsonl"
+        if jsonl_file.exists():
+            temp_file = cam_dir / "detections.jsonl.tmp"
+            with open(jsonl_file, "r", encoding="utf-8") as f_in, open(
+                temp_file, "w", encoding="utf-8"
+            ) as f_out:
+                for line in f_in:
+                    try:
+                        d = json.loads(line)
+                        timestamp_str = d.get("timestamp", "")
+                        if timestamp_str:
+                            dt = datetime.fromisoformat(timestamp_str)
+                            display_time = timestamp_str[:19].replace("T", " ")
+                            label_key = _detection_label_key(camera_name, display_time)
+                            label = _normalize_detection_label(labels.get(label_key, ""))
+
+                            if label == "post_detected":
+                                base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
+                                files_to_delete = [
+                                    cam_dir / f"{base_filename}.mov",
+                                    cam_dir / f"{base_filename}.mp4",
+                                    cam_dir / f"{base_filename}_composite.jpg",
+                                    cam_dir / f"{base_filename}_composite_original.jpg",
+                                ]
+
+                                for file_path in files_to_delete:
+                                    if file_path.exists():
+                                        file_path.unlink()
+
+                                if label_key in labels:
+                                    del labels[label_key]
+
+                                deleted_count += 1
+                                deleted_detections.append(display_time)
+                            else:
+                                f_out.write(line)
+                        else:
+                            f_out.write(line)
+                    except Exception:
+                        f_out.write(line)
+
+            temp_file.replace(jsonl_file)
+
+        _save_detection_labels(labels)
+        _refresh_detection_cache(force=True)
+
+        handler.send_response(200)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+
+        response = {
+            "success": True,
+            "deleted_count": deleted_count,
+            "deleted_detections": deleted_detections,
+            "message": f"{camera_name}: {deleted_count}件の「それ以外」を削除しました",
+        }
+        handler.wfile.write(json.dumps(response, ensure_ascii=False).encode("utf-8"))
+        return True
+
+    except Exception as e:
+        handler.send_response(500)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        response = {
+            "success": False,
+            "error": str(e),
+        }
+        handler.wfile.write(json.dumps(response, ensure_ascii=False).encode("utf-8"))
+        return True
