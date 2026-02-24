@@ -134,7 +134,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             background: #1e2a4a;
             border-radius: 12px;
             overflow: hidden;
-            border: 1px solid #2a3f6f;
+            border: 3px solid #4a6f9f;
         }}
         .camera-header {{
             display: flex;
@@ -142,7 +142,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             align-items: center;
             padding: 12px 15px;
             background: #16213e;
-            border-bottom: 1px solid #2a3f6f;
+            border-bottom: 3px solid #4a6f9f;
         }}
         .camera-name {{
             font-weight: bold;
@@ -215,7 +215,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         .camera-actions {{
             padding: 8px 12px;
             background: #16213e;
-            border-bottom: 1px solid #2a3f6f;
+            border-bottom: 3px solid #4a6f9f;
             display: flex;
             justify-content: flex-end;
             gap: 8px;
@@ -387,6 +387,29 @@ def render_dashboard_html(cameras, version, server_start_time):
             overflow-y: auto;
             padding-right: 6px;
         }}
+        .date-group {{
+            border: 3px solid #4a6f9f;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            background: rgba(42, 63, 111, 0.15);
+        }}
+        .date-group:last-child {{
+            margin-bottom: 0;
+        }}
+        .date-group-header {{
+            color: #00d4ff;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 3px solid #4a6f9f;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }}
         .detection-group {{
             margin-bottom: 16px;
         }}
@@ -398,7 +421,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             font-weight: bold;
             margin-bottom: 8px;
             padding-bottom: 6px;
-            border-bottom: 1px solid #2a3f6f;
+            border-bottom: 3px solid #4a6f9f;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -1577,41 +1600,33 @@ def render_dashboard_html(cameras, version, server_start_time):
                         }}
                         lastDetectionsKey = detectionsKey;
 
-                        const grouped = {{}};
+                        // 日付毎にグループ化（時系列順）
+                        const groupedByDate = {{}};
                         data.recent.forEach(d => {{
-                            if (!grouped[d.camera]) {{
-                                grouped[d.camera] = [];
+                            const dateKey = d.time.split(' ')[0]; // "YYYY-MM-DD HH:MM:SS" から日付部分を取得
+                            if (!groupedByDate[dateKey]) {{
+                                groupedByDate[dateKey] = [];
                             }}
-                            grouped[d.camera].push(d);
+                            groupedByDate[dateKey].push(d);
                         }});
 
-                        const cameraOrder = cameras.map(cam => cam.name).filter(name => grouped[name]);
-                        Object.keys(grouped).forEach(name => {{
-                            if (!cameraOrder.includes(name)) {{
-                                cameraOrder.push(name);
-                            }}
-                        }});
+                        // 日付を新しい順にソート
+                        const dateOrder = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
 
-                        cameraOrder.sort((a, b) => {{
-                            const aMatch = a.match(/(\\d+)$/);
-                            const bMatch = b.match(/(\\d+)$/);
-                            if (aMatch && bMatch) {{
-                                return Number(aMatch[1]) - Number(bMatch[1]);
-                            }}
-                            return a.localeCompare(b);
-                        }});
+                        const html = dateOrder.map(date => {{
+                            const dateItems = groupedByDate[date];
+                            // 時刻の新しい順にソート
+                            dateItems.sort((a, b) => b.time.localeCompare(a.time));
 
-                        const html = cameraOrder.map(camera => {{
-                            const cameraItems = grouped[camera];
-                            const items = cameraItems.map((d, idx) => {{
+                            const items = dateItems.map((d, idx) => {{
                                 const thumb = d.image
-                                    ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{camera}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">`
+                                    ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{d.camera}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">`
                                     : '';
                                 const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
                                 const radioName = `label-${{d.camera}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
                                 return `
                                     <div class="detection-item">
-                                        <div class="time">${{d.time}}</div>
+                                        <div class="time">${{d.time}} | ${{d.camera}}</div>
                                         ${{thumb}}
                                         <div>信頼度: ${{d.confidence}}</div>
                                         <div class="detection-actions">
@@ -1639,15 +1654,27 @@ def render_dashboard_html(cameras, version, server_start_time):
                                     </div>
                                 `;
                             }}).join('');
-                            const nonMeteorCount = cameraItems.filter(d => d.label === 'post_detected').length;
-                            const bulkDeleteBtn = nonMeteorCount > 0
-                                ? `<button class="bulk-delete-btn" onclick="bulkDeleteNonMeteor('${{camera}}', event)">それ以外を一括削除 (${{nonMeteorCount}}件)</button>`
-                                : '';
+
+                            // カメラ別に「それ以外」をカウント
+                            const cameraNonMeteorCount = {{}};
+                            dateItems.forEach(d => {{
+                                if (d.label === 'post_detected') {{
+                                    cameraNonMeteorCount[d.camera] = (cameraNonMeteorCount[d.camera] || 0) + 1;
+                                }}
+                            }});
+
+                            // 一括削除ボタンを生成
+                            const bulkDeleteButtons = Object.keys(cameraNonMeteorCount)
+                                .filter(camera => cameraNonMeteorCount[camera] > 0)
+                                .map(camera =>
+                                    `<button class="bulk-delete-btn" onclick="bulkDeleteNonMeteor('${{camera}}', event)">${{camera}}: それ以外を一括削除 (${{cameraNonMeteorCount[camera]}}件)</button>`
+                                ).join('');
+
                             return `
-                                <div class="detection-group">
-                                    <div class="detection-group-title">
-                                        <span>${{camera}}</span>
-                                        ${{bulkDeleteBtn}}
+                                <div class="date-group">
+                                    <div class="date-group-header">
+                                        <span>${{date}}</span>
+                                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">${{bulkDeleteButtons}}</div>
                                     </div>
                                     <div class="detection-group-grid">
                                         ${{items}}
