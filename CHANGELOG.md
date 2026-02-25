@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.2] - 2026-02-25
+### Fixed
+- 日本語名のカメラ（例: 東側）でスナップショット保存が失敗する問題を修正。Pythonの `str.isalnum()` は日本語文字に対しても `True` を返すため、ダウンロードファイル名に日本語が含まれると HTTP ヘッダーの `latin-1` エンコードで `UnicodeEncodeError` が発生し、レスポンスが壊れてダウンロードできなかった。`c.isascii()` も条件に追加することで ASCII 文字のみをファイル名に使用するよう修正。
+
 ## [1.20.1] - 2026-02-25
 ### Fixed
 - 日本語名のカメラディレクトリ（例: 東側、西側）で画像が表示されない問題を修正。`handle_image` でURLパスのカメラ名をURLデコードしていなかったため、`%E6%9D%B1%E5%81%B4` のようなエンコード済み文字列でファイルを検索して見つからなくなっていた。

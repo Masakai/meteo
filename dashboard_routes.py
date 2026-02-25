@@ -880,7 +880,7 @@ def handle_camera_snapshot(handler):
         query = parse_qs(parsed.query)
         should_download = query.get("download", ["0"])[0] in ("1", "true", "yes")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_name = "".join(c if c.isalnum() else "_" for c in cam["name"]).strip("_") or f"camera{camera_index+1}"
+        safe_name = "".join(c if (c.isalnum() and c.isascii()) else "_" for c in cam["name"]).strip("_") or f"camera{camera_index+1}"
         filename = f"snapshot_{safe_name}_{timestamp}.jpg"
 
         handler.send_response(200)
