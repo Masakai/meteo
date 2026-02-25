@@ -239,13 +239,15 @@ flowchart TD
 
     Filter1{"面積フィルタ<br/>5 ≤ area ≤ 10000"}
     Filter2{"輝度フィルタ<br/>brightness ≥ min_brightness"}
-    Filter2b{"ノイズ帯重なり除外<br/>small_area & overlap高"}
-    Filter3{"画面下部除外<br/>y < height×15/16"}
+    Filter2b{"ノイズ帯重なり除外<br/>(v1.12.0)<br/>small_area & overlap高"}
+    Filter3{"画面下部除外<br/>y < height×(1-exclude_bottom)"}
+    Filter4{"画面端除外<br/>(v1.16.0)<br/>exclude_edge_ratio適用"}
 
     Objects["検出物体リスト<br/>{centroid, brightness, area}"]
     Track["トラッキング<br/>track_objects()"]
 
     Decision{"軌跡が完了<br/>かつ判定条件を満たす"}
+    NuisanceCheck{"ノイズ帯経路除外<br/>(v1.12.0)<br/>path_overlap高"}
     Meteor["MeteorEvent生成"]
     End["次フレームへ"]
 
@@ -262,16 +264,23 @@ flowchart TD
     Filter2b -->|"除外"| End
     Filter2b -->|"通過"| Filter3
     Filter3 -->|"No"| End
-    Filter3 -->|"Yes"| Objects
+    Filter3 -->|"Yes"| Filter4
+    Filter4 -->|"No"| End
+    Filter4 -->|"Yes"| Objects
     Objects --> Track
     Track --> Decision
-    Decision -->|"Yes"| Meteor
     Decision -->|"No"| End
+    Decision -->|"Yes"| NuisanceCheck
+    NuisanceCheck -->|"除外"| End
+    NuisanceCheck -->|"通過"| Meteor
     Meteor --> End
 
     style Start fill:#16213e
     style Meteor fill:#ff4444
     style Objects fill:#2a3f6f
+    style Filter2b fill:#ff8844
+    style Filter4 fill:#ff8844
+    style NuisanceCheck fill:#ff8844
 ```
 
 #### トラッキング状態管理
@@ -306,30 +315,33 @@ stateDiagram-v2
 
 #### 検出パラメータ (DetectionParams)
 
-| パラメータ | デフォルト値 | 説明 |
-|-----------|------------|------|
-| `diff_threshold` | 30 | 差分閾値 |
-| `min_brightness` | 200 | 最小輝度 |
-| `min_brightness_tracking` | min_brightness | 追跡時の最小輝度 |
-| `min_length` | 20 px | 最小軌跡長 |
-| `max_length` | 5000 px | 最大軌跡長 |
-| `min_duration` | 0.1 秒 | 最小継続時間 |
-| `max_duration` | 10.0 秒 | 最大継続時間 |
-| `min_speed` | 50.0 px/s | 最小速度 |
-| `min_linearity` | 0.7 | 最小直線性 (0-1) |
-| `min_area` | 5 px² | 最小面積 |
-| `max_area` | 10000 px² | 最大面積 |
-| `max_gap_time` | 2.0 秒 | 最大トラッキング間隔 |
-| `max_distance` | 80 px | 最大移動距離 |
-| `merge_max_gap_time` | 1.5 秒 | イベント結合の最大間隔 |
-| `merge_max_distance` | 80 px | イベント結合の最大距離 |
-| `merge_max_speed_ratio` | 0.5 | イベント結合の最大速度比 |
-| `exclude_bottom_ratio` | 1/16 | 画面下部除外率 |
-| `nuisance_overlap_threshold` | 0.60 | ノイズ帯重なり閾値 |
-| `nuisance_path_overlap_threshold` | 0.70 | ノイズ帯経路重なり閾値 |
-| `min_track_points` | 4 | 最小追跡点数 |
-| `max_stationary_ratio` | 0.40 | 静止率上限 |
-| `small_area_threshold` | 40 | 小領域判定閾値 |
+| パラメータ | デフォルト値 | 説明 | 導入バージョン |
+|-----------|------------|------|--------------|
+| `diff_threshold` | 30 | 差分閾値 | v1.0.0 |
+| `min_brightness` | 200 | 最小輝度 | v1.0.0 |
+| `min_brightness_tracking` | min_brightness | 追跡時の最小輝度 | v1.0.0 |
+| `min_length` | 20 px | 最小軌跡長 | v1.0.0 |
+| `max_length` | 5000 px | 最大軌跡長 | v1.0.0 |
+| `min_duration` | 0.1 秒 | 最小継続時間 | v1.0.0 |
+| `max_duration` | 10.0 秒 | 最大継続時間 | v1.0.0 |
+| `min_speed` | 50.0 px/s | 最小速度 | v1.0.0 |
+| `min_linearity` | 0.7 | 最小直線性 (0-1) | v1.0.0 |
+| `min_area` | 5 px² | 最小面積 | v1.0.0 |
+| `max_area` | 10000 px² | 最大面積 | v1.0.0 |
+| `max_gap_time` | 2.0 秒 | 最大トラッキング間隔 | v1.0.0 |
+| `max_distance` | 80 px | 最大移動距離 | v1.0.0 |
+| `merge_max_gap_time` | 1.5 秒 | イベント結合の最大間隔 | v1.0.0 |
+| `merge_max_distance` | 80 px | イベント結合の最大距離 | v1.0.0 |
+| `merge_max_speed_ratio` | 0.5 | イベント結合の最大速度比 | v1.0.0 |
+| `exclude_bottom_ratio` | 1/16 | 画面下部除外率 | v1.0.0 |
+| `nuisance_overlap_threshold` | 0.60 | ノイズ帯重なり閾値（候補段階） | v1.12.0 |
+| `nuisance_path_overlap_threshold` | 0.70 | ノイズ帯経路重なり閾値（トラック確定時） | v1.12.0 |
+| `min_track_points` | 4 | 最小追跡点数 | v1.12.0 |
+| `max_stationary_ratio` | 0.40 | 静止率上限（停滞物体除外） | v1.12.0 |
+| `small_area_threshold` | 40 | 小領域判定閾値（px²） | v1.12.0 |
+| `clip_margin_before` | 1.0 秒 | 録画開始マージン（イベント前） | v1.14.0 |
+| `clip_margin_after` | 1.0 秒 | 録画終了マージン（イベント後） | v1.14.0 |
+| `exclude_edge_ratio` | 0.0 | 画面端除外率（0.0-0.5、0=無効） | v1.16.0 |
 
 #### 除外マスク（固定カメラ向け）
 
@@ -337,14 +349,65 @@ stateDiagram-v2
 - `MASK_FROM_DAY` が設定されている場合は、昼間画像からマスクを生成
 - ダッシュボードの「マスク更新」ボタンで現在フレームから再生成（永続化）
 
-#### ノイズ帯マスク（電線・部分照明対策）
+#### ノイズ帯マスク（電線・部分照明対策）(v1.12.0)
 
 - `nuisance_mask` は除外マスクとは別の誤検出抑制マスク
-- 設定方法:
-  - `nuisance_mask_image`: 手動マスク画像
-  - `nuisance_from_night`: 夜間基準画像から `Canny + HoughLinesP + dilate` で自動生成
-- 小領域候補で `nuisance_overlap_threshold` を超える場合は候補段階で除外
-- トラック確定時に `nuisance_path_overlap_threshold` を超える場合はイベント除外
+- **目的**: 電線、街灯、部分照明など、静止しているが明滅する物体による誤検出を抑制
+- **設定方法**:
+  - `nuisance_mask_image`: 手動マスク画像パス
+  - `nuisance_from_night`: 夜間基準画像から自動生成
+- **自動生成アルゴリズム**:
+  ```python
+  # 1. Canny エッジ検出
+  edges = cv2.Canny(reference_frame, 50, 150, apertureSize=3)
+
+  # 2. HoughLinesP で直線検出（電線など）
+  lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, minLineLength=30, maxLineGap=10)
+
+  # 3. dilate で線を太くする（nuisance_dilate ピクセル）
+  mask = cv2.dilate(line_mask, kernel, iterations=nuisance_dilate)
+  ```
+
+##### ノイズ帯除外の2段階フィルタリング
+
+**1. 候補段階の除外** (`detect_bright_objects` 内)
+- 小領域 (`area < small_area_threshold`) の候補のみ対象
+- 候補バウンディングボックスとノイズ帯の重なり率を計算
+- `nuisance_overlap_threshold` (デフォルト 0.60) を超える場合は候補を除外
+
+```python
+if area < params.small_area_threshold and nuisance_mask is not None:
+    overlap_ratio = calculate_mask_overlap(bbox, nuisance_mask)
+    if overlap_ratio > params.nuisance_overlap_threshold:
+        continue  # 候補として採用しない
+```
+
+**2. トラック確定時の除外** (`track_objects` 内)
+- 確定したトラックの全経路とノイズ帯の重なり率を計算
+- `nuisance_path_overlap_threshold` (デフォルト 0.70) を超える場合はイベント除外
+- 追加条件も評価:
+  - `min_track_points`: 最小追跡点数（デフォルト 4点）
+  - `max_stationary_ratio`: 停滞物体の除外（デフォルト 0.40）
+
+```python
+# トラック経路とノイズ帯の重なり計算
+path_overlap = calculate_path_overlap(track.positions, nuisance_mask)
+
+if path_overlap > params.nuisance_path_overlap_threshold:
+    # 流星イベントとして採用しない
+    continue
+```
+
+##### 関連パラメータ
+
+| パラメータ | 用途 | デフォルト値 |
+|-----------|------|------------|
+| `nuisance_overlap_threshold` | 候補段階の重なり閾値 | 0.60 |
+| `nuisance_path_overlap_threshold` | トラック確定時の経路重なり閾値 | 0.70 |
+| `small_area_threshold` | 小領域判定の面積閾値（px²） | 40 |
+| `min_track_points` | 最小追跡点数 | 4 |
+| `max_stationary_ratio` | 停滞物体の除外閾値 | 0.40 |
+| `nuisance_dilate` | マスク膨張イテレーション数 | 3 |
 
 #### 感度プリセット
 

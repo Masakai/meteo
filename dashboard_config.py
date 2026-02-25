@@ -4,7 +4,7 @@ Dashboard configuration and environment setup.
 
 import os
 
-VERSION = "1.19.0"
+VERSION = "1.20.0"
 
 # 検出時間の取得用
 try:
@@ -18,7 +18,8 @@ for i in range(1, 10):
     name = os.environ.get(f"CAMERA{i}_NAME")
     url = os.environ.get(f"CAMERA{i}_URL")
     if name and url:
-        CAMERAS.append({"name": name, "url": url})
+        display_name = os.environ.get(f"CAMERA{i}_NAME_DISPLAY", name)
+        CAMERAS.append({"name": name, "url": url, "display_name": display_name})
 
 # デフォルト設定
 if not CAMERAS:

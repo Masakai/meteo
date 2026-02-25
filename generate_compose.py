@@ -46,10 +46,11 @@ def parse_rtsp_url(url: str) -> dict:
 
 
 def parse_streamers_line(line: str) -> dict:
-    if '|' in line:
-        url, mask_path = [part.strip() for part in line.split('|', 1)]
-        return {"url": url, "mask_path": mask_path}
-    return {"url": line.strip(), "mask_path": ""}
+    parts = [part.strip() for part in line.split('|')]
+    url = parts[0] if len(parts) > 0 else line.strip()
+    mask_path = parts[1] if len(parts) > 1 else ""
+    display_name = parts[2] if len(parts) > 2 else ""
+    return {"url": url, "mask_path": mask_path, "display_name": display_name}
 
 
 def expand_mask_path(mask_template: str, index: int, rtsp_info: dict, base_dir: Path) -> str:
@@ -92,9 +93,13 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
     """1つのカメラ用のサービス定義を生成"""
 
     camera_name = f"camera{index}_{rtsp_info['host'].replace('.', '_')}"
+    display_name = rtsp_info.get('display_name', '')
     service_name = f"camera{index}"
     mask_env = "/app/mask_image.png" if mask_image else ""
     mask_build_arg = mask_image if mask_image else "mask_none.jpg"
+
+    # CAMERA_NAME_DISPLAY環境変数を追加（表示名がある場合のみ）
+    display_name_env = f"      - CAMERA_NAME_DISPLAY={display_name}\n" if display_name else ""
 
     return f"""
   # カメラ{index} ({rtsp_info['host']})
@@ -109,7 +114,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
       - TZ=Asia/Tokyo
       - RTSP_URL={rtsp_info['url']}
       - CAMERA_NAME={camera_name}
-      - SENSITIVITY={settings['sensitivity']}
+{display_name_env}      - SENSITIVITY={settings['sensitivity']}
       - SCALE={settings['scale']}
       - BUFFER={settings['buffer']}
       - EXCLUDE_BOTTOM={settings['exclude_bottom']}
@@ -145,7 +150,9 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     camera_envs = []
     depends = []
     for i, cam in enumerate(cameras, 1):
-        camera_envs.append(f"      - CAMERA{i}_NAME=camera{i} ({cam['host']})")
+        camera_envs.append(f"      - CAMERA{i}_NAME={cam['name']}")
+        if cam.get('display_name'):
+            camera_envs.append(f"      - CAMERA{i}_NAME_DISPLAY={cam['display_name']}")
         camera_envs.append(f"      - CAMERA{i}_URL=http://localhost:{base_port + i}")
         depends.append(f"camera{i}")
 
@@ -195,6 +202,9 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
         parsed = parse_streamers_line(line)
         info = parse_rtsp_url(parsed["url"])
         if info:
+            # 表示名を保持
+            if parsed["display_name"]:
+                info["display_name"] = parsed["display_name"]
             cameras.append(info)
             web_port = base_port + i  # 8081, 8082, 8083, ...
             mask_image = ""
@@ -269,12 +279,14 @@ def main():
 streamersファイルの形式:
   1行に1つのRTSP URLを記載
   # で始まる行はコメント
+  | で区切ってマスク画像パスと表示名を指定可能
+    形式: URL|マスク画像|表示名
 
 例:
   rtsp://user:pass@192.168.1.100/live
-  rtsp://user:pass@192.168.1.101/live
+  rtsp://user:pass@192.168.1.101/live|mask1.png|玄関カメラ
   # これはコメント
-  rtsp://192.168.1.102:554/stream
+  rtsp://192.168.1.102:554/stream||駐車場
         """
     )
 

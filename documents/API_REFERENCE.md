@@ -15,11 +15,56 @@ Licensed under the MIT License
 
 ## 目次
 
+- [バージョン履歴](#バージョン履歴)
 - [dashboard.py API](#dashboardpy-api)
 - [meteor_detector_rtsp_web.py API](#meteor_detector_rtsp_webpy-api)
+- [環境変数](#環境変数)
 - [共通仕様](#共通仕様)
 - [エラーコード](#エラーコード)
 - [使用例](#使用例)
+
+---
+
+## バージョン履歴
+
+### v1.18.0 - 一括削除機能
+- **新規エンドポイント**: `POST /bulk_delete_non_meteor/{camera_name}`
+  - カメラごとに非流星検出（`label="non-meteor"`）を一括削除
+  - 削除件数とファイルリストを返却
+
+### v1.17.0 - カメラ監視機能
+- **機能追加**: `/camera_stats/{index}` レスポンスに監視関連フィールドを追加
+  - `monitor_enabled`: 監視機能の有効/無効
+  - `monitor_checked_at`: 最終監視確認時刻
+  - `monitor_error`: 監視エラーメッセージ
+  - `monitor_stop_reason`: 監視停止理由
+  - `monitor_last_restart_at`: 最終再起動時刻
+  - `monitor_restart_count`: 再起動回数
+  - `monitor_restart_triggered`: 再起動トリガー発動中か
+- **環境変数**: カメラ監視設定（`CAMERA_MONITOR_*`, `CAMERA_RESTART_*`）
+
+### v1.16.0 - 画面端ノイズ除外
+- **パラメータ追加**: `exclude_edge_ratio`
+  - `/stats` レスポンスの `settings.exclude_edge_ratio`
+  - `/apply_settings` リクエストボディ
+  - 画面四辺の指定割合をノイズ除外エリアとして設定
+
+### v1.14.0 - 録画マージン設定
+- **パラメータ追加**: 録画前後マージン
+  - `/stats` レスポンスの `settings.clip_margin_before`, `settings.clip_margin_after`
+  - `/apply_settings` リクエストボディ
+  - 検出前後に録画する追加秒数を設定可能
+
+### v1.13.0 - 全カメラ設定UI
+- **新規エンドポイント**: `GET /settings` - 全カメラ設定ページ
+- **新規エンドポイント**: `GET /camera_settings/current` - 各カメラの現在設定取得
+- **新規エンドポイント**: `POST /camera_settings/apply_all` - 全カメラへ設定一括適用
+
+### v1.10.0 - 検出ラベル機能
+- **新規エンドポイント**: `POST /detection_label`
+  - 検出に任意ラベル（`meteor`, `non-meteor` など）を設定
+- **機能追加**: `/detections` レスポンスに `label` フィールド追加
+- **機能追加**: `/detections_mtime` がラベルファイル（`detection_labels.json`）も監視対象に
 
 ---
 
@@ -40,8 +85,11 @@ Licensed under the MIT License
 | `/camera_settings/apply_all` | POST | 設定を全カメラへ一括適用 |
 | `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） |
 | `/camera_restart/{index}` | POST | カメラ再起動要求 |
+| `/camera_stats/{index}` | GET | カメラ統計情報取得 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
 | `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 |
+| `/bulk_delete_non_meteor/{camera_name}` | POST | カメラの非流星検出を一括削除 |
+| `/detection_label` | POST | 検出にラベルを設定 |
 | `/changelog` | GET | CHANGELOG表示 |
 
 ---
@@ -183,6 +231,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
 | `recent[].image` | string | 画像パス |
 | `recent[].mp4` | string | 動画パス（.mov/.mp4） |
 | `recent[].composite_original` | string | 元画像の比較明合成パス |
+| `recent[].label` | string | 検出ラベル（v1.10.0以降、未設定時は空文字） |
 
 **使用例**:
 ```bash
@@ -208,7 +257,7 @@ fetch('/detections')
 
 ### GET /detections_mtime
 
-**説明**: 各カメラの `detections.jsonl` の更新時刻（UNIXエポック秒）を取得
+**説明**: 各カメラの `detections.jsonl` および `detection_labels.json` の更新時刻（UNIXエポック秒）を取得（v1.10.0以降、ラベルファイルも監視対象）
 
 **レスポンス**:
 - Content-Type: `application/json`
@@ -230,6 +279,76 @@ curl http://localhost:8080/detections_mtime | jq
 fetch('/detections_mtime')
   .then(r => r.json())
   .then(data => console.log('mtime:', data.mtime));
+```
+
+---
+
+### GET /camera_stats/{index}
+
+**説明**: 指定カメラの統計情報を取得（v1.17.0で監視機能を追加）
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `index` | integer | カメラインデックス（0始まり） | `0` |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "detections": 5,
+  "elapsed": 3600.5,
+  "camera": "camera1_10_0_1_25",
+  "stream_alive": true,
+  "time_since_last_frame": 0.03,
+  "is_detecting": true,
+  "monitor_enabled": true,
+  "monitor_checked_at": "2026-02-24 12:34:56",
+  "monitor_error": null,
+  "monitor_stop_reason": null,
+  "monitor_last_restart_at": "2026-02-24 10:00:00",
+  "monitor_restart_count": 2,
+  "monitor_restart_triggered": false
+}
+```
+
+**フィールド説明**:
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `detections` | integer | 検出数 |
+| `elapsed` | float | 稼働時間（秒） |
+| `camera` | string | カメラ名 |
+| `stream_alive` | boolean | ストリーム生存確認 |
+| `time_since_last_frame` | float | 最終フレームからの経過時間（秒） |
+| `is_detecting` | boolean | 現在検出処理中か |
+| `monitor_enabled` | boolean | カメラ監視機能の有効/無効 |
+| `monitor_checked_at` | string/null | 最終監視確認時刻 |
+| `monitor_error` | string/null | 監視エラーメッセージ |
+| `monitor_stop_reason` | string/null | 監視停止理由 |
+| `monitor_last_restart_at` | string/null | 最終再起動時刻 |
+| `monitor_restart_count` | integer | 再起動回数 |
+| `monitor_restart_triggered` | boolean | 再起動トリガー発動中か |
+
+**使用例**:
+```bash
+# curlで取得
+curl http://localhost:8080/camera_stats/0 | jq
+
+# JavaScriptから定期取得
+setInterval(() => {
+  fetch('/camera_stats/0')
+    .then(r => r.json())
+    .then(data => {
+      console.log('Stream alive:', data.stream_alive);
+      console.log('Monitor enabled:', data.monitor_enabled);
+      console.log('Restart count:', data.monitor_restart_count);
+    });
+}, 5000);
 ```
 
 ---
@@ -475,6 +594,156 @@ fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
 
 ---
 
+### POST /bulk_delete_non_meteor/{camera_name}
+
+**説明**: 指定カメラの非流星検出（ラベルが "non-meteor" の検出）を一括削除（v1.18.0）
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `camera_name` | string | カメラディレクトリ名 | `camera1_10_0_1_25` |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**成功レスポンス**:
+```json
+{
+  "success": true,
+  "deleted_count": 5,
+  "deleted_detections": [
+    {
+      "time": "2026-02-02 06:55:33",
+      "deleted_files": [
+        "meteor_20260202_065533.mov",
+        "meteor_20260202_065533_composite.jpg",
+        "meteor_20260202_065533_composite_original.jpg"
+      ]
+    },
+    {
+      "time": "2026-02-02 05:32:18",
+      "deleted_files": [
+        "meteor_20260202_053218.mov",
+        "meteor_20260202_053218_composite.jpg",
+        "meteor_20260202_053218_composite_original.jpg"
+      ]
+    }
+  ],
+  "message": "5件の非流星検出を削除しました（合計15ファイル）"
+}
+```
+
+**エラーレスポンス**:
+```json
+{
+  "success": false,
+  "error": "No non-meteor detections found"
+}
+```
+
+**使用例**:
+```bash
+# curlで一括削除
+curl -X POST "http://localhost:8080/bulk_delete_non_meteor/camera1_10_0_1_25" | jq
+
+# JavaScriptから一括削除
+fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
+  method: 'POST'
+})
+.then(r => r.json())
+.then(data => {
+  if (data.success) {
+    alert(`${data.deleted_count}件の非流星検出を削除しました`);
+  } else {
+    alert('削除失敗: ' + data.error);
+  }
+});
+```
+
+---
+
+### POST /detection_label
+
+**説明**: 検出にラベルを設定（v1.10.0）
+
+**リクエストボディ**:
+```json
+{
+  "camera": "camera1_10_0_1_25",
+  "timestamp": "2026-02-02 06:55:33",
+  "label": "meteor"
+}
+```
+
+**パラメータ説明**:
+
+| パラメータ | 型 | 必須 | 説明 | 例 |
+|-----------|-----|------|------|-----|
+| `camera` | string | Yes | カメラディレクトリ名 | `camera1_10_0_1_25` |
+| `timestamp` | string | Yes | 検出時刻 | `2026-02-02 06:55:33` |
+| `label` | string | Yes | ラベル（`meteor`, `non-meteor`, 空文字など） | `meteor` |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**成功レスポンス**:
+```json
+{
+  "success": true,
+  "message": "Label updated"
+}
+```
+
+**エラーレスポンス**:
+```json
+{
+  "success": false,
+  "error": "Detection not found"
+}
+```
+
+**使用例**:
+```bash
+# curlでラベル設定
+curl -X POST "http://localhost:8080/detection_label" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "camera": "camera1_10_0_1_25",
+    "timestamp": "2026-02-02 06:55:33",
+    "label": "meteor"
+  }' | jq
+
+# JavaScriptからラベル設定
+fetch('/detection_label', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    camera: 'camera1_10_0_1_25',
+    timestamp: '2026-02-02 06:55:33',
+    label: 'meteor'
+  })
+})
+.then(r => r.json())
+.then(data => {
+  if (data.success) {
+    alert('ラベル設定完了');
+  } else {
+    alert('エラー: ' + data.error);
+  }
+});
+```
+
+**ラベルの活用**:
+- `meteor`: 流星として確認済み
+- `non-meteor`: 非流星（誤検出）
+- 空文字: 未確認
+- カスタムラベル: 任意の文字列（例: `satellite`, `aircraft`, `noise`）
+
+---
+
 ### GET /changelog
 
 **説明**: CHANGELOG.mdの内容を取得
@@ -628,6 +897,9 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.source_fps` | float | 接続時に取得した入力ストリームFPS |
 | `settings.exclude_bottom` | float | 画面下部除外率 |
 | `settings.exclude_bottom_ratio` | float | 画面下部除外率（内部キー） |
+| `settings.exclude_edge_ratio` | float | 画面端ノイズ除外率（v1.16.0、デフォルト0.0） |
+| `settings.clip_margin_before` | float | 録画前マージン秒数（v1.14.0、デフォルト0.5） |
+| `settings.clip_margin_after` | float | 録画後マージン秒数（v1.14.0、デフォルト0.5） |
 | `settings.mask_image` | string | マスク画像（優先） |
 | `settings.mask_from_day` | string | 昼間画像から生成するマスク |
 | `settings.mask_dilate` | integer | マスク拡張ピクセル数 |
@@ -745,7 +1017,10 @@ curl -X POST http://localhost:8081/update_mask | jq
   "max_stationary_ratio": 0.4,
   "small_area_threshold": 40,
   "mask_dilate": 20,
-  "nuisance_dilate": 3
+  "nuisance_dilate": 3,
+  "exclude_edge_ratio": 0.0,
+  "clip_margin_before": 0.5,
+  "clip_margin_after": 0.5
 }
 ```
 
@@ -856,6 +1131,55 @@ server {
 
 ---
 
+## 環境変数
+
+### カメラ監視機能（v1.17.0）
+
+カメラの自動監視と再起動を制御する環境変数です。
+
+| 環境変数 | デフォルト | 説明 |
+|---------|----------|------|
+| `CAMERA_MONITOR_ENABLED` | `true` | カメラ監視機能の有効/無効 |
+| `CAMERA_MONITOR_INTERVAL` | `60` | 監視チェック間隔（秒） |
+| `CAMERA_MONITOR_TIMEOUT` | `120` | フレーム未受信タイムアウト（秒） |
+| `CAMERA_RESTART_ENABLED` | `true` | 自動再起動の有効/無効 |
+| `CAMERA_RESTART_DELAY` | `5` | 再起動実行までの遅延（秒） |
+| `CAMERA_RESTART_MAX_COUNT` | `10` | 最大再起動回数（この回数を超えると監視停止） |
+| `CAMERA_RESTART_COOLDOWN` | `300` | 再起動後のクールダウン時間（秒） |
+
+**使用例（docker-compose.yml）**:
+```yaml
+version: '3.8'
+services:
+  dashboard:
+    image: meteor-dashboard:latest
+    environment:
+      - CAMERA_MONITOR_ENABLED=true
+      - CAMERA_MONITOR_INTERVAL=60
+      - CAMERA_MONITOR_TIMEOUT=120
+      - CAMERA_RESTART_ENABLED=true
+      - CAMERA_RESTART_DELAY=5
+      - CAMERA_RESTART_MAX_COUNT=10
+      - CAMERA_RESTART_COOLDOWN=300
+    ports:
+      - "8080:8080"
+```
+
+**監視機能の動作**:
+1. 各カメラの `/stats` エンドポイントを定期的に確認
+2. `time_since_last_frame` が `CAMERA_MONITOR_TIMEOUT` を超えた場合、フレーム停止と判定
+3. `CAMERA_RESTART_ENABLED=true` の場合、自動的に `/restart` を呼び出し
+4. 再起動回数が `CAMERA_RESTART_MAX_COUNT` を超えると監視を停止
+5. 監視状態は `/camera_stats/{index}` で確認可能
+
+**監視を無効化する場合**:
+```yaml
+environment:
+  - CAMERA_MONITOR_ENABLED=false
+```
+
+---
+
 ## エラーコード
 
 ### HTTPステータスコード
@@ -932,6 +1256,38 @@ async function deleteDetection(camera, timestamp) {
 
   if (result.success) {
     alert(result.message);
+    loadDetections();  // リストを更新
+  } else {
+    alert(`Error: ${result.error}`);
+  }
+}
+
+// 非流星検出を一括削除
+async function bulkDeleteNonMeteor(camera) {
+  const response = await fetch(`/bulk_delete_non_meteor/${camera}`, {
+    method: 'POST'
+  });
+  const result = await response.json();
+
+  if (result.success) {
+    alert(`${result.deleted_count}件の非流星検出を削除しました`);
+    loadDetections();  // リストを更新
+  } else {
+    alert(`Error: ${result.error}`);
+  }
+}
+
+// 検出にラベルを設定
+async function setDetectionLabel(camera, timestamp, label) {
+  const response = await fetch('/detection_label', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({camera, timestamp, label})
+  });
+  const result = await response.json();
+
+  if (result.success) {
+    alert('ラベル設定完了');
     loadDetections();  // リストを更新
   } else {
     alert(`Error: ${result.error}`);
@@ -1124,9 +1480,29 @@ class MeteorDetectionClient:
         )
         return response.json()
 
+    def bulk_delete_non_meteor(self, camera: str) -> Dict:
+        """非流星検出を一括削除"""
+        response = requests.post(
+            f"{self.dashboard_url}/bulk_delete_non_meteor/{camera}"
+        )
+        return response.json()
+
+    def set_detection_label(self, camera: str, timestamp: str, label: str) -> Dict:
+        """検出にラベルを設定"""
+        response = requests.post(
+            f"{self.dashboard_url}/detection_label",
+            json={"camera": camera, "timestamp": timestamp, "label": label}
+        )
+        return response.json()
+
     def get_camera_stats(self, port: int) -> Dict:
         """カメラの統計情報を取得"""
         response = requests.get(f"http://localhost:{port}/stats")
+        return response.json()
+
+    def get_camera_stats_from_dashboard(self, index: int) -> Dict:
+        """ダッシュボード経由でカメラ統計を取得（監視情報含む）"""
+        response = requests.get(f"{self.dashboard_url}/camera_stats/{index}")
         return response.json()
 
 # 使用例
@@ -1140,6 +1516,23 @@ if __name__ == "__main__":
     # カメラ統計を取得
     stats = client.get_camera_stats(8081)
     print(f"Camera: {stats['camera']}, Detections: {stats['detections']}")
+
+    # ダッシュボード経由でカメラ統計取得（監視情報含む）
+    dashboard_stats = client.get_camera_stats_from_dashboard(0)
+    print(f"Monitor enabled: {dashboard_stats['monitor_enabled']}")
+    print(f"Restart count: {dashboard_stats['monitor_restart_count']}")
+
+    # 検出にラベルを設定
+    result = client.set_detection_label(
+        camera="camera1_10_0_1_25",
+        timestamp="2026-02-02 06:55:33",
+        label="meteor"
+    )
+    print(result)
+
+    # 非流星検出を一括削除
+    delete_result = client.bulk_delete_non_meteor("camera1_10_0_1_25")
+    print(f"Deleted {delete_result['deleted_count']} non-meteor detections")
 ```
 
 ---

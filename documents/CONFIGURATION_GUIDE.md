@@ -16,12 +16,15 @@ Licensed under the MIT License
 ## 目次
 
 - [環境変数](#環境変数)
+- [マスク設定（固定カメラ向け）](#マスク設定固定カメラ向け)
+- [ノイズ帯マスク設定（v1.12.0+）](#ノイズ帯マスク設定v1120)
 - [検出パラメータ](#検出パラメータ)
 - [感度プリセット](#感度プリセット)
 - [処理スケール設定](#処理スケール設定)
 - [天文薄暮時間帯設定](#天文薄暮時間帯設定)
 - [ハードウェア別推奨設定](#ハードウェア別推奨設定)
 - [チューニング方法](#チューニング方法)
+- [バージョン別新機能](#バージョン別新機能)
 
 ---
 
@@ -50,6 +53,11 @@ docker-compose.ymlで設定される環境変数:
 | `MASK_FROM_DAY` | `""` | 昼間画像からマスク生成 | `/app/mask_from_day.jpg` |
 | `MASK_DILATE` | `20` | マスク拡張ピクセル数 | `10` / `30` |
 | `MASK_SAVE` | `""` | マスク保存先 | `/output/masks/camera1_mask.png` |
+| `NUISANCE_MASK_IMAGE` | `""` | ノイズ帯マスク画像（v1.12.0+） | `/app/nuisance_mask.png` |
+| `NUISANCE_FROM_NIGHT` | `""` | 夜間画像からノイズ帯マスク生成（v1.12.0+） | `/app/nuisance_night.jpg` |
+| `NUISANCE_DILATE` | `3` | ノイズ帯マスク拡張ピクセル数（v1.12.0+） | `2` / `5` |
+| `NUISANCE_OVERLAP_THRESHOLD` | `0.3` | ノイズ帯重複率閾値（v1.12.0+） | `0.2` ~ `0.5` |
+| `EXCLUDE_EDGE_RATIO` | `0.0` | 画面四辺除外率（v1.16.0+） | `0.0` ~ `0.2` |
 
 ### ダッシュボードの環境変数
 
@@ -63,6 +71,8 @@ docker-compose.ymlで設定される環境変数:
 | `CAMERA1_NAME` | - | カメラ1の表示名 |
 | `CAMERA1_URL` | - | カメラ1のURL |
 | `DETECTIONS_DIR` | `/output` | 検出結果ディレクトリ |
+| `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |
+| `CAMERA_TIMEOUT` | `5` | カメラ応答タイムアウト（秒） |
 
 ### 環境変数の設定方法
 
@@ -123,7 +133,7 @@ environment:
   - RTSP_URL=rtsp://${RTSP_USER}:${RTSP_PASS}@10.0.1.25/live
 ```
 
-### ダッシュボード一括設定（再ビルド不要）
+### ダッシュボード一括設定（再ビルド不要） v1.13.0+
 
 `/settings` から全カメラへ設定を一括反映できます。
 
@@ -133,18 +143,29 @@ environment:
 
 #### 反映タイミング
 
-- 即時反映（再起動不要）:
-  - `diff_threshold`, `min_brightness`, `min_linearity`
-  - `nuisance_overlap_threshold`, `nuisance_path_overlap_threshold`
-  - `min_track_points`, `max_stationary_ratio`, `small_area_threshold`
-  - `mask_dilate`, `nuisance_dilate`, `mask_*`, `nuisance_*` の画像パス
-- 自動再起動で反映（再ビルド不要）:
-  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+**即時反映（再起動不要）:**
+  - **検出パラメータ**: `diff_threshold`, `min_brightness`, `min_linearity`, `min_length`, `min_speed`, `min_duration`, `max_duration`, `min_area`, `max_area`
+  - **ノイズ除外パラメータ**: `nuisance_overlap_threshold`, `nuisance_path_overlap_threshold`, `min_track_points`, `max_stationary_ratio`, `small_area_threshold`
+  - **録画マージン設定（v1.14.0+）**: `clip_margin_before`, `clip_margin_after`
+  - **マスク設定**: `mask_dilate`, `nuisance_dilate`, `mask_*`, `nuisance_*` の画像パス
+  - **画面端除外（v1.16.0+）**: `exclude_edge_ratio`
+
+**自動再起動で反映（再ビルド不要）:**
+  - **基本設定**: `sensitivity`, `scale`, `buffer`, `extract_clips`
+  - **火球モード**: `fb_normalize`, `fb_delete_mov`
 
 #### 永続化
 
 起動時依存の設定は `output/runtime_settings/<camera>.json` に保存されます。
 これにより、コンテナ再起動後も同じ設定が維持されます。
+
+#### 設定変更の推奨手順
+
+1. ダッシュボードの `/settings` ページにアクセス
+2. 変更したいパラメータを入力（差分のみハイライト表示）
+3. 「全カメラに適用」ボタンで一括反映
+4. 即時反映項目はリアルタイムで適用、再起動項目は自動で再起動
+5. `output/runtime_settings/<camera>.json` に永続化され、次回起動時も有効
 
 ---
 
@@ -168,6 +189,74 @@ rtsp://user:pass@10.0.1.11/live
 
 ダッシュボードの「マスク更新」ボタンで、**現在フレームからマスクを再生成**できます。
 保存先は `/output/masks/<camera>_mask.png` です。
+
+---
+
+## ノイズ帯マスク設定（v1.12.0+）
+
+### 概要
+
+ノイズ帯マスク機能は、電線や部分照明など、**動かない明るい線状物体**による誤検出を防ぎます。
+通常のマスクと異なり、ノイズ帯と軌跡が重複した場合のみ除外判定を行います。
+
+### 設定パラメータ
+
+| パラメータ | デフォルト値 | 説明 | 推奨値 |
+|-----------|------------|------|--------|
+| `nuisance_mask_image` | `""` | 事前生成済みノイズ帯マスク | `/app/nuisance_mask.png` |
+| `nuisance_from_night` | `""` | 夜間画像からマスク自動生成 | `/app/nuisance_night.jpg` |
+| `nuisance_dilate` | `3` | マスク拡張ピクセル数 | `2` ~ `5` |
+| `nuisance_overlap_threshold` | `0.3` | 重複率閾値（軌跡の何％がノイズ帯に重なったら除外） | `0.2` ~ `0.5` |
+
+### 設定方法
+
+#### 方法1: 夜間画像から自動生成
+
+```bash
+# streamers に夜間画像を指定
+python generate_compose.py \
+  --streamers streamers \
+  --nuisance-images nuisance_images
+```
+
+`nuisance_images` ファイル例:
+```
+camera1_night.jpg
+camera2_night.jpg
+camera3_night.jpg
+```
+
+#### 方法2: 環境変数で直接指定
+
+```yaml
+environment:
+  - NUISANCE_FROM_NIGHT=/app/nuisance_night.jpg
+  - NUISANCE_DILATE=3
+  - NUISANCE_OVERLAP_THRESHOLD=0.3
+```
+
+#### 方法3: ダッシュボードから設定（v1.13.0+）
+
+1. `/settings` ページにアクセス
+2. `nuisance_overlap_threshold` を調整（0.2 = 20%重複で除外）
+3. 「全カメラに適用」で即時反映
+
+### 使用例：電線対策
+
+電線が画面中央を横切る場合:
+
+```yaml
+environment:
+  - NUISANCE_FROM_NIGHT=/app/night_with_wires.jpg
+  - NUISANCE_DILATE=5  # 電線を太めに認識
+  - NUISANCE_OVERLAP_THRESHOLD=0.25  # 軌跡の25%以上が電線に重なったら除外
+```
+
+### 注意事項
+
+- **夜間画像を使用**: 電線や照明が明るく写っている夜間画像が必要
+- **通常マスクとの併用**: 建物など完全除外したい領域は通常マスクを使用
+- **重複率の調整**: 値を小さくすると除外が厳しく、大きくすると緩くなる
 
 ---
 
@@ -330,6 +419,97 @@ params.diff_threshold = 25  # より敏感に
 ```
 画面高さ 1080px × 0.0625 = 下から67.5px を除外
 ```
+
+---
+
+#### exclude_edge_ratio（画面四辺除外率） v1.16.0+
+
+**説明**: 画面四辺（上下左右）からの除外割合（0.0-0.2）
+
+**用途**: 画面端のノイズや歪みによる誤検出を防ぐ
+
+**影響**:
+- **0.0（デフォルト）**: 除外なし
+- **0.05**: 各辺から5%を除外
+- **0.1**: 各辺から10%を除外
+- **0.2（最大）**: 各辺から20%を除外
+
+**推奨値**:
+- 通常運用: 0.0
+- 画面端ノイズあり: 0.05
+- 魚眼レンズ（歪み大）: 0.1
+
+**設定方法**:
+
+```bash
+# generate_compose.pyで設定
+python generate_compose.py --exclude-edge-ratio 0.05
+
+# docker-compose.ymlで設定
+environment:
+  - EXCLUDE_EDGE_RATIO=0.05
+
+# ダッシュボードから即時反映
+# /settings ページで exclude_edge_ratio を設定
+```
+
+**例**:
+```
+画面サイズ 1920x1080、EXCLUDE_EDGE_RATIO=0.05 の場合:
+- 左右: 1920 × 0.05 = 96px ずつ除外
+- 上下: 1080 × 0.05 = 54px ずつ除外
+- 有効領域: 1728 × 972px
+```
+
+**注意事項**:
+- `exclude_bottom_ratio` と併用可能（下部のみさらに除外）
+- 値を大きくしすぎると検出範囲が狭まる
+
+---
+
+#### clip_margin_before / clip_margin_after（録画マージン設定） v1.14.0+
+
+**説明**: 検出イベント前後に追加で録画する時間（秒）
+
+**用途**: 流星の出現直前・直後の状況も記録
+
+**デフォルト値**:
+- `clip_margin_before`: 0.0秒
+- `clip_margin_after`: 0.0秒
+
+**推奨値**:
+- 標準運用: `before=0.5`, `after=0.5`
+- 詳細記録: `before=1.0`, `after=1.0`
+- ディスク節約: `before=0.0`, `after=0.0`
+
+**設定方法**:
+
+```yaml
+# docker-compose.ymlで設定（v1.14.0以降）
+environment:
+  - CLIP_MARGIN_BEFORE=0.5
+  - CLIP_MARGIN_AFTER=0.5
+```
+
+```bash
+# ダッシュボードから即時反映（v1.14.0+）
+# /settings ページで clip_margin_before, clip_margin_after を設定
+```
+
+**使用例**:
+
+検出時間 10:00:05.0 ～ 10:00:07.0（2秒間）の場合:
+- `margin_before=0.5`, `margin_after=0.5` 設定時
+- 録画範囲: 10:00:04.5 ～ 10:00:07.5（3秒間）
+
+**メリット**:
+- 流星の出現前の空の状態を確認可能
+- 複数の流星が連続した場合も記録
+- 検出漏れの前後フレームも保存
+
+**注意事項**:
+- BUFFER設定より大きい値は無効
+- 値を大きくするとファイルサイズが増加
 
 ---
 
@@ -888,6 +1068,102 @@ python generate_compose.py --buffer 10
 # 古いファイルを削除
 ./meteor-docker.sh clean
 ```
+
+---
+
+## バージョン別新機能
+
+### v1.16.0 - 画面端ノイズ除外
+
+**新規パラメータ**:
+- `EXCLUDE_EDGE_RATIO`（環境変数、デフォルト: 0.0、範囲: 0.0-0.2）
+- `--exclude-edge-ratio`（コマンドライン引数）
+
+**機能**:
+画面四辺（上下左右）から指定割合を除外し、端部のノイズや歪みによる誤検出を防止
+
+**使用例**:
+```bash
+python generate_compose.py --exclude-edge-ratio 0.05
+```
+
+**ダッシュボードから即時反映可能**（再起動不要）
+
+---
+
+### v1.14.0 - 録画マージン設定
+
+**新規パラメータ**:
+- `clip_margin_before`: 検出前の追加録画時間（秒）
+- `clip_margin_after`: 検出後の追加録画時間（秒）
+
+**機能**:
+流星検出イベントの前後に余裕を持たせて録画
+
+**デフォルト値**: 0.0秒（両方）
+
+**推奨値**: 0.5秒（両方）
+
+**使用例**:
+```yaml
+environment:
+  - CLIP_MARGIN_BEFORE=0.5
+  - CLIP_MARGIN_AFTER=0.5
+```
+
+**ダッシュボードから即時反映可能**（再起動不要）
+
+---
+
+### v1.13.0 - 全カメラ設定UI
+
+**新機能**:
+- `/settings` ページによる全カメラへの一括設定
+- 設定差分のハイライト表示
+- `output/runtime_settings/<camera>.json` への永続化
+
+**即時反映項目（再起動不要）**:
+- 検出パラメータ（diff_threshold, min_brightness, min_linearity等）
+- ノイズ除外パラメータ
+- マスク設定
+- 録画マージン設定（v1.14.0+）
+- 画面端除外設定（v1.16.0+）
+
+**自動再起動項目（再ビルド不要）**:
+- sensitivity, scale, buffer, extract_clips
+- 火球モード設定（fb_normalize, fb_delete_mov）
+
+**メリット**:
+- Docker再ビルド不要で設定変更可能
+- 設定が永続化され、再起動後も維持
+- 複数カメラへの設定を一括適用
+
+---
+
+### v1.12.0 - ノイズ帯マスク
+
+**新規パラメータ**:
+- `nuisance_mask_image`: 事前生成済みノイズ帯マスク画像
+- `nuisance_from_night`: 夜間画像からマスク自動生成
+- `nuisance_dilate`: マスク拡張ピクセル数（デフォルト: 3）
+- `nuisance_overlap_threshold`: 重複率閾値（デフォルト: 0.3）
+
+**機能**:
+電線、部分照明など固定された線状ノイズを除外
+
+**通常マスクとの違い**:
+- 通常マスク: 領域内の検出を完全に無効化
+- ノイズ帯マスク: 軌跡がノイズ帯と一定以上重複した場合のみ除外
+
+**使用例**:
+```yaml
+environment:
+  - NUISANCE_FROM_NIGHT=/app/night_with_wires.jpg
+  - NUISANCE_DILATE=5
+  - NUISANCE_OVERLAP_THRESHOLD=0.25
+```
+
+**ダッシュボードから閾値を即時調整可能**
 
 ---
 

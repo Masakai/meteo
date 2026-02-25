@@ -7,10 +7,11 @@ def render_dashboard_html(cameras, version, server_start_time):
     # カメラグリッドを生成
     camera_cards = ""
     for i, cam in enumerate(cameras):
+        display_name = cam.get('display_name', cam['name'])
         camera_cards += f'''
                 <div class="camera-card">
                     <div class="camera-header">
-                        <span class="camera-name">{cam['name']}</span>
+                        <span class="camera-name">{display_name}</span>
                         <div class="status-indicators">
                             <span class="camera-status indicator-help" id="status{i}" title="ストリーム接続" data-help="ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）">●</span>
                             <span class="server-status unknown indicator-help" id="server-status{i}" title="カメラサーバ生存" data-help="カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）">●</span>
@@ -1316,7 +1317,8 @@ def render_dashboard_html(cameras, version, server_start_time):
         function restartCamera(i) {{
             const cam = cameras[i];
             if (!cam) return;
-            if (!confirm(`カメラを再起動しますか?\n${{cam.name}}`)) {{
+            const displayName = cam.display_name || cam.name;
+            if (!confirm(`カメラを再起動しますか?\n${{displayName}}`)) {{
                 return;
             }}
             const btn = document.querySelectorAll('.restart-btn')[i];

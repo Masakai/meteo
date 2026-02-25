@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-02-25
+### Added
+- streamersファイルの第3パラメータとしてカメラ表示名を追加し、UI上でIPアドレス表記ではなく分かりやすい名称（例: 東側、南側、西側）で表示可能に。
+- 環境変数 `CAMERA_NAME_DISPLAY` を新設し、UI表示専用の名称を設定可能に（システム内部では従来通り `CAMERA_NAME` を使用）。
+- generate_compose.py でstreamersファイルの3番目のパラメータを `display_name` として解析し、Docker Compose設定に `CAMERA_NAME_DISPLAY` を自動生成。
+
+### Changed
+- ダッシュボードのカメラカード、再起動確認ダイアログでカメラ表示名を使用するよう改善。
+- カメラサーバのWebページタイトルとヘッダーでカメラ表示名を使用するよう改善。
+- docker-compose.ymlのコメントをIPアドレス表記から表示名に変更し、可読性を向上。
+
+### Fixed
+- 一時的にCAMERA_NAMEに表示名を設定していた実装を修正し、ディレクトリ名・ファイルパス・API通信では従来通りのカメラ名（例: camera1_10_0_1_25）を使用するよう是正。
+- スクリーンショットのダウンロードファイル名が正しく生成されない問題を、CAMERA_NAMEとCAMERA_NAME_DISPLAYの分離により解決。
+
 ## [1.19.0] - 2026-02-25
 ### Changed
 - 最近の検出リストの表示方法を、カメラ別グループ化から時系列順（日付内で新しい順）に変更し、全カメラの検出を一覧で確認しやすく改善。

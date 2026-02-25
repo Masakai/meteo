@@ -54,6 +54,7 @@ current_frame_lock = Lock()
 detection_count = 0
 start_time_global = None
 camera_name = ""
+camera_display_name = ""  # Web表示用のカメラ名
 last_frame_time = 0  # 最後にフレームを受信した時刻
 stream_timeout = 10.0  # ストリームがタイムアウトとみなす秒数
 is_detecting_now = False  # 現在検出処理中かどうか
@@ -232,7 +233,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Meteor Detector - {camera_name}</title>
+    <title>Meteor Detector - {camera_display_name or camera_name}</title>
     <style>
         body {{
             font-family: Arial, sans-serif;
@@ -324,7 +325,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
 </head>
 <body>
     <div class="container">
-        <h1>Meteor Detector - {camera_name}</h1>
+        <h1>Meteor Detector - {camera_display_name or camera_name}</h1>
         <div class="video">
             <img src="/stream" alt="Live Stream">
             <img class="mask-overlay" id="mask-overlay" data-src="/mask" alt="mask">
@@ -1429,12 +1430,15 @@ def process_rtsp_stream(
     fb_normalize: bool = False,
     fb_delete_mov: bool = False,
 ):
-    global current_frame, detection_count, start_time_global, camera_name, current_settings
+    global current_frame, detection_count, start_time_global, camera_name, camera_display_name, current_settings
     global current_runtime_fps, current_runtime_overrides_paths
     global current_stop_flag
 
     params = params or DetectionParams()
     camera_name = cam_name
+    # 環境変数からWeb表示用の名前を取得（オプション）
+    import os
+    camera_display_name = os.environ.get("CAMERA_NAME_DISPLAY", "")
 
     override_paths = _runtime_override_paths(output_dir, cam_name)
     current_runtime_overrides_paths = override_paths
