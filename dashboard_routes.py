@@ -576,7 +576,8 @@ def handle_image(handler):
     try:
         parts = handler.path[7:].split("/", 1)
         if len(parts) == 2:
-            camera_name, filename = parts
+            camera_name = unquote(parts[0])
+            filename = unquote(parts[1])
             image_path = Path(DETECTIONS_DIR) / camera_name / filename
 
             if image_path.exists() and image_path.is_file():
@@ -703,8 +704,8 @@ def handle_delete_detection(handler):
     try:
         parts = handler.path[11:].split("/", 1)
         if len(parts) == 2:
-            camera_name, timestamp_str = parts
-            timestamp_str = unquote(timestamp_str)
+            camera_name = unquote(parts[0])
+            timestamp_str = unquote(parts[1])
 
             dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
             base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
