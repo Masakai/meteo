@@ -20,10 +20,11 @@ _SERVER_START_TIME = time()
 _LABELS_FILENAME = "detection_labels.json"
 _DETECTION_MONITOR_INTERVAL = float(os.environ.get("DETECTION_MONITOR_INTERVAL", "2.0"))
 _CAMERA_MONITOR_INTERVAL = float(os.environ.get("CAMERA_MONITOR_INTERVAL", "2.0"))
-_CAMERA_MONITOR_TIMEOUT = float(os.environ.get("CAMERA_MONITOR_TIMEOUT", "2.0"))
+_CAMERA_MONITOR_TIMEOUT = float(os.environ.get("CAMERA_MONITOR_TIMEOUT", "6.0"))
 _CAMERA_RESTART_TIMEOUT = float(os.environ.get("CAMERA_RESTART_TIMEOUT", "5.0"))
 _CAMERA_RESTART_COOLDOWN_SEC = float(os.environ.get("CAMERA_RESTART_COOLDOWN_SEC", "120"))
 _CAMERA_MONITOR_ENABLED = os.environ.get("CAMERA_MONITOR_ENABLED", "true").lower() in ("1", "true", "yes")
+_CAMERA_MONITOR_FAIL_THRESHOLD = int(os.environ.get("CAMERA_MONITOR_FAIL_THRESHOLD", "12"))
 _detection_cache_lock = Lock()
 _detection_cache = {
     "detections_dir": "",
@@ -309,6 +310,8 @@ def _camera_monitor_default_snapshot(camera_index):
         "monitor_stop_reason": "unknown",
         "monitor_last_restart_at": 0.0,
         "monitor_restart_count": 0,
+        "monitor_stats_failures": 0,
+        "monitor_fail_threshold": max(1, _CAMERA_MONITOR_FAIL_THRESHOLD),
     }
 
 
@@ -339,6 +342,7 @@ def _refresh_camera_monitor_once():
             state = _camera_monitor_state.get(camera_index, _camera_monitor_default_snapshot(camera_index))
             last_restart_at = float(state.get("monitor_last_restart_at", 0.0) or 0.0)
             restart_count = int(state.get("monitor_restart_count", 0) or 0)
+            stats_failures = int(state.get("monitor_stats_failures", 0) or 0)
 
         monitor_error = ""
         restart_triggered = False
@@ -352,13 +356,21 @@ def _refresh_camera_monitor_once():
             stats = json.loads(payload.decode("utf-8")) if payload else {}
             if not isinstance(stats, dict):
                 raise ValueError("camera stats payload is not object")
+            stats_failures = 0
             stop_reason = _classify_stop_reason(stats)
         except Exception as e:
             monitor_error = str(e)
-            stats = _camera_monitor_default_snapshot(camera_index)
-            stop_reason = "stats_unreachable"
+            stats_failures += 1
+            threshold = max(1, _CAMERA_MONITOR_FAIL_THRESHOLD)
+            if stats_failures < threshold:
+                # 一時的な取得失敗では直前スナップショットを維持して誤検知を避ける
+                stats = dict(state)
+                stop_reason = "stats_unreachable_transient"
+            else:
+                stats = _camera_monitor_default_snapshot(camera_index)
+                stop_reason = "stats_unreachable"
 
-        should_restart = _CAMERA_MONITOR_ENABLED and (stop_reason != "none")
+        should_restart = _CAMERA_MONITOR_ENABLED and (stop_reason in ("timeout", "stuck", "timeout_and_stuck", "stats_unreachable"))
         restart_allowed = (now_ts - last_restart_at) >= _CAMERA_RESTART_COOLDOWN_SEC
         if should_restart and restart_allowed:
             try:
@@ -376,6 +388,8 @@ def _refresh_camera_monitor_once():
         stats["monitor_stop_reason"] = stop_reason
         stats["monitor_last_restart_at"] = last_restart_at
         stats["monitor_restart_count"] = restart_count
+        stats["monitor_stats_failures"] = stats_failures
+        stats["monitor_fail_threshold"] = max(1, _CAMERA_MONITOR_FAIL_THRESHOLD)
         stats["monitor_restart_triggered"] = restart_triggered
 
         with _camera_monitor_lock:
@@ -901,19 +915,16 @@ def handle_camera_snapshot(handler):
         return True
 
 
-def handle_camera_mask(handler):
-    if not handler.path.startswith("/camera_mask/"):
-        return False
-
+def _proxy_camera_post(handler, camera_path, ok_status=200):
     try:
         camera_index = _parse_camera_index(handler.path)
         cam = CAMERAS[camera_index]
-        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/update_mask"
+        target_url = _camera_url_for_proxy(cam["url"], camera_index) + camera_path
         req = Request(target_url, method="POST")
         with urlopen(req, timeout=5) as response:
             payload = response.read()
 
-        handler.send_response(200)
+        handler.send_response(ok_status)
         handler.send_header("Content-type", "application/json")
         handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
         handler.end_headers()
@@ -925,6 +936,24 @@ def handle_camera_mask(handler):
         handler.end_headers()
         handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
         return True
+
+
+def handle_camera_mask(handler):
+    if not handler.path.startswith("/camera_mask/"):
+        return False
+    return _proxy_camera_post(handler, "/update_mask", ok_status=200)
+
+
+def handle_camera_mask_confirm(handler):
+    if not handler.path.startswith("/camera_mask_confirm/"):
+        return False
+    return _proxy_camera_post(handler, "/confirm_mask_update", ok_status=200)
+
+
+def handle_camera_mask_discard(handler):
+    if not handler.path.startswith("/camera_mask_discard/"):
+        return False
+    return _proxy_camera_post(handler, "/discard_mask_update", ok_status=200)
 
 
 def handle_camera_restart(handler):

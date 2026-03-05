@@ -1,146 +1,281 @@
 #!/usr/bin/env python3
 """
-流星検出ダッシュボード
+流星検出ダッシュボード (Flask 版)
 全カメラのプレビューを1ページで表示
 
 Copyright (c) 2026 Masanori Sakai
 Licensed under the MIT License
 """
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import socketserver
+from __future__ import annotations
 
-from dashboard_config import CAMERAS, PORT
-from dashboard_routes import (
-    handle_changelog,
-    handle_camera_snapshot,
-    handle_camera_restart,
-    handle_delete_detection,
-    handle_detection_window,
-    handle_detections,
-    handle_detections_mtime,
-    handle_dashboard_stats,
-    handle_camera_mask,
-    handle_camera_mask_image,
-    handle_camera_stats,
-    handle_camera_stream,
-    handle_set_detection_label,
-    start_detection_monitor,
-    stop_detection_monitor,
-    start_camera_monitor,
-    stop_camera_monitor,
-    handle_image,
-    handle_index,
-    handle_settings_page,
-    handle_camera_settings_current,
-    handle_camera_settings_apply_all,
-    handle_bulk_delete_non_meteor,
-)
+import atexit
+from io import BytesIO
+from pathlib import Path
+from urllib.error import URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
+
+from flask import Flask, Response, jsonify, request
+
+import dashboard_routes as routes
+from dashboard_config import CAMERAS, PORT, VERSION
+from dashboard_templates import render_dashboard_html, render_settings_html
+
+app = Flask(__name__)
 
 
-class DashboardHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass
+class HandlerAdapter:
+    """BaseHTTPRequestHandler 互換の最小アダプタ。"""
 
-    def do_GET(self):
-        if self.path == '/':
-            handle_index(self)
-            return
-        if self.path == '/settings':
-            handle_settings_page(self)
-            return
-        if self.path.startswith('/detection_window'):
-            handle_detection_window(self)
-            return
-        if self.path == '/changelog':
-            handle_changelog(self)
-            return
-        if self.path == '/detections':
-            handle_detections(self)
-            return
-        if self.path == '/detections_mtime':
-            handle_detections_mtime(self)
-            return
-        if self.path == '/dashboard_stats':
-            handle_dashboard_stats(self)
-            return
-        if self.path.startswith('/camera_stats/'):
-            handle_camera_stats(self)
-            return
-        if self.path == '/camera_settings/current':
-            handle_camera_settings_current(self)
-            return
-        if self.path.startswith('/camera_stream/'):
-            handle_camera_stream(self)
-            return
-        if self.path.startswith('/camera_snapshot/'):
-            handle_camera_snapshot(self)
-            return
-        if self.path.startswith('/camera_mask/'):
-            handle_camera_mask(self)
-            return
-        if self.path.startswith('/camera_mask_image/'):
-            handle_camera_mask_image(self)
-            return
-        if self.path.startswith('/image/'):
-            handle_image(self)
-            return
+    def __init__(self, path: str):
+        self.path = path
+        self.headers = request.headers
+        self.rfile = BytesIO(request.get_data(cache=True))
+        self.wfile = BytesIO()
+        self._status = 200
+        self._status_set = False
+        self._headers: list[tuple[str, str]] = []
 
-        self.send_response(404)
-        self.end_headers()
+    def send_response(self, code: int):
+        self._status = int(code)
+        self._status_set = True
 
-    def do_DELETE(self):
-        """DELETE リクエストを処理（検出結果の削除）"""
-        if handle_delete_detection(self):
-            return
+    def send_header(self, key: str, value: str):
+        self._headers.append((key, value))
 
-        self.send_response(404)
-        self.end_headers()
+    def end_headers(self):
+        return None
 
-    def do_POST(self):
-        if self.path == '/detection_label':
-            handle_set_detection_label(self)
-            return
-        if self.path.startswith('/camera_mask/'):
-            handle_camera_mask(self)
-            return
-        if self.path.startswith('/camera_restart/'):
-            handle_camera_restart(self)
-            return
-        if self.path == '/camera_settings/apply_all':
-            handle_camera_settings_apply_all(self)
-            return
-        if self.path.startswith('/bulk_delete_non_meteor/'):
-            handle_bulk_delete_non_meteor(self)
-            return
-
-        self.send_response(404)
-        self.end_headers()
+    def to_response(self, default_status: int = 404) -> Response:
+        status = self._status if (self._status_set or self._headers or self.wfile.tell() > 0) else default_status
+        body = self.wfile.getvalue()
+        return Response(body, status=status, headers=self._headers)
 
 
-class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
-    daemon_threads = True
+
+def _request_path_with_query() -> str:
+    query = request.query_string.decode("utf-8")
+    if query:
+        return f"{request.path}?{query}"
+    return request.path
+
+
+
+def _dispatch(handler_func, path: str | None = None) -> Response:
+    adapter = HandlerAdapter(path or _request_path_with_query())
+    result = handler_func(adapter)
+    if result is False:
+        return Response(status=404)
+    return adapter.to_response()
+
+
+@app.get("/")
+def index() -> Response:
+    html = render_dashboard_html(CAMERAS, VERSION, routes._SERVER_START_TIME)
+    response = Response(html, content_type="text/html; charset=utf-8")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/settings")
+def settings() -> Response:
+    html = render_settings_html(CAMERAS, VERSION)
+    response = Response(html, content_type="text/html; charset=utf-8")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/detection_window")
+def detection_window() -> Response:
+    return _dispatch(routes.handle_detection_window)
+
+
+@app.get("/changelog")
+def changelog() -> Response:
+    changelog_path = Path(__file__).parent / "CHANGELOG.md"
+    if not changelog_path.exists():
+        return Response("CHANGELOG.md not found", content_type="text/plain; charset=utf-8")
+    return Response(changelog_path.read_text(encoding="utf-8"), content_type="text/plain; charset=utf-8")
+
+
+@app.get("/detections")
+def detections() -> Response:
+    snapshot = routes.get_detection_cache_snapshot()
+    response = jsonify({"total": snapshot["total"], "recent": snapshot["recent"]})
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+@app.get("/detections_mtime")
+def detections_mtime() -> Response:
+    snapshot = routes.get_detection_cache_snapshot()
+    response = jsonify({"mtime": snapshot["mtime"]})
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+@app.get("/dashboard_stats")
+def dashboard_stats() -> Response:
+    snapshot = routes.get_dashboard_cpu_snapshot(refresh=True)
+    response = jsonify(snapshot)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+@app.get("/camera_stats/<int:camera_index>")
+def camera_stats(camera_index: int) -> Response:
+    return _dispatch(routes.handle_camera_stats, path=f"/camera_stats/{camera_index}")
+
+
+@app.get("/camera_settings/current")
+def camera_settings_current() -> Response:
+    return _dispatch(routes.handle_camera_settings_current, path="/camera_settings/current")
+
+
+@app.post("/camera_settings/apply_all")
+def camera_settings_apply_all() -> Response:
+    return _dispatch(routes.handle_camera_settings_apply_all, path="/camera_settings/apply_all")
+
+
+@app.route("/camera_mask/<int:camera_index>", methods=["GET", "POST"])
+def camera_mask(camera_index: int) -> Response:
+    return _dispatch(routes.handle_camera_mask, path=f"/camera_mask/{camera_index}")
+
+
+@app.post("/camera_mask_confirm/<int:camera_index>")
+def camera_mask_confirm(camera_index: int) -> Response:
+    return _dispatch(routes.handle_camera_mask_confirm, path=f"/camera_mask_confirm/{camera_index}")
+
+
+@app.post("/camera_mask_discard/<int:camera_index>")
+def camera_mask_discard(camera_index: int) -> Response:
+    return _dispatch(routes.handle_camera_mask_discard, path=f"/camera_mask_discard/{camera_index}")
+
+
+@app.get("/camera_mask_image/<int:camera_index>")
+def camera_mask_image(camera_index: int) -> Response:
+    query = request.query_string.decode("utf-8")
+    path = f"/camera_mask_image/{camera_index}"
+    if query:
+        path = f"{path}?{query}"
+    return _dispatch(routes.handle_camera_mask_image, path=path)
+
+
+@app.post("/camera_restart/<int:camera_index>")
+def camera_restart(camera_index: int) -> Response:
+    return _dispatch(routes.handle_camera_restart, path=f"/camera_restart/{camera_index}")
+
+
+@app.get("/camera_snapshot/<int:camera_index>")
+def camera_snapshot(camera_index: int) -> Response:
+    query = request.query_string.decode("utf-8")
+    path = f"/camera_snapshot/{camera_index}"
+    if query:
+        path = f"{path}?{query}"
+    return _dispatch(routes.handle_camera_snapshot, path=path)
+
+
+@app.get("/camera_stream/<int:camera_index>")
+def camera_stream(camera_index: int) -> Response:
+    try:
+        cam = CAMERAS[camera_index]
+    except IndexError:
+        return Response(status=503)
+
+    target_url = routes._camera_url_for_proxy(cam["url"], camera_index) + "/stream"
+
+    try:
+        upstream = urlopen(Request(target_url), timeout=routes._CAMERA_STREAM_TIMEOUT)
+    except (URLError, TimeoutError, ValueError):
+        return Response(status=503)
+    except Exception:
+        return Response(status=500)
+
+    content_type = upstream.headers.get("Content-Type", "multipart/x-mixed-replace")
+
+    def generate():
+        try:
+            while True:
+                chunk = upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            try:
+                upstream.close()
+            except Exception:
+                pass
+
+    response = Response(generate(), content_type=content_type)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
+@app.get("/image/<path:subpath>")
+def image(subpath: str) -> Response:
+    query = request.query_string.decode("utf-8")
+    encoded_subpath = "/".join(quote(p, safe="") for p in subpath.split("/"))
+    path = f"/image/{encoded_subpath}"
+    if query:
+        path = f"{path}?{query}"
+    return _dispatch(routes.handle_image, path=path)
+
+
+@app.delete("/detection/<path:subpath>")
+def delete_detection(subpath: str) -> Response:
+    encoded_subpath = "/".join(quote(p, safe="") for p in subpath.split("/"))
+    return _dispatch(routes.handle_delete_detection, path=f"/detection/{encoded_subpath}")
+
+
+@app.post("/detection_label")
+def detection_label() -> Response:
+    return _dispatch(routes.handle_set_detection_label, path="/detection_label")
+
+
+@app.post("/bulk_delete_non_meteor/<path:camera_name>")
+def bulk_delete_non_meteor(camera_name: str) -> Response:
+    encoded_name = quote(camera_name, safe="")
+    return _dispatch(routes.handle_bulk_delete_non_meteor, path=f"/bulk_delete_non_meteor/{encoded_name}")
+
+
+_started = False
+
+
+def _start_monitors_once():
+    global _started
+    if _started:
+        return
+    routes.start_detection_monitor()
+    routes.start_camera_monitor()
+    _started = True
+
+
+
+def _stop_monitors():
+    routes.stop_camera_monitor()
+    routes.stop_detection_monitor()
+
+
+atexit.register(_stop_monitors)
 
 
 def main():
-    print(f"Dashboard starting on port {PORT}")
+    print(f"Dashboard (Flask) starting on port {PORT}")
     print(f"Cameras: {len(CAMERAS)}")
     for cam in CAMERAS:
         print(f"  - {cam['name']}: {cam['url']}")
     print()
     print(f"Open http://localhost:{PORT}/ in your browser")
 
-    start_detection_monitor()
-    start_camera_monitor()
-    httpd = ThreadedHTTPServer(('0.0.0.0', PORT), DashboardHandler)
+    _start_monitors_once()
+
     try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-        httpd.shutdown()
+        app.run(host="0.0.0.0", port=PORT, threaded=True, use_reloader=False)
     finally:
-        stop_camera_monitor()
-        stop_detection_monitor()
+        _stop_monitors()
 
 
 if __name__ == "__main__":

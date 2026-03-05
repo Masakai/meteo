@@ -860,6 +860,8 @@ def process_video_realtime(
     buffer_seconds: float = 15.0,
     sensitivity: str = "medium",
     extract_clips: bool = True,
+    clip_margin_before: float = 1.0,
+    clip_margin_after: float = 1.0,
     exclude_bottom_ratio: float = 1 / 16,
     mask_image: str | None = None,
     mask_from_day: str | None = None,
@@ -885,10 +887,13 @@ def process_video_realtime(
 
     params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
 
-    required_buffer = params.max_duration + 2.0
+    required_buffer = params.max_duration + clip_margin_before + clip_margin_after
     effective_buffer_seconds = min(buffer_seconds, required_buffer)
     if effective_buffer_seconds != buffer_seconds:
-        print(f"バッファ秒数を{effective_buffer_seconds:.1f}秒に調整（検出前後1秒 + 最大検出時間）")
+        print(
+            f"バッファ秒数を{effective_buffer_seconds:.1f}秒に調整"
+            f"（検出前{clip_margin_before:.1f}秒 + 検出後{clip_margin_after:.1f}秒 + 最大検出時間）"
+        )
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -977,9 +982,9 @@ def process_video_realtime(
                         output_path,
                         fps=fps,
                         extract_clips=extract_clips,
-                        clip_margin_before=1.0,
-                        clip_margin_after=1.0,
-                        composite_after=1.0,
+                        clip_margin_before=clip_margin_before,
+                        clip_margin_after=clip_margin_after,
+                        composite_after=clip_margin_after,
                     )
 
             expired_events = merger.flush_expired(timestamp)
@@ -993,9 +998,9 @@ def process_video_realtime(
                     output_path,
                     fps=fps,
                     extract_clips=extract_clips,
-                    clip_margin_before=1.0,
-                    clip_margin_after=1.0,
-                    composite_after=1.0,
+                    clip_margin_before=clip_margin_before,
+                    clip_margin_after=clip_margin_after,
+                    composite_after=clip_margin_after,
                 )
 
         prev_gray = gray.copy()
@@ -1012,9 +1017,9 @@ def process_video_realtime(
                 output_path,
                 fps=fps,
                 extract_clips=extract_clips,
-                clip_margin_before=1.0,
-                clip_margin_after=1.0,
-                composite_after=1.0,
+                clip_margin_before=clip_margin_before,
+                clip_margin_after=clip_margin_after,
+                composite_after=clip_margin_after,
             )
 
     for event in merger.flush_all():
@@ -1025,9 +1030,9 @@ def process_video_realtime(
             output_path,
             fps=fps,
             extract_clips=extract_clips,
-            clip_margin_before=1.0,
-            clip_margin_after=1.0,
-            composite_after=1.0,
+            clip_margin_before=clip_margin_before,
+            clip_margin_after=clip_margin_after,
+            composite_after=clip_margin_after,
         )
 
     cap.release()
@@ -1091,6 +1096,10 @@ def main():
                        help="リアルタイム再検出時の出力ディレクトリ (default: meteor_detections)")
     parser.add_argument("--buffer", type=float, default=15.0,
                        help="リアルタイム再検出時のバッファ秒数 (default: 15.0)")
+    parser.add_argument("--clip-margin-before", type=float, default=1.0,
+                       help="クリップ切り出し時の検出前マージン秒数 (default: 1.0)")
+    parser.add_argument("--clip-margin-after", type=float, default=1.0,
+                       help="クリップ切り出し時の検出後マージン秒数 (default: 1.0)")
     parser.add_argument("--mask-image", help="作成済みの除外マスク画像を使用（リアルタイム再検出）")
     parser.add_argument("--mask-from-day", help="昼間画像から検出除外マスクを生成（リアルタイム再検出）")
     parser.add_argument("--mask-dilate", type=int, default=20,
@@ -1184,6 +1193,8 @@ def main():
             buffer_seconds=args.buffer,
             sensitivity=args.sensitivity,
             extract_clips=args.extract_clips,
+            clip_margin_before=max(0.0, args.clip_margin_before),
+            clip_margin_after=max(0.0, args.clip_margin_after),
             exclude_bottom_ratio=args.exclude_bottom,
             mask_image=args.mask_image.strip() if args.mask_image else None,
             mask_from_day=args.mask_from_day.strip() if args.mask_from_day else None,
@@ -1207,7 +1218,17 @@ def main():
 
     # オプション処理
     if args.extract_clips and meteors:
-        extract_meteor_clips(args.input, meteors)
+        cap = cv2.VideoCapture(args.input)
+        fps_for_clips = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        cap.release()
+        margin_before_frames = max(0, int(round(max(0.0, args.clip_margin_before) * fps_for_clips)))
+        margin_after_frames = max(0, int(round(max(0.0, args.clip_margin_after) * fps_for_clips)))
+        extract_meteor_clips(
+            args.input,
+            meteors,
+            margin_before=margin_before_frames,
+            margin_after=margin_after_frames,
+        )
 
     if args.composite and meteors:
         composite_path = Path(args.input).with_suffix('.composite.jpg')

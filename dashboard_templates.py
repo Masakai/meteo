@@ -880,11 +880,17 @@ def render_dashboard_html(cameras, version, server_start_time):
         const cameraStatsTimers = [];
         const cameraStatsState = [];
         const streamRetryState = [];
+        const streamConnectWatchdogs = [];
         const streamSelectionState = [];
         const STREAM_RETRY_MIN_MS = 2000;
         const STREAM_RETRY_MAX_MS = 30000;
         const STREAM_INITIAL_STAGGER_MS = 2000;
+        const STREAM_CONNECT_TIMEOUT_MS = 12000;
+        const STREAM_STALE_FRAME_SEC = 5.0;
+        const CAMERA_STATS_FETCH_TIMEOUT_MS = 5000;
+        const FOCUS_RECOVERY_COOLDOWN_MS = 8000;
         let dashboardBackgroundPaused = document.hidden === true;
+        let lastForegroundRecoveryAt = 0;
         let detectionPollTimer = null;
 
         function ensureStreamRetryState(i) {{
@@ -931,6 +937,20 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}
         }}
 
+        function isPlaceholderStreamSrc(img) {{
+            if (!img) return false;
+            const src = String(img.currentSrc || img.src || '');
+            return src.startsWith(streamPlaceholderSrc);
+        }}
+
+        function fetchJsonWithTimeout(url, timeoutMs, options = {{}}) {{
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            return fetch(url, {{ ...options, signal: controller.signal }})
+                .then((r) => r.json())
+                .finally(() => clearTimeout(timeoutId));
+        }}
+
         function applyStreamToggleUI(i) {{
             const checkbox = document.getElementById('stream-toggle' + i);
             if (checkbox) {{
@@ -942,6 +962,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             streamSelectionState[i] = enabled === true;
             applyStreamToggleUI(i);
             clearStreamRetryTimer(i);
+            clearStreamConnectWatchdog(i);
 
             const img = document.getElementById('stream' + i);
             const errorEl = document.getElementById('error' + i);
@@ -952,6 +973,8 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}
 
             if (isStreamEnabled(i)) {{
+                const state = ensureStreamRetryState(i);
+                state.delay = STREAM_RETRY_MIN_MS;
                 setStreamErrorMessage(i, '接続中...');
                 statusEl.className = 'camera-status';
                 scheduleStreamRetry(i, 0);
@@ -980,6 +1003,36 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}
         }}
 
+        function clearStreamConnectWatchdog(i) {{
+            if (streamConnectWatchdogs[i]) {{
+                clearTimeout(streamConnectWatchdogs[i]);
+                streamConnectWatchdogs[i] = null;
+            }}
+        }}
+
+        function armStreamConnectWatchdog(i) {{
+            clearStreamConnectWatchdog(i);
+            streamConnectWatchdogs[i] = setTimeout(() => {{
+                if (dashboardBackgroundPaused || !isStreamEnabled(i)) {{
+                    return;
+                }}
+                const state = ensureStreamRetryState(i);
+                const img = document.getElementById('stream' + i);
+                const errorEl = document.getElementById('error' + i);
+                if (img) {{
+                    // ハングした接続を明示的に破棄して再接続
+                    img.src = streamPlaceholderSrc;
+                    img.style.display = 'none';
+                }}
+                if (errorEl) {{
+                    errorEl.style.display = 'flex';
+                }}
+                setStreamErrorMessage(i, '通信遅延を検知（再接続中）');
+                scheduleStreamRetry(i, state.delay);
+                state.delay = Math.min(state.delay * 2, STREAM_RETRY_MAX_MS);
+            }}, STREAM_CONNECT_TIMEOUT_MS);
+        }}
+
         function scheduleStreamRetry(i, delay) {{
             if (dashboardBackgroundPaused) {{
                 return;
@@ -994,7 +1047,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                 const img = document.getElementById('stream' + i);
                 if (!img) return;
                 const base = img.dataset.streamSrc || ('/camera_stream/' + i);
+                img.src = streamPlaceholderSrc;
                 img.src = base + '?t=' + Date.now();
+                armStreamConnectWatchdog(i);
             }}, Math.max(0, delay));
         }}
 
@@ -1013,9 +1068,10 @@ def render_dashboard_html(cameras, version, server_start_time):
             if (errorEl) {{
                 errorEl.style.display = 'flex';
             }}
-            setStreamErrorMessage(i, '接続エラー（再試行中）');
+            setStreamErrorMessage(i, '映像取得に失敗（再接続中）');
 
             const state = ensureStreamRetryState(i);
+            clearStreamConnectWatchdog(i);
             scheduleStreamRetry(i, state.delay);
             state.delay = Math.min(state.delay * 2, STREAM_RETRY_MAX_MS);
         }}
@@ -1028,6 +1084,10 @@ def render_dashboard_html(cameras, version, server_start_time):
                 return;
             }}
             const img = document.getElementById('stream' + i);
+            if (isPlaceholderStreamSrc(img)) {{
+                // プレースホルダ読込は正常接続ではないため無視する
+                return;
+            }}
             const errorEl = document.getElementById('error' + i);
             if (img) {{
                 img.style.display = '';
@@ -1039,6 +1099,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             const state = ensureStreamRetryState(i);
             state.delay = STREAM_RETRY_MIN_MS;
             clearStreamRetryTimer(i);
+            clearStreamConnectWatchdog(i);
         }}
 
         function startCameraStreams() {{
@@ -1071,6 +1132,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}
             cameras.forEach((_, i) => {{
                 clearStreamRetryTimer(i);
+                clearStreamConnectWatchdog(i);
                 const img = document.getElementById('stream' + i);
                 const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
@@ -1104,13 +1166,13 @@ def render_dashboard_html(cameras, version, server_start_time):
                 const state = ensureStreamRetryState(i);
                 state.delay = STREAM_RETRY_MIN_MS;
                 clearStreamRetryTimer(i);
+                clearStreamConnectWatchdog(i);
                 const img = document.getElementById('stream' + i);
                 const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
                 const serverStatusEl = document.getElementById('server-status' + i);
                 if (img) {{
-                    const base = img.dataset.streamSrc || ('/camera_stream/' + i);
-                    img.src = base + '?t=' + Date.now();
+                    img.src = streamPlaceholderSrc;
                     img.style.display = 'none';
                 }}
                 if (errorEl) {{
@@ -1123,7 +1185,39 @@ def render_dashboard_html(cameras, version, server_start_time):
                     serverStatusEl.className = 'server-status unknown';
                 }}
                 setStreamErrorMessage(i, '接続中...');
-                scheduleStreamRetry(i, 0);
+                scheduleStreamRetry(i, i * STREAM_INITIAL_STAGGER_MS);
+            }});
+            cameras.forEach((_, i) => {{
+                updateCameraStats(i);
+            }});
+            pollDetections();
+        }}
+
+        function recoverForegroundActivity(reason = 'focus') {{
+            if (document.hidden) {{
+                return;
+            }}
+            const now = Date.now();
+            if ((now - lastForegroundRecoveryAt) < FOCUS_RECOVERY_COOLDOWN_MS) {{
+                return;
+            }}
+            lastForegroundRecoveryAt = now;
+
+            if (dashboardBackgroundPaused) {{
+                resumeDashboardActivity();
+                return;
+            }}
+
+            cameras.forEach((_, i) => {{
+                if (!isStreamEnabled(i)) {{
+                    return;
+                }}
+                const state = ensureStreamRetryState(i);
+                state.delay = STREAM_RETRY_MIN_MS;
+                clearStreamRetryTimer(i);
+                clearStreamConnectWatchdog(i);
+                setStreamErrorMessage(i, `再同期中... (${{reason}})`);
+                scheduleStreamRetry(i, i * STREAM_INITIAL_STAGGER_MS);
             }});
             cameras.forEach((_, i) => {{
                 updateCameraStats(i);
@@ -1135,7 +1229,7 @@ def render_dashboard_html(cameras, version, server_start_time):
             if (document.hidden) {{
                 pauseDashboardActivity();
             }} else {{
-                resumeDashboardActivity();
+                recoverForegroundActivity('visibility');
             }}
         }}
 
@@ -1169,14 +1263,13 @@ def render_dashboard_html(cameras, version, server_start_time):
             if (dashboardBackgroundPaused) return;
             const cam = cameras[i];
             if (!cam) return;
-            const baseDelay = 60000;
-            const maxDelay = 300000;
+            const baseDelay = 5000;
+            const maxDelay = 15000;
             if (!cameraStatsState[i]) {{
                 cameraStatsState[i] = {{ delay: baseDelay }};
             }}
 
-            fetch('/camera_stats/' + i, {{ cache: 'no-store' }})
-                .then(r => r.json())
+            fetchJsonWithTimeout('/camera_stats/' + i, CAMERA_STATS_FETCH_TIMEOUT_MS, {{ cache: 'no-store' }})
                 .then(data => {{
                     if (dashboardBackgroundPaused) {{
                         return;
@@ -1186,9 +1279,13 @@ def render_dashboard_html(cameras, version, server_start_time):
                     renderCameraParams(i, data);
                     const serverStatusEl = document.getElementById('server-status' + i);
                     const monitorStopReason = String(data.monitor_stop_reason || '');
+                    const monitorStatsFailures = Number(data.monitor_stats_failures || 0);
+                    const monitorFailThreshold = Number(data.monitor_fail_threshold || 8);
                     if (serverStatusEl) {{
                         if (monitorStopReason === 'stats_unreachable') {{
-                            serverStatusEl.className = 'server-status offline';
+                            serverStatusEl.className = monitorStatsFailures >= monitorFailThreshold ? 'server-status offline' : 'server-status unknown';
+                        }} else if (monitorStopReason === 'stats_unreachable_transient') {{
+                            serverStatusEl.className = 'server-status unknown';
                         }} else if (monitorStopReason === 'unknown') {{
                             serverStatusEl.className = 'server-status unknown';
                         }} else {{
@@ -1201,10 +1298,16 @@ def render_dashboard_html(cameras, version, server_start_time):
                         document.getElementById('status' + i).className = 'camera-status paused';
                     }} else if (!streamAlive) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
+                        setStreamErrorMessage(i, '映像更新待ち（再接続中）');
+                        scheduleStreamRetry(i, 0);
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status';
                         const streamImg = document.getElementById('stream' + i);
-                        if (streamImg && streamImg.style.display === 'none') {{
+                        const timeSinceLastFrame = Number(data.time_since_last_frame);
+                        const looksStale = Number.isFinite(timeSinceLastFrame) && timeSinceLastFrame > STREAM_STALE_FRAME_SEC;
+                        if (looksStale) {{
+                            scheduleStreamRetry(i, 0);
+                        }} else if (streamImg && streamImg.style.display === 'none') {{
                             scheduleStreamRetry(i, 0);
                         }}
                     }}
@@ -1233,10 +1336,12 @@ def render_dashboard_html(cameras, version, server_start_time):
                     cameraStatsState[i].delay = Math.min(cameraStatsState[i].delay * 2, maxDelay);
                     const serverStatusEl = document.getElementById('server-status' + i);
                     if (serverStatusEl) {{
-                        serverStatusEl.className = 'server-status offline';
+                        serverStatusEl.className = 'server-status unknown';
                     }}
                     if (isStreamEnabled(i)) {{
-                        document.getElementById('status' + i).className = 'camera-status offline';
+                        document.getElementById('status' + i).className = 'camera-status';
+                        setStreamErrorMessage(i, '通信状態を確認中...');
+                        scheduleStreamRetry(i, 0);
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status paused';
                     }}
@@ -1247,27 +1352,47 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        loadStreamSelection();
-        cameras.forEach((cam, i) => {{
-            updateCameraStats(i);
-        }});
-        startCameraStreams();
-        syncDashboardVisibilityState();
+        function startCameraSection() {{
+            loadStreamSelection();
+            cameras.forEach((cam, i) => {{
+                updateCameraStats(i);
+            }});
+            startCameraStreams();
+            syncDashboardVisibilityState();
+        }}
 
         // マスク更新
         function updateMask(i) {{
             const btn = document.querySelectorAll('.mask-btn')[i];
             if (!btn) return;
+            const overlay = document.getElementById('mask' + i);
+            const wasVisible = overlay && overlay.dataset.visible === '1';
             btn.disabled = true;
             btn.textContent = '更新中...';
             fetch('/camera_mask/' + i, {{ method: 'POST' }})
                 .then(r => r.json())
-                .then(data => {{
-                    btn.textContent = data.success ? '更新完了' : '失敗';
-                    if (data.success) {{
-                        const overlay = document.getElementById('mask' + i);
-                        if (overlay && overlay.dataset.visible === '1') {{
-                            setMaskOverlay(i, true);
+                .then(async (data) => {{
+                    if (!data.success) {{
+                        btn.textContent = '失敗';
+                        return;
+                    }}
+                    if (overlay) {{
+                        overlay.dataset.src = '/camera_mask_image/' + i + '?pending=1';
+                        setMaskOverlay(i, true);
+                    }}
+                    const apply = confirm('新しいマスクを表示しました。入れ替えを適用しますか？');
+                    const endpoint = apply ? '/camera_mask_confirm/' + i : '/camera_mask_discard/' + i;
+                    const applyResponse = await fetch(endpoint, {{ method: 'POST' }});
+                    const applyData = await applyResponse.json();
+                    btn.textContent = applyData.success ? (apply ? '更新完了' : '更新取消') : '失敗';
+                    if (overlay) {{
+                        overlay.dataset.src = '/camera_mask_image/' + i;
+                        if (applyData.success) {{
+                            if (wasVisible) {{
+                                setMaskOverlay(i, true);
+                            }} else {{
+                                setMaskOverlay(i, false);
+                            }}
                         }}
                     }}
                 }})
@@ -1347,7 +1472,9 @@ def render_dashboard_html(cameras, version, server_start_time):
             const btn = document.getElementById('mask-btn' + i);
             if (!overlay || !btn) return;
             if (visible) {{
-                overlay.src = overlay.dataset.src + '?t=' + Date.now();
+                const baseSrc = overlay.dataset.src || '';
+                const sep = baseSrc.includes('?') ? '&' : '?';
+                overlay.src = baseSrc + sep + 't=' + Date.now();
                 overlay.style.display = 'block';
                 overlay.dataset.visible = '1';
                 btn.textContent = 'マスク非表示';
@@ -1569,6 +1696,8 @@ def render_dashboard_html(cameras, version, server_start_time):
         let detectionPollDelay = detectionPollBaseDelay;
         detectionPollTimer = null;
         document.addEventListener('visibilitychange', syncDashboardVisibilityState);
+        window.addEventListener('focus', () => recoverForegroundActivity('focus'));
+        window.addEventListener('pageshow', () => recoverForegroundActivity('pageshow'));
 
         function scheduleDetectionPoll(delay) {{
             if (dashboardBackgroundPaused) {{
@@ -1722,10 +1851,12 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        // 初回表示時は検出時間帯に関係なく一覧を取得し、その後差分ポーリングへ移行
+        // 初回表示時は検出時間帯に関係なく一覧を先に取得し、その後差分ポーリングへ移行
+        // カメラ接続状況に関わらず「最近の検出」を先に表示する
         updateDetections()
             .finally(() => {{
                 pollDetections();
+                startCameraSection();
             }});
 
         // CHANGELOG表示

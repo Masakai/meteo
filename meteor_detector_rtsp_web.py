@@ -70,6 +70,9 @@ current_camera_name = ""
 current_stop_flag = None
 current_runtime_fps = 0.0
 current_runtime_overrides_paths = []
+current_pending_exclusion_mask = None
+current_pending_mask_save_path = None
+current_pending_mask_lock = Lock()
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -352,7 +355,9 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             const btn = document.getElementById('mask-toggle-btn');
             if (!overlay || !btn) return;
             if (visible) {{
-                overlay.src = overlay.dataset.src + '?t=' + Date.now();
+                const baseSrc = overlay.dataset.src || '';
+                const sep = baseSrc.includes('?') ? '&' : '?';
+                overlay.src = baseSrc + sep + 't=' + Date.now();
                 overlay.style.display = 'block';
                 btn.textContent = 'マスク非表示';
                 maskVisible = true;
@@ -370,14 +375,35 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         function updateMask() {{
             const btn = document.getElementById('mask-update-btn');
             if (!btn) return;
+            const overlay = document.getElementById('mask-overlay');
+            const wasVisible = maskVisible;
             btn.disabled = true;
             btn.textContent = '更新中...';
             fetch('/update_mask', {{ method: 'POST' }})
                 .then(r => r.json())
-                .then(data => {{
-                    btn.textContent = data.success ? '更新完了' : '失敗';
-                    if (data.success && maskVisible) {{
+                .then(async (data) => {{
+                    if (!data.success) {{
+                        btn.textContent = '失敗';
+                        return;
+                    }}
+                    if (overlay) {{
+                        overlay.dataset.src = '/mask?pending=1';
                         setMaskOverlay(true);
+                    }}
+                    const apply = confirm('新しいマスクを表示しました。入れ替えを適用しますか？');
+                    const endpoint = apply ? '/confirm_mask_update' : '/discard_mask_update';
+                    const applyResponse = await fetch(endpoint, {{ method: 'POST' }});
+                    const applyData = await applyResponse.json();
+                    btn.textContent = applyData.success ? (apply ? '更新完了' : '更新取消') : '失敗';
+                    if (overlay) {{
+                        overlay.dataset.src = '/mask';
+                        if (applyData.success) {{
+                            if (wasVisible) {{
+                                setMaskOverlay(true);
+                            }} else {{
+                                setMaskOverlay(false);
+                            }}
+                        }}
                     }}
                 }})
                 .catch(() => {{
@@ -484,6 +510,8 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             if current_detector is not None:
                 with current_detector.mask_lock:
                     mask_active = current_detector.exclusion_mask is not None
+            with current_pending_mask_lock:
+                has_pending_mask = current_pending_exclusion_mask is not None
             stats = {
                 "detections": detection_count,
                 "elapsed": round(elapsed, 1),
@@ -494,19 +522,26 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "time_since_last_frame": round(time_since_last_frame, 1),
                 "is_detecting": is_detecting_now,
                 "mask_active": mask_active,
+                "mask_update_pending": has_pending_mask,
             }
             self.wfile.write(json.dumps(stats).encode())
         elif path == '/mask':
             mask = None
-            if current_detector is not None:
-                with current_detector.mask_lock:
-                    if current_detector.exclusion_mask is not None:
-                        mask = current_detector.exclusion_mask.copy()
+            query = parse_qs(parsed.query)
+            show_pending = query.get("pending", ["0"])[0] in ("1", "true", "yes", "on")
+            if show_pending:
+                with current_pending_mask_lock:
+                    if current_pending_exclusion_mask is not None:
+                        mask = current_pending_exclusion_mask.copy()
+            else:
+                if current_detector is not None:
+                    with current_detector.mask_lock:
+                        if current_detector.exclusion_mask is not None:
+                            mask = current_detector.exclusion_mask.copy()
             if mask is None:
                 self.send_response(404)
                 self.end_headers()
                 return
-            query = parse_qs(parsed.query)
             try:
                 alpha = int(query.get("alpha", ["120"])[0])
             except (TypeError, ValueError):
@@ -539,6 +574,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         global current_mask_dilate, current_nuisance_dilate
         global current_clip_margin_before, current_clip_margin_after
+        global current_pending_exclusion_mask, current_pending_mask_save_path
         if self.path == '/restart':
             self.send_response(202)
             self.send_header('Content-type', 'application/json')
@@ -597,14 +633,77 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 frame,
                 current_proc_size,
                 dilate_px=current_mask_dilate,
-                save_path=save_path,
+                save_path=None,
             )
-            current_detector.update_exclusion_mask(mask)
+            with current_pending_mask_lock:
+                current_pending_exclusion_mask = None if mask is None else mask.copy()
+                current_pending_mask_save_path = save_path
 
             self.wfile.write(json.dumps({
                 "success": mask is not None,
-                "message": "mask updated" if mask is not None else "mask update failed",
-                "saved": str(save_path) if save_path else ""
+                "message": "mask preview ready" if mask is not None else "mask update failed",
+                "saved": str(save_path) if save_path else "",
+                "requires_confirmation": mask is not None,
+            }).encode())
+            return
+
+        if self.path == '/confirm_mask_update':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            if current_detector is None:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "detector not ready"
+                }).encode())
+                return
+
+            with current_pending_mask_lock:
+                pending_mask = None if current_pending_exclusion_mask is None else current_pending_exclusion_mask.copy()
+                pending_save_path = current_pending_mask_save_path
+                current_pending_exclusion_mask = None
+                current_pending_mask_save_path = None
+
+            if pending_mask is None:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "no pending mask"
+                }).encode())
+                return
+
+            current_detector.update_exclusion_mask(pending_mask)
+            saved = ""
+            if pending_save_path:
+                try:
+                    pending_save_path.parent.mkdir(parents=True, exist_ok=True)
+                    if cv2.imwrite(str(pending_save_path), pending_mask):
+                        saved = str(pending_save_path)
+                except Exception:
+                    pass
+
+            self.wfile.write(json.dumps({
+                "success": True,
+                "message": "mask updated",
+                "saved": saved,
+            }).encode())
+            return
+
+        if self.path == '/discard_mask_update':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            with current_pending_mask_lock:
+                had_pending = current_pending_exclusion_mask is not None
+                current_pending_exclusion_mask = None
+                current_pending_mask_save_path = None
+
+            self.wfile.write(json.dumps({
+                "success": True,
+                "message": "pending mask discarded" if had_pending else "no pending mask",
             }).encode())
             return
 
@@ -772,6 +871,9 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                         mask_img = cv2.resize(mask_img, (proc_w, proc_h), interpolation=cv2.INTER_NEAREST)
                     _, new_mask = cv2.threshold(mask_img, 1, 255, cv2.THRESH_BINARY)
                     current_detector.update_exclusion_mask(new_mask)
+                    with current_pending_mask_lock:
+                        current_pending_exclusion_mask = None
+                        current_pending_mask_save_path = None
                     applied["mask_image"] = mask_image
                     overrides_update["mask_image"] = mask_image
                 elif mask_from_day:
@@ -784,6 +886,9 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                     if new_mask is None:
                         raise ValueError(f"mask_from_day not readable: {mask_from_day}")
                     current_detector.update_exclusion_mask(new_mask)
+                    with current_pending_mask_lock:
+                        current_pending_exclusion_mask = None
+                        current_pending_mask_save_path = None
                     applied["mask_from_day"] = mask_from_day
                     overrides_update["mask_from_day"] = mask_from_day
             except Exception as e:
@@ -1170,6 +1275,7 @@ def detection_thread_worker(
     global current_nuisance_dilate
     global current_clip_margin_before, current_clip_margin_after
     global current_output_dir, current_camera_name
+    global current_pending_exclusion_mask, current_pending_mask_save_path
 
     width, height = reader.frame_size
     proc_width = int(width * process_scale)
@@ -1239,6 +1345,9 @@ def detection_thread_worker(
     current_mask_save = mask_save
     current_output_dir = Path(output_path)
     current_camera_name = camera_name
+    with current_pending_mask_lock:
+        current_pending_exclusion_mask = None
+        current_pending_mask_save_path = None
 
     prev_gray = None
     frame_count = 0
