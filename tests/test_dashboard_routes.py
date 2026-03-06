@@ -255,3 +255,54 @@ def test_handle_camera_settings_apply_all(monkeypatch):
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["success"] is True
     assert payload["applied_count"] == 1
+
+
+def test_handle_bulk_delete_non_meteor_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_dir = tmp_path / "camera1"
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    (cam_dir / "detections.jsonl").write_text(
+        "\n".join(
+            [
+                json.dumps({"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}),
+                json.dumps({"timestamp": "2026-02-07T22:00:01", "confidence": 0.8}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "detection_labels.json").write_text(
+        json.dumps(
+            {
+                "camera1|2026-02-07 22:00:00": "post_detected",
+                "camera1|2026-02-07 22:00:01": "detected",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (cam_dir / "meteor_20260207_220000.mov").write_bytes(b"mov")
+    (cam_dir / "meteor_20260207_220000_composite.jpg").write_bytes(b"jpg")
+
+    handler = _DummyHandler("/bulk_delete_non_meteor/camera1")
+    assert dr.handle_bulk_delete_non_meteor(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["deleted_count"] == 1
+
+    remained = (cam_dir / "detections.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(remained) == 1
+    item = json.loads(remained[0])
+    assert item["timestamp"] == "2026-02-07T22:00:01"
+
+
+def test_handle_bulk_delete_non_meteor_path_parse(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_name = "camera1_10_0_1_25"
+    cam_dir = tmp_path / cam_name
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    (cam_dir / "detections.jsonl").write_text("", encoding="utf-8")
+
+    handler = _DummyHandler(f"/bulk_delete_non_meteor/{cam_name}")
+    assert dr.handle_bulk_delete_non_meteor(handler) is True
+    assert handler.status == 200

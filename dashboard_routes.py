@@ -1136,14 +1136,16 @@ def handle_camera_settings_apply_all(handler):
 
 
 def handle_bulk_delete_non_meteor(handler):
-    if not handler.path.startswith("/bulk_delete_non_meteor/"):
+    parsed_path = urlparse(handler.path).path
+    prefix = "/bulk_delete_non_meteor/"
+    if not parsed_path.startswith(prefix):
         return False
 
     try:
-        parts = handler.path[25:].split("/", 1)
-        if len(parts) != 1:
+        camera_part = parsed_path[len(prefix):]
+        if (not camera_part) or ("/" in camera_part):
             raise ValueError("invalid path")
-        camera_name = unquote(parts[0])
+        camera_name = unquote(camera_part)
 
         labels = _load_detection_labels()
         cam_dir = Path(DETECTIONS_DIR) / camera_name
