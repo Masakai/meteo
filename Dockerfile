@@ -14,16 +14,15 @@ RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # OpenCV実行に必要な最小限のシステムライブラリをインストール
 # libxcb1はopencv-python-headlessでも必要
-# -o APT::Keep-Downloaded-Packages=false でキャッシュを無効化してディスク容量を節約
-RUN mkdir -p /dev/shm/apt-cache && \
-    apt-get update --allow-releaseinfo-change && \
+# ffmpeg追加により /dev/shm のキャッシュ容量を超えやすいため通常キャッシュを使い、直後に削除する
+RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
-        -o APT::Keep-Downloaded-Packages=false \
-        -o Dir::Cache::archives=/dev/shm/apt-cache \
+        ffmpeg \
         libxcb1 \
         libglib2.0-0 \
         libgomp1 && \
-    rm -rf /var/lib/apt/lists/* /dev/shm/apt-cache
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
 # アプリケーションコード
 COPY meteor_detector_rtsp_web.py .

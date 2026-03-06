@@ -25,6 +25,7 @@ import signal
 import sys
 import os
 import subprocess
+import socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
 from urllib.parse import urlparse, parse_qs
@@ -51,6 +52,7 @@ except ImportError:
 # グローバル変数（Webサーバー用）
 current_frame = None
 current_frame_lock = Lock()
+current_frame_seq = 0
 detection_count = 0
 start_time_global = None
 camera_name = ""
@@ -143,6 +145,10 @@ def fb_normalize_clip(
     if out_path.exists() and not overwrite:
         return None
 
+    if clip_path.suffix.lower() != ".mov":
+        print(f"[WARN] 正規化対象がMOVではありません: {clip_path}")
+        return None
+
     fps = 30.0
     try:
         probe = subprocess.run(
@@ -171,6 +177,12 @@ def fb_normalize_clip(
                     fps = float(num) / den_f
             elif rate:
                 fps = float(rate)
+        else:
+            if probe.stderr:
+                print(f"[WARN] ffprobe失敗: {probe.stderr.strip()}")
+    except FileNotFoundError:
+        print("[WARN] ffprobeコマンドが見つかりません。ffmpegパッケージをインストールしてください。")
+        return None
     except Exception:
         pass
     fps = sanitize_fps(fps, default=30.0)
@@ -207,9 +219,14 @@ def fb_normalize_clip(
         "+faststart",
         str(out_path),
     ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except FileNotFoundError:
+        print("[WARN] ffmpegコマンドが見つかりません。fb_normalizeを有効化するにはffmpegが必要です。")
+        return None
     if result.returncode != 0:
-        sys.stderr.write(result.stderr)
+        if result.stderr:
+            sys.stderr.write(result.stderr)
         return None
     if delete_source:
         try:
@@ -454,21 +471,47 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         elif path == '/stream':
             self.send_response(200)
             self.send_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Connection", "close")
             self.end_headers()
 
+            try:
+                self.connection.settimeout(15.0)
+            except Exception:
+                pass
+
+            last_sent_seq = -1
+            last_send_at = 0.0
             while True:
                 with current_frame_lock:
-                    if current_frame is None:
-                        continue
-                    _, jpeg = cv2.imencode('.jpg', current_frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    frame = None if current_frame is None else current_frame.copy()
+                    frame_seq = current_frame_seq
+
+                if frame is None:
+                    time.sleep(0.03)
+                    continue
+
+                now = time.time()
+                if frame_seq == last_sent_seq and (now - last_send_at) < 1.0:
+                    time.sleep(0.02)
+                    continue
+
+                ok, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                if not ok:
+                    time.sleep(0.02)
+                    continue
 
                 try:
                     self.wfile.write(b'--frame\r\n')
                     self.wfile.write(b'Content-Type: image/jpeg\r\n\r\n')
                     self.wfile.write(jpeg.tobytes())
                     self.wfile.write(b'\r\n')
+                    self.wfile.flush()
+                    last_sent_seq = frame_seq
+                    last_send_at = now
                     time.sleep(0.033)  # ~30fps
-                except:
+                except (BrokenPipeError, ConnectionResetError, socket.timeout, TimeoutError, OSError):
                     break
 
         elif path == '/snapshot':
@@ -1270,7 +1313,7 @@ def detection_thread_worker(
     fb_delete_mov=False,
 ):
     """検出処理を行うワーカースレッド"""
-    global current_frame, detection_count, last_frame_time, is_detecting_now, current_runtime_fps
+    global current_frame, current_frame_seq, detection_count, last_frame_time, is_detecting_now, current_runtime_fps
     global current_detector, current_proc_size, current_mask_dilate, current_mask_save
     global current_nuisance_dilate
     global current_clip_margin_before, current_clip_margin_after
@@ -1473,6 +1516,7 @@ def detection_thread_worker(
 
             with current_frame_lock:
                 current_frame = display
+                current_frame_seq += 1
 
         prev_gray = gray.copy()
         frame_count += 1

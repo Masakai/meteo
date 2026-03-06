@@ -10,9 +10,9 @@ Licensed under the MIT License
 from __future__ import annotations
 
 import atexit
+import time
 from io import BytesIO
 from pathlib import Path
-from urllib.error import URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -23,6 +23,8 @@ from dashboard_config import CAMERAS, PORT, VERSION
 from dashboard_templates import render_dashboard_html, render_settings_html
 
 app = Flask(__name__)
+STREAM_PROXY_TIMEOUT_SEC = 20
+STREAM_PROXY_RECONNECT_DELAY_SEC = 0.3
 
 
 class HandlerAdapter:
@@ -186,31 +188,82 @@ def camera_stream(camera_index: int) -> Response:
         return Response(status=503)
 
     target_url = routes._camera_url_for_proxy(cam["url"], camera_index) + "/stream"
+    req = Request(target_url)
 
     try:
-        upstream = urlopen(Request(target_url), timeout=routes._CAMERA_STREAM_TIMEOUT)
-    except (URLError, TimeoutError, ValueError):
+        upstream = urlopen(req, timeout=STREAM_PROXY_TIMEOUT_SEC)
+        first_chunk = upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
+        if not first_chunk:
+            upstream.close()
+            return Response(status=503)
+    except (TimeoutError, ValueError):
         return Response(status=503)
     except Exception:
         return Response(status=500)
 
-    content_type = upstream.headers.get("Content-Type", "multipart/x-mixed-replace")
+    content_type = "multipart/x-mixed-replace; boundary=frame"
 
     def generate():
+        current_upstream = upstream
+        current_first_chunk = first_chunk
         try:
             while True:
-                chunk = upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
-                if not chunk:
+                first_chunk_sent = False
+                try:
+                    if current_first_chunk:
+                        first_chunk_sent = True
+                        yield current_first_chunk
+                        current_first_chunk = b""
+
+                    while True:
+                        chunk = current_upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
+                        if not chunk:
+                            raise TimeoutError("stream ended")
+                        first_chunk_sent = True
+                        yield chunk
+                except GeneratorExit:
                     break
-                yield chunk
+                except Exception:
+                    if first_chunk_sent:
+                        time.sleep(STREAM_PROXY_RECONNECT_DELAY_SEC)
+
+                    try:
+                        if current_upstream is not None:
+                            current_upstream.close()
+                    except Exception:
+                        pass
+                    current_upstream = None
+                    current_first_chunk = b""
+
+                    while True:
+                        try:
+                            current_upstream = urlopen(req, timeout=STREAM_PROXY_TIMEOUT_SEC)
+                            current_first_chunk = current_upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
+                            if not current_first_chunk:
+                                raise TimeoutError("empty first chunk")
+                            break
+                        except GeneratorExit:
+                            raise
+                        except Exception:
+                            try:
+                                if current_upstream is not None:
+                                    current_upstream.close()
+                            except Exception:
+                                pass
+                            current_upstream = None
+                            current_first_chunk = b""
+                            time.sleep(STREAM_PROXY_RECONNECT_DELAY_SEC)
         finally:
-            try:
-                upstream.close()
-            except Exception:
-                pass
+            if current_upstream is not None:
+                try:
+                    current_upstream.close()
+                except Exception:
+                    pass
 
     response = Response(generate(), content_type=content_type)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
     return response
 
 
