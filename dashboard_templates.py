@@ -1051,7 +1051,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const host = window.location.hostname;
             const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:';
             const base = (host && port > 0)
-                ? `${scheme}//${host}:${port}/stream`
+                ? `${{scheme}}//${{host}}:${{port}}/stream`
                 : ('/camera_stream/' + i);
             if (errorEl) {{
                 errorEl.style.display = 'flex';
@@ -1762,7 +1762,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     totalEl.textContent = data.total;
                     if (data.recent.length > 0) {{
                         const detectionsKey = data.recent.map(d =>
-                            `${{d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
+                            `${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
                         ).join('||');
                         if (detectionsKey === lastDetectionsKey) {{
                             return;
@@ -1788,23 +1788,25 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                             dateItems.sort((a, b) => b.time.localeCompare(a.time));
 
                             const items = dateItems.map((d, idx) => {{
+                                const cameraKey = d.camera;
+                                const cameraLabel = d.camera_display || d.camera;
                                 const thumb = d.image
-                                    ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{d.camera}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">`
+                                    ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{cameraLabel}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">`
                                     : '';
                                 const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
-                                const radioName = `label-${{d.camera}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                                const radioName = `label-${{cameraKey}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
                                 const videoAction = d.mp4
-                                    ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">VIDEO</span>`
+                                    ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">VIDEO</span>`
                                     : '';
                                 const imageAction = d.image
-                                    ? `<span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">画像</span>`
+                                    ? `<span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">画像</span>`
                                     : '';
                                 const originalAction = d.composite_original
-                                    ? `<span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>`
+                                    ? `<span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">元画像</span>`
                                     : '';
                                 return `
                                     <div class="detection-item">
-                                        <div class="time">${{d.time}} | ${{d.camera}}</div>
+                                        <div class="time">${{d.time}} | ${{cameraLabel}}</div>
                                         ${{thumb}}
                                         <div>信頼度: ${{d.confidence}}</div>
                                         <div class="detection-actions">
@@ -1817,16 +1819,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                                 <div class="label-radios" data-label="${{normalizedLabel}}">
                                                     <label class="label-radio">
                                                         <input type="radio" name="${{radioName}}" value="detected" ${{normalizedLabel === 'detected' ? 'checked' : ''}}
-                                                               onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', 'detected', this)">
+                                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'detected', this)">
                                                         <span>流星</span>
                                                     </label>
                                                     <label class="label-radio">
                                                         <input type="radio" name="${{radioName}}" value="post_detected" ${{normalizedLabel === 'post_detected' ? 'checked' : ''}}
-                                                               onchange="updateDetectionLabel('${{d.camera}}', '${{d.time}}', 'post_detected', this)">
+                                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'post_detected', this)">
                                                         <span>それ以外</span>
                                                     </label>
                                                 </div>
-                                                <button class="delete-btn" onclick="deleteDetection('${{d.camera}}', '${{d.time}}', event)">削除</button>
+                                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.time}}', event)">削除</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1835,17 +1837,19 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
 
                             // カメラ別に「それ以外」をカウント
                             const cameraNonMeteorCount = {{}};
+                            const cameraLabels = {{}};
                             dateItems.forEach(d => {{
                                 if (d.label === 'post_detected') {{
                                     cameraNonMeteorCount[d.camera] = (cameraNonMeteorCount[d.camera] || 0) + 1;
                                 }}
+                                cameraLabels[d.camera] = d.camera_display || d.camera;
                             }});
 
                             // 一括削除ボタンを生成
                             const bulkDeleteButtons = Object.keys(cameraNonMeteorCount)
                                 .filter(camera => cameraNonMeteorCount[camera] > 0)
                                 .map(camera =>
-                                    `<button class="bulk-delete-btn" onclick="bulkDeleteNonMeteor('${{camera}}', event)">${{camera}}: それ以外を一括削除 (${{cameraNonMeteorCount[camera]}}件)</button>`
+                                    `<button class="bulk-delete-btn" onclick="bulkDeleteNonMeteor('${{camera}}', event)">${{cameraLabels[camera] || camera}}: それ以外を一括削除 (${{cameraNonMeteorCount[camera]}}件)</button>`
                                 ).join('');
 
                             return `

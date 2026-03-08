@@ -68,7 +68,8 @@ docker-compose.ymlで設定される環境変数:
 | `LONGITUDE` | `138.7274` | 観測地の経度 |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
 | `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限 |
-| `CAMERA1_NAME` | - | カメラ1の表示名 |
+| `CAMERA1_NAME` | - | カメラ1の内部名（ディレクトリ名・識別子） |
+| `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名 |
 | `CAMERA1_URL` | - | カメラ1のURL |
 | `DETECTIONS_DIR` | `/output` | 検出結果ディレクトリ |
 | `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |

@@ -102,11 +102,14 @@ graph LR
 | `LONGITUDE` | `139.6503` | 観測地の経度（東京） |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
 | `ENABLE_TIME_WINDOW` | `true` | 天文薄暮時間帯制限 |
-| `CAMERA1_NAME` | `camera1 (10.0.1.25)` | カメラ1の表示名 |
+| `CAMERA1_NAME` | `camera1_10_0_1_25` | カメラ1の内部名（ディレクトリ名・識別子） |
+| `CAMERA1_NAME_DISPLAY` | `東側` | カメラ1のWeb表示名 |
 | `CAMERA1_URL` | `http://localhost:8081` | カメラ1のURL |
-| `CAMERA2_NAME` | `camera2 (10.0.1.3)` | カメラ2の表示名 |
+| `CAMERA2_NAME` | `camera2_10_0_1_3` | カメラ2の内部名（ディレクトリ名・識別子） |
+| `CAMERA2_NAME_DISPLAY` | `南側` | カメラ2のWeb表示名 |
 | `CAMERA2_URL` | `http://localhost:8082` | カメラ2のURL |
-| `CAMERA3_NAME` | `camera3 (10.0.1.11)` | カメラ3の表示名 |
+| `CAMERA3_NAME` | `camera3_10_0_1_11` | カメラ3の内部名（ディレクトリ名・識別子） |
+| `CAMERA3_NAME_DISPLAY` | `西側` | カメラ3のWeb表示名 |
 | `CAMERA3_URL` | `http://localhost:8083` | カメラ3のURL |
 
 #### Dockerfile.dashboard

@@ -161,6 +161,13 @@ def _normalize_detection_label(label):
     return "detected"
 
 
+def _camera_display_name(camera_name):
+    for cam in CAMERAS:
+        if cam.get("name") == camera_name:
+            return cam.get("display_name") or camera_name
+    return camera_name
+
+
 def _compute_latest_mtime():
     latest_mtime = 0.0
     detections_root = Path(DETECTIONS_DIR)
@@ -257,6 +264,7 @@ def _build_detections_payload():
                                     {
                                         "time": display_time,
                                         "camera": cam_dir.name,
+                                        "camera_display": _camera_display_name(cam_dir.name),
                                         "confidence": f"{d.get('confidence', 0):.0%}",
                                         "image": image_path,
                                         "mp4": mp4_path,
