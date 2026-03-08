@@ -565,7 +565,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .calendar-day,
         .calendar-day-empty {{
-            min-height: 38px;
+            min-height: 52px;
             border-radius: 8px;
         }}
         .calendar-day-empty {{
@@ -578,6 +578,40 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #dce8ff;
             cursor: pointer;
             font-size: 0.85em;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 6px 7px;
+        }}
+        .calendar-day-number {{
+            font-weight: 600;
+            line-height: 1.1;
+        }}
+        .calendar-day-weather {{
+            margin-top: 4px;
+            font-size: 0.66em;
+            line-height: 1.1;
+            color: #9bb1d8;
+            white-space: nowrap;
+        }}
+        .calendar-day-weather.is-unknown {{
+            color: #6d7f9d;
+        }}
+        .calendar-day-weather.is-clear {{
+            color: #8fe7ff;
+        }}
+        .calendar-day-weather.is-cloudy {{
+            color: #d0d8e8;
+        }}
+        .calendar-day-weather.is-rainy {{
+            color: #7cc5ff;
+        }}
+        .calendar-day-weather.is-snowy {{
+            color: #f0f7ff;
+        }}
+        .calendar-day-weather.is-stormy {{
+            color: #ffd36e;
         }}
         .calendar-day.has-data {{
             background: #1f5b49;
@@ -1916,10 +1950,12 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         let lastDetectionsMtime = 0;
         let detectionRecords = [];
         let detectionCountsByDate = {{}};
+        let detectionNightWeather = {{}};
         let detectionAvailableYears = [];
         let detectionCalendarRange = 'current';
         let selectedDetectionDate = '';
         let detectionCalendarYear = new Date().getFullYear();
+        let lastNightWeatherRangeKey = '';
         const detectionPollBaseDelay = 5000;
         const detectionPollMaxDelay = 30000;
         const detectionWindowIdleDelay = 60000;
@@ -1969,6 +2005,13 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             return Array.from(years).filter(Number.isFinite).sort((a, b) => b - a);
         }}
 
+        function formatDateKey(dt) {{
+            const year = dt.getFullYear();
+            const month = String(dt.getMonth() + 1).padStart(2, '0');
+            const day = String(dt.getDate()).padStart(2, '0');
+            return `${{year}}-${{month}}-${{day}}`;
+        }}
+
         function getCalendarMonths() {{
             const now = new Date();
             const current = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2014,6 +2057,76 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
         }}
 
+        function getVisibleCalendarDateRange() {{
+            const months = getCalendarMonths();
+            if (!months.length) return null;
+            const first = months[0];
+            const last = months[months.length - 1];
+            return {{
+                start: formatDateKey(new Date(first.year, first.month, 1)),
+                end: formatDateKey(new Date(last.year, last.month + 1, 0)),
+            }};
+        }}
+
+        function weatherTone(label) {{
+            if (label === '雷') return 'is-stormy';
+            if (label === '雪') return 'is-snowy';
+            if (label === '雨' || label === '霧') return 'is-rainy';
+            if (label === '曇' || label === '薄曇') return 'is-cloudy';
+            if (label === '快晴' || label === '晴') return 'is-clear';
+            return 'is-unknown';
+        }}
+
+        function weatherTitle(dateStr, count, weather) {{
+            const parts = [dateLabel(dateStr)];
+            if (count > 0) parts.push(`検出 ${{count}}件`);
+            if (weather && weather.label) {{
+                let weatherText = `夜間天気: ${{weather.label}}`;
+                if (typeof weather.cloud_cover_avg === 'number') {{
+                    weatherText += ` / 雲量 ${{Math.round(weather.cloud_cover_avg)}}%`;
+                }}
+                parts.push(weatherText);
+            }}
+            return parts.join(' / ');
+        }}
+
+        function weatherBadgeHtml(dateStr) {{
+            const weather = detectionNightWeather[dateStr];
+            if (!weather || !weather.label) {{
+                return '<span class="calendar-day-weather is-unknown">夜間 --</span>';
+            }}
+            const cloud = typeof weather.cloud_cover_avg === 'number'
+                ? ` ${{Math.round(weather.cloud_cover_avg)}}%`
+                : '';
+            return `<span class="calendar-day-weather ${{weatherTone(weather.label)}}">夜間 ${{weather.label}}${{cloud}}</span>`;
+        }}
+
+        function refreshNightWeatherForVisibleRange() {{
+            const range = getVisibleCalendarDateRange();
+            if (!range) {{
+                detectionNightWeather = {{}};
+                renderDetectionCalendar();
+                return Promise.resolve();
+            }}
+            const nextKey = `${{range.start}}:${{range.end}}`;
+            if (nextKey === lastNightWeatherRangeKey) {{
+                renderDetectionCalendar();
+                return Promise.resolve();
+            }}
+            lastNightWeatherRangeKey = nextKey;
+            return fetch(`/night_weather?start=${{encodeURIComponent(range.start)}}&end=${{encodeURIComponent(range.end)}}`, {{ cache: 'no-store' }})
+                .then((r) => r.json())
+                .then((data) => {{
+                    detectionNightWeather = data && data.days ? data.days : {{}};
+                    renderDetectionCalendar();
+                }})
+                .catch((err) => {{
+                    console.warn('Night weather fetch error:', err);
+                    detectionNightWeather = {{}};
+                    renderDetectionCalendar();
+                }});
+        }}
+
         function populateDetectionYearSelect() {{
             const yearSelect = document.getElementById('detection-year-select');
             if (!yearSelect) return;
@@ -2054,11 +2167,15 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 for (let day = 1; day <= lastDate; day++) {{
                     const dateStr = `${{year}}-${{String(month + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
                     const count = detectionCountsByDate[dateStr] || 0;
+                    const weather = detectionNightWeather[dateStr];
                     const classes = ['calendar-day'];
                     if (count > 0) classes.push('has-data');
                     if (dateStr === selectedDetectionDate) classes.push('selected');
                     dayCells.push(
-                        `<button type="button" class="${{classes.join(' ')}}" data-date="${{dateStr}}" data-count-label="${{count}}件" title="${{count > 0 ? `${{dateLabel(dateStr)}}: ${{count}}件` : dateLabel(dateStr)}}">${{day}}</button>`
+                        `<button type="button" class="${{classes.join(' ')}}" data-date="${{dateStr}}" data-count-label="${{count}}件" title="${{weatherTitle(dateStr, count, weather)}}">
+                            <span class="calendar-day-number">${{day}}</span>
+                            ${{weatherBadgeHtml(dateStr)}}
+                        </button>`
                     );
                 }}
                 return `
@@ -2200,6 +2317,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             syncSelectedDateToCalendarRange();
             renderDetectionCalendar();
             renderSelectedDetections();
+            return refreshNightWeatherForVisibleRange();
         }}
 
         function updateDetections() {{
@@ -2225,10 +2343,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         `${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
                     ).join('||');
                     if (detectionsKey === lastDetectionsKey) {{
-                        return;
+                        return refreshNightWeatherForVisibleRange();
                     }}
                     lastDetectionsKey = detectionsKey;
-                    applyDetectionData(data);
+                    return applyDetectionData(data);
                 }})
                 .catch(err => {{
                     detectionPollDelay = Math.min(detectionPollDelay * 2, detectionPollMaxDelay);
@@ -2283,6 +2401,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     syncSelectedDateToCalendarRange();
                     renderDetectionCalendar();
                     renderSelectedDetections();
+                    refreshNightWeatherForVisibleRange();
                 }});
             }});
             const yearSelect = document.getElementById('detection-year-select');
@@ -2296,6 +2415,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         syncSelectedDateToCalendarRange();
                         renderDetectionCalendar();
                         renderSelectedDetections();
+                        refreshNightWeatherForVisibleRange();
                     }}
                 }});
             }}

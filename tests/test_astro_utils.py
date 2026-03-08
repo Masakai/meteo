@@ -42,3 +42,17 @@ def test_is_detection_active_night_true(monkeypatch):
     assert end.tzinfo is not None
     assert end > start
     assert active is True
+
+
+def test_get_detection_window_for_date_returns_cross_midnight_window():
+    start, end = astro_utils.get_detection_window_for_date(
+        datetime(2024, 1, 15).date(),
+        35.6762,
+        139.6503,
+        "Asia/Tokyo",
+    )
+    assert start.tzinfo is not None
+    assert end.tzinfo is not None
+    assert start.date().isoformat() == "2024-01-15"
+    assert end.date().isoformat() == "2024-01-16"
+    assert end > start
