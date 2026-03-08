@@ -914,35 +914,19 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         const cameraStatsTimers = [];
         const cameraStatsState = [];
         const streamRetryState = [];
-        const streamConnectWatchdogs = [];
         const streamSelectionState = [];
-        const STREAM_RETRY_MIN_MS = 2000;
-        const STREAM_RETRY_MAX_MS = 30000;
-        const STREAM_INITIAL_STAGGER_MS = 2000;
-        const STREAM_CONNECT_TIMEOUT_MS = 12000;
-        const STREAM_STALE_FRAME_SEC = 5.0;
-        const STREAM_HEALTH_CHECK_MS = 3000;
-        const STREAM_FORCE_RETRY_AFTER_MS = 15000;
-        const STREAM_RECOVERY_EXTRA_GRACE_MS = 8000;
+        const STREAM_RETRY_DELAY_MS = 3000;
         const CAMERA_STATS_FETCH_TIMEOUT_MS = 5000;
-        const CAMERA_SECTION_START_DELAY_MS = 1500;
         const FOCUS_RECOVERY_COOLDOWN_MS = 8000;
         let dashboardBackgroundPaused = document.hidden === true;
         let lastForegroundRecoveryAt = 0;
         let detectionPollTimer = null;
-        let streamHealthTimer = null;
-        let streamRecoveryWarmupUntil = 0;
         let cameraSectionStarted = false;
 
         function ensureStreamRetryState(i) {{
             if (!streamRetryState[i]) {{
                 streamRetryState[i] = {{
-                    delay: STREAM_RETRY_MIN_MS,
                     timer: null,
-                    lastAttemptAt: 0,
-                    lastLoadAt: 0,
-                    connecting: false,
-                    consecutiveTimeouts: 0,
                 }};
             }}
             return streamRetryState[i];
@@ -1010,7 +994,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             streamSelectionState[i] = enabled === true;
             applyStreamToggleUI(i);
             clearStreamRetryTimer(i);
-            clearStreamConnectWatchdog(i);
 
             const img = document.getElementById('stream' + i);
             const errorEl = document.getElementById('error' + i);
@@ -1021,13 +1004,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
 
             if (isStreamEnabled(i)) {{
-                const state = ensureStreamRetryState(i);
-                state.delay = STREAM_RETRY_MIN_MS;
-                state.connecting = false;
-                state.consecutiveTimeouts = 0;
                 setStreamErrorMessage(i, '接続中...');
                 statusEl.className = 'camera-status';
-                scheduleStreamRetry(i, 0);
+                connectStream(i);
             }} else {{
                 img.removeAttribute('src');
                 img.style.display = 'none';
@@ -1053,60 +1032,30 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
         }}
 
-        function clearStreamConnectWatchdog(i) {{
-            if (streamConnectWatchdogs[i]) {{
-                clearTimeout(streamConnectWatchdogs[i]);
-                streamConnectWatchdogs[i] = null;
-            }}
-        }}
-
-        function armStreamConnectWatchdog(i) {{
-            clearStreamConnectWatchdog(i);
-            streamConnectWatchdogs[i] = setTimeout(() => {{
-                if (dashboardBackgroundPaused || !isStreamEnabled(i)) {{
-                    return;
-                }}
-                const state = ensureStreamRetryState(i);
-                const img = document.getElementById('stream' + i);
-                const errorEl = document.getElementById('error' + i);
-                if (img) {{
-                    // ハングした接続を明示的に破棄して再接続
-                    img.removeAttribute('src');
-                    img.style.display = 'none';
-                }}
-                if (errorEl) {{
-                    errorEl.style.display = 'flex';
-                }}
-                setStreamErrorMessage(i, '通信遅延を検知（再接続中）');
-                state.connecting = false;
-                state.consecutiveTimeouts = Math.min(Number(state.consecutiveTimeouts || 0) + 1, 99);
-                scheduleStreamRetry(i, state.delay);
-                state.delay = Math.min(state.delay * 2, STREAM_RETRY_MAX_MS);
-            }}, STREAM_CONNECT_TIMEOUT_MS);
-        }}
-
-        function scheduleStreamRetry(i, delay) {{
-            if (dashboardBackgroundPaused) {{
-                return;
-            }}
-            if (!isStreamEnabled(i)) {{
-                return;
-            }}
-            const state = ensureStreamRetryState(i);
-            const now = Date.now();
-            if (state.connecting && (now - Number(state.lastAttemptAt || 0)) < STREAM_CONNECT_TIMEOUT_MS) {{
+        function connectStream(i) {{
+            if (dashboardBackgroundPaused || !isStreamEnabled(i)) {{
                 return;
             }}
             clearStreamRetryTimer(i);
+            const img = document.getElementById('stream' + i);
+            const errorEl = document.getElementById('error' + i);
+            if (!img) return;
+            const base = img.dataset.streamSrc || ('/camera_stream/' + i);
+            if (errorEl) {{
+                errorEl.style.display = 'flex';
+            }}
+            img.style.display = 'none';
+            img.src = base + '?t=' + Date.now();
+        }}
+
+        function scheduleStreamRetry(i, delay = STREAM_RETRY_DELAY_MS) {{
+            if (dashboardBackgroundPaused || !isStreamEnabled(i)) {{
+                return;
+            }}
+            const state = ensureStreamRetryState(i);
+            clearStreamRetryTimer(i);
             state.timer = setTimeout(() => {{
-                if (!isStreamEnabled(i)) return;
-                const img = document.getElementById('stream' + i);
-                if (!img) return;
-                const base = img.dataset.streamSrc || ('/camera_stream/' + i);
-                state.lastAttemptAt = Date.now();
-                state.connecting = true;
-                img.src = base + '?t=' + Date.now();
-                armStreamConnectWatchdog(i);
+                connectStream(i);
             }}, Math.max(0, delay));
         }}
 
@@ -1120,19 +1069,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const img = document.getElementById('stream' + i);
             const errorEl = document.getElementById('error' + i);
             if (img) {{
+                img.removeAttribute('src');
                 img.style.display = 'none';
             }}
             if (errorEl) {{
                 errorEl.style.display = 'flex';
             }}
             setStreamErrorMessage(i, '映像取得に失敗（再接続中）');
-
-            const state = ensureStreamRetryState(i);
-            state.connecting = false;
-            state.consecutiveTimeouts = Math.min(Number(state.consecutiveTimeouts || 0) + 1, 99);
-            clearStreamConnectWatchdog(i);
-            scheduleStreamRetry(i, state.delay);
-            state.delay = Math.min(state.delay * 2, STREAM_RETRY_MAX_MS);
+            scheduleStreamRetry(i);
         }}
 
         function handleStreamLoad(i) {{
@@ -1154,14 +1098,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             if (errorEl) {{
                 errorEl.style.display = 'none';
             }}
-
-            const state = ensureStreamRetryState(i);
-            state.lastLoadAt = Date.now();
-            state.connecting = false;
-            state.consecutiveTimeouts = 0;
-            state.delay = STREAM_RETRY_MIN_MS;
             clearStreamRetryTimer(i);
-            clearStreamConnectWatchdog(i);
         }}
 
         function forceResetStreamElement(i) {{
@@ -1176,65 +1113,15 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
         }}
 
-        function checkStreamHealth() {{
-            if (dashboardBackgroundPaused) {{
-                return;
-            }}
-            const now = Date.now();
-            if (now < streamRecoveryWarmupUntil) {{
-                return;
-            }}
-            cameras.forEach((_, i) => {{
-                if (!isStreamEnabled(i)) {{
-                    return;
-                }}
-                const state = ensureStreamRetryState(i);
-                const lastLoadAt = Number(state.lastLoadAt || 0);
-                const lastAttemptAt = Number(state.lastAttemptAt || 0);
-                const noRecentFrame = lastLoadAt <= 0 || (now - lastLoadAt) > STREAM_FORCE_RETRY_AFTER_MS;
-                const retryCoolDownPassed = lastAttemptAt <= 0 || (now - lastAttemptAt) > STREAM_HEALTH_CHECK_MS;
-                if (noRecentFrame && retryCoolDownPassed) {{
-                    if (Number(state.consecutiveTimeouts || 0) >= 3) {{
-                        forceResetStreamElement(i);
-                        state.connecting = false;
-                        state.consecutiveTimeouts = 0;
-                    }}
-                    setStreamErrorMessage(i, '接続回復を試行中...');
-                    scheduleStreamRetry(i, 0);
-                }}
-            }});
-        }}
-
-        function beginStreamRecoveryWave(reason = 'recovery') {{
-            const enabledIndices = [];
+        function startCameraStreams() {{
             cameras.forEach((_, i) => {{
                 applyStreamToggleUI(i);
                 if (isStreamEnabled(i)) {{
-                    enabledIndices.push(i);
+                    connectStream(i);
                 }} else {{
                     setStreamEnabled(i, false, false);
                 }}
             }});
-
-            const perStreamStaggerMs = Math.max(STREAM_INITIAL_STAGGER_MS, 2500);
-            const totalWaveMs = enabledIndices.length * perStreamStaggerMs;
-            streamRecoveryWarmupUntil = Date.now() + totalWaveMs + STREAM_RECOVERY_EXTRA_GRACE_MS;
-
-            enabledIndices.forEach((idx, order) => {{
-                const state = ensureStreamRetryState(idx);
-                state.delay = STREAM_RETRY_MIN_MS;
-                state.connecting = false;
-                state.consecutiveTimeouts = 0;
-                clearStreamRetryTimer(idx);
-                clearStreamConnectWatchdog(idx);
-                setStreamErrorMessage(idx, `接続中... (${{reason}})`);
-                scheduleStreamRetry(idx, order * perStreamStaggerMs);
-            }});
-        }}
-
-        function startCameraStreams() {{
-            // 初回接続も復帰時と同じくウェーブで実行し、同時接続を抑制する
-            beginStreamRecoveryWave('startup');
         }}
 
         function clearAllCameraStatsTimers() {{
@@ -1257,10 +1144,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 return;
             }}
             cameras.forEach((_, i) => {{
-                const state = ensureStreamRetryState(i);
-                state.connecting = false;
                 clearStreamRetryTimer(i);
-                clearStreamConnectWatchdog(i);
                 const img = document.getElementById('stream' + i);
                 const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
@@ -1292,12 +1176,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     if (!isStreamEnabled(i)) {{
                         return;
                     }}
-                    const state = ensureStreamRetryState(i);
-                    state.delay = STREAM_RETRY_MIN_MS;
-                    state.connecting = false;
-                    state.consecutiveTimeouts = 0;
                     clearStreamRetryTimer(i);
-                    clearStreamConnectWatchdog(i);
                     const img = document.getElementById('stream' + i);
                     const errorEl = document.getElementById('error' + i);
                     const statusEl = document.getElementById('status' + i);
@@ -1317,7 +1196,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     }}
                     setStreamErrorMessage(i, '接続待機...');
                 }});
-                beginStreamRecoveryWave('resume');
+                startCameraStreams();
                 cameras.forEach((_, i) => {{
                     updateCameraStats(i);
                 }});
@@ -1347,14 +1226,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     if (!isStreamEnabled(i)) {{
                         return;
                     }}
-                    const state = ensureStreamRetryState(i);
-                    state.delay = STREAM_RETRY_MIN_MS;
-                    state.connecting = false;
                     clearStreamRetryTimer(i);
-                    clearStreamConnectWatchdog(i);
                     setStreamErrorMessage(i, `再同期待機... (${{reason}})`);
                 }});
-                beginStreamRecoveryWave(reason);
+                startCameraStreams();
                 cameras.forEach((_, i) => {{
                     updateCameraStats(i);
                 }});
@@ -1442,27 +1317,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     }} else if (!streamAlive) {{
                         document.getElementById('status' + i).className = 'camera-status offline';
                         setStreamErrorMessage(i, '映像更新待ち（再接続中）');
-                        if (Date.now() >= streamRecoveryWarmupUntil) {{
-                            scheduleStreamRetry(i, 0);
-                        }}
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status';
-                        const state = ensureStreamRetryState(i);
-                        state.lastLoadAt = Date.now();
-                        state.connecting = false;
-                        state.consecutiveTimeouts = 0;
-                        const streamImg = document.getElementById('stream' + i);
-                        const timeSinceLastFrame = Number(data.time_since_last_frame);
-                        const looksStale = Number.isFinite(timeSinceLastFrame) && timeSinceLastFrame > STREAM_STALE_FRAME_SEC;
-                        if (looksStale) {{
-                            if (Date.now() >= streamRecoveryWarmupUntil) {{
-                                scheduleStreamRetry(i, 0);
-                            }}
-                        }} else if (streamImg && streamImg.style.display === 'none') {{
-                            if (Date.now() >= streamRecoveryWarmupUntil) {{
-                                scheduleStreamRetry(i, 0);
-                            }}
-                        }}
                     }}
                     if (data.is_detecting === true) {{
                         document.getElementById('detection' + i).className = 'detection-status detecting';
@@ -1494,9 +1350,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     if (isStreamEnabled(i)) {{
                         document.getElementById('status' + i).className = 'camera-status';
                         setStreamErrorMessage(i, '通信状態を確認中...');
-                        if (Date.now() >= streamRecoveryWarmupUntil) {{
-                            scheduleStreamRetry(i, 0);
-                        }}
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status paused';
                     }}
@@ -1520,10 +1373,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 updateCameraStats(i);
             }});
             startCameraStreams();
-            if (streamHealthTimer) {{
-                clearInterval(streamHealthTimer);
-            }}
-            streamHealthTimer = setInterval(checkStreamHealth, STREAM_HEALTH_CHECK_MS);
             syncDashboardVisibilityState();
         }}
 
