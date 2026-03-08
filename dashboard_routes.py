@@ -209,21 +209,34 @@ def _build_detections_payload():
                                     dt = datetime.fromisoformat(timestamp_str)
                                     base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
                                     clip_ext = None
-                                    if (cam_dir / f"{base_filename}.mov").exists():
-                                        clip_ext = ".mov"
-                                    elif (cam_dir / f"{base_filename}.mp4").exists():
+                                    if (cam_dir / f"{base_filename}.mp4").exists():
                                         clip_ext = ".mp4"
+                                    elif (cam_dir / f"{base_filename}.mov").exists():
+                                        clip_ext = ".mov"
 
                                     mp4_path = (
                                         f"{cam_dir.name}/{base_filename}{clip_ext}"
                                         if clip_ext
                                         else ""
                                     )
-                                    composite_path = f"{cam_dir.name}/{base_filename}_composite.jpg"
-                                    composite_orig_path = f"{cam_dir.name}/{base_filename}_composite_original.jpg"
-                                    if not (cam_dir / f"{base_filename}_composite.jpg").exists():
+                                    composite_exists = (cam_dir / f"{base_filename}_composite.jpg").exists()
+                                    composite_original_exists = (
+                                        cam_dir / f"{base_filename}_composite_original.jpg"
+                                    ).exists()
+                                    composite_path = (
+                                        f"{cam_dir.name}/{base_filename}_composite.jpg"
+                                        if composite_exists
+                                        else ""
+                                    )
+                                    composite_orig_path = (
+                                        f"{cam_dir.name}/{base_filename}_composite_original.jpg"
+                                        if composite_original_exists
+                                        else ""
+                                    )
+                                    image_path = composite_path or composite_orig_path
+                                    if not composite_exists:
                                         missing_composite += 1
-                                    if not (cam_dir / f"{base_filename}_composite_original.jpg").exists():
+                                    if not composite_original_exists:
                                         missing_original += 1
                                     if not clip_ext:
                                         missing_video += 1
@@ -231,6 +244,7 @@ def _build_detections_payload():
                                     mp4_path = ""
                                     composite_path = ""
                                     composite_orig_path = ""
+                                    image_path = ""
                                     missing_composite += 1
                                     missing_original += 1
                                     missing_video += 1
@@ -244,7 +258,7 @@ def _build_detections_payload():
                                         "time": display_time,
                                         "camera": cam_dir.name,
                                         "confidence": f"{d.get('confidence', 0):.0%}",
-                                        "image": composite_path,
+                                        "image": image_path,
                                         "mp4": mp4_path,
                                         "composite_original": composite_orig_path,
                                         "label": _normalize_detection_label(labels.get(label_key, "")),

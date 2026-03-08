@@ -1932,6 +1932,15 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                     : '';
                                 const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
                                 const radioName = `label-${{d.camera}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                                const videoAction = d.mp4
+                                    ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">VIDEO</span>`
+                                    : '';
+                                const imageAction = d.image
+                                    ? `<span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">画像</span>`
+                                    : '';
+                                const originalAction = d.composite_original
+                                    ? `<span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>`
+                                    : '';
                                 return `
                                     <div class="detection-item">
                                         <div class="time">${{d.time}} | ${{d.camera}}</div>
@@ -1939,9 +1948,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                         <div>信頼度: ${{d.confidence}}</div>
                                         <div class="detection-actions">
                                             <div class="detection-view-actions">
-                                                <span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">VIDEO</span>
-                                                <span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">合成</span>
-                                                <span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{d.camera}}', '${{d.confidence}}')">元画像</span>
+                                                ${{videoAction}}
+                                                ${{imageAction}}
+                                                ${{originalAction}}
                                             </div>
                                             <div class="detection-manage-actions">
                                                 <div class="label-radios" data-label="${{normalizedLabel}}">
