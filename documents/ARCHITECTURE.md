@@ -190,7 +190,7 @@ sequenceDiagram
 
     Dashboard->>Storage: タイムスタンプからファイル名を生成<br/>meteor_20260202_065533_*.{mov,mp4,jpg}
 
-    Dashboard->>Storage: ファイル削除<br/>- meteor_20260202_065533.mov<br/>- meteor_20260202_065533_composite.jpg<br/>- meteor_20260202_065533_composite_original.jpg
+    Dashboard->>Storage: ファイル削除<br/>- meteor_20260202_065533.mp4<br/>- meteor_20260202_065533_composite.jpg<br/>- meteor_20260202_065533_composite_original.jpg
 
     Dashboard->>Storage: detections.jsonl読み込み
     Dashboard->>Dashboard: 該当タイムスタンプの行を除外
@@ -210,7 +210,7 @@ sequenceDiagram
 /output/
   ├── camera1_10.0.1.25/
   │   ├── detections.jsonl          # 検出ログ (1行1イベント)
-  │   ├── meteor_20260202_065533.mov
+  │   ├── meteor_20260202_065533.mp4
   │   ├── meteor_20260202_065533_composite.jpg
   │   └── meteor_20260202_065533_composite_original.jpg
   ├── camera2_10.0.1.3/

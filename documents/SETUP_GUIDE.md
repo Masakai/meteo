@@ -2,6 +2,12 @@
 
 Windows と macOS で、実行環境の作成から動作確認までの手順をまとめています。
 
+## サンプル画面
+
+初回構築後に最初に確認するトップ画面の例です。
+
+<img src="assets/dashboard-sample_1.png" alt="Meteo ダッシュボードのトップ画面サンプル" width="920">
+
 ---
 
 ## 1. 事前準備

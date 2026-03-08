@@ -145,6 +145,8 @@ def fb_normalize_clip(
     if out_path.exists() and not overwrite:
         return None
 
+    if clip_path.suffix.lower() == ".mp4":
+        return clip_path
     if clip_path.suffix.lower() != ".mov":
         print(f"[WARN] 正規化対象がMOVではありません: {clip_path}")
         return None
@@ -185,8 +187,9 @@ def fb_normalize_clip(
         return None
     except Exception:
         pass
-    fps = sanitize_fps(fps, default=30.0)
-    gop = max(1, int(round(fps * 2)))
+    target_fps = 30.0
+    target_timescale = 15360
+    gop = int(target_fps * 2)
 
     cmd = [
         "ffmpeg",
@@ -198,23 +201,41 @@ def fb_normalize_clip(
         str(clip_path),
         "-c:v",
         "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "18",
         "-profile:v",
         "baseline",
         "-level",
-        "3.1",
+        "4.0",
         "-pix_fmt",
         "yuv420p",
+        "-bf",
+        "0",
+        "-refs",
+        "1",
+        "-coder",
+        "0",
+        "-x264-params",
+        "cabac=0:ref=1:bframes=0:weightp=0:8x8dct=0:force-cfr=1",
         "-r",
-        f"{fps:.3f}",
+        f"{target_fps:.0f}",
+        "-fps_mode",
+        "cfr",
         "-g",
         str(gop),
         "-keyint_min",
         str(gop),
         "-sc_threshold",
         "0",
+        "-video_track_timescale",
+        str(target_timescale),
         "-tag:v",
         "avc1",
         "-an",
+        "-brand",
+        "isom",
         "-movflags",
         "+faststart",
         str(out_path),

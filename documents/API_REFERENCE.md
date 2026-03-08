@@ -204,7 +204,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
       "camera": "camera1_10_0_1_25",
       "confidence": "87%",
       "image": "camera1_10_0_1_25/meteor_20260202_065533_composite.jpg",
-      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mov",
+      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mp4",
       "composite_original": "camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg"
     },
     {
@@ -212,7 +212,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
       "camera": "camera2_10_0_1_3",
       "confidence": "92%",
       "image": "camera2_10_0_1_3/meteor_20260202_053218_composite.jpg",
-      "mp4": "camera2_10_0_1_3/meteor_20260202_053218.mov",
+      "mp4": "camera2_10_0_1_3/meteor_20260202_053218.mp4",
       "composite_original": "camera2_10_0_1_3/meteor_20260202_053218_composite_original.jpg"
     }
   ]
@@ -229,7 +229,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
 | `recent[].camera` | string | カメラ名 |
 | `recent[].confidence` | string | 信頼度（パーセント表示） |
 | `recent[].image` | string | 画像パス |
-| `recent[].mp4` | string | 動画パス（.mov/.mp4） |
+| `recent[].mp4` | string | 動画パス（通常は `.mp4`） |
 | `recent[].composite_original` | string | 元画像の比較明合成パス |
 | `recent[].label` | string | 検出ラベル（v1.10.0以降、未設定時は空文字） |
 
@@ -557,7 +557,7 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 {
   "success": true,
   "deleted_files": [
-    "meteor_20260202_065533.mov",
+    "meteor_20260202_065533.mp4",
     "meteor_20260202_065533_composite.jpg",
     "meteor_20260202_065533_composite_original.jpg"
   ],
@@ -617,7 +617,7 @@ fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
     {
       "time": "2026-02-02 06:55:33",
       "deleted_files": [
-        "meteor_20260202_065533.mov",
+        "meteor_20260202_065533.mp4",
         "meteor_20260202_065533_composite.jpg",
         "meteor_20260202_065533_composite_original.jpg"
       ]
@@ -625,7 +625,7 @@ fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
     {
       "time": "2026-02-02 05:32:18",
       "deleted_files": [
-        "meteor_20260202_053218.mov",
+        "meteor_20260202_053218.mp4",
         "meteor_20260202_053218_composite.jpg",
         "meteor_20260202_053218_composite_original.jpg"
       ]
@@ -892,8 +892,8 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.scale` | float | 処理スケール |
 | `settings.buffer` | float | バッファ秒数 |
 | `settings.extract_clips` | boolean | 動画保存の有効/無効 |
-| `settings.fb_normalize` | boolean | Facebook向けMP4正規化 |
-| `settings.fb_delete_mov` | boolean | 正規化後に元MOVを削除するか |
+| `settings.fb_normalize` | boolean | 旧互換設定。現在の標準MP4出力では通常不要 |
+| `settings.fb_delete_mov` | boolean | 旧MOV互換経路向け設定。通常は未使用 |
 | `settings.source_fps` | float | 接続時に取得した入力ストリームFPS |
 | `settings.exclude_bottom` | float | 画面下部除外率 |
 | `settings.exclude_bottom_ratio` | float | 画面下部除外率（内部キー） |
@@ -1042,7 +1042,7 @@ curl -X POST http://localhost:8081/update_mask | jq
 
 **反映ルール**:
 - 再起動不要: `diff_threshold` など検出ロジック/誤検出抑制の閾値群
-- 自動再起動で反映: `sensitivity` / `scale` / `buffer` / `extract_clips` / `fb_normalize` / `fb_delete_mov`
+- 自動再起動で反映: `sensitivity` / `scale` / `buffer` / `extract_clips`
 - 設定は `output/runtime_settings/<camera>.json` に永続化され、再起動後も維持
 
 **使用例**:

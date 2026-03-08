@@ -124,7 +124,7 @@ RTSP版には以下の抑制が追加されています。
   - `min_track_points`, `max_stationary_ratio`, `small_area_threshold`
   - `mask_dilate`, `nuisance_dilate`, `mask_image`, `mask_from_day`, `nuisance_mask_image`, `nuisance_from_night`
 - 自動再起動で反映（再ビルド不要）:
-  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`
 
 起動時設定は `output/runtime_settings/<camera>.json` に保存されるため、
 コンテナ再起動後も有効です。

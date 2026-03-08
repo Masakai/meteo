@@ -1,12 +1,20 @@
 """Dashboard HTML rendering."""
 
+import base64
 import json
+from pathlib import Path
 from urllib.parse import urlparse
 
 
 def render_dashboard_html(cameras, version, server_start_time, page_mode="detections"):
     is_camera_page = page_mode == "cameras"
     is_detections_page = not is_camera_page
+    logotype_path = Path(__file__).parent / "documents" / "assets" / "meteo-logotype.svg"
+    logotype_src = ""
+    if logotype_path.exists():
+        logotype_bytes = logotype_path.read_bytes()
+        logotype_src = "data:image/svg+xml;base64," + base64.b64encode(logotype_bytes).decode("ascii")
+    brand_logo_html = f'<img src="{logotype_src}" alt="METEO">' if logotype_src else ""
     client_cameras = []
     for cam in cameras:
         parsed = urlparse(cam["url"])
@@ -131,16 +139,43 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .header {{
             text-align: center;
-            padding: 20px 0 30px;
+            padding: 8px 0 30px;
+        }}
+        .brand-mark {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            margin-bottom: 14px;
+        }}
+        .brand-mark img {{
+            width: min(280px, 42vw);
+            height: auto;
+            display: block;
+            filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.28));
+        }}
+        .brand-title {{
+            color: #f4fbff;
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            line-height: 1.1;
         }}
         .header h1 {{
             color: #00d4ff;
             font-size: 2em;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }}
         .header .subtitle {{
             color: #888;
             font-size: 0.9em;
+        }}
+        .page-kicker {{
+            color: #7ec8ff;
+            font-size: 0.82em;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
         }}
         .header-actions {{
             margin-top: 12px;
@@ -887,10 +922,24 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             border-radius: 5px;
             overflow-x: auto;
         }}
+        @media (max-width: 720px) {{
+            .brand-mark {{
+                flex-direction: column;
+                gap: 10px;
+            }}
+            .brand-mark img {{
+                width: min(240px, 70vw);
+            }}
+        }}
     </style>
 </head>
 <body>
     <div class="header">
+        <div class="brand-mark">
+            {brand_logo_html}
+            <div class="brand-title">Meteor Detection Dashboard</div>
+        </div>
+        <div class="page-kicker">Dashboard View</div>
         <h1>{page_heading}</h1>
         <div class="subtitle">リアルタイム流星検出システム</div>
         <div class="header-actions">

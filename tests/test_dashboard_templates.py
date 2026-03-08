@@ -19,6 +19,7 @@ def test_render_dashboard_includes_stream_toggle_controls():
         cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
         version="0.0.0",
         server_start_time=0.0,
+        page_mode="cameras",
     )
     assert "常時表示" in html
     assert "toggleStreamEnabled(0, this.checked)" in html
@@ -38,6 +39,7 @@ def test_render_dashboard_includes_camera_server_alive_indicator():
         cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
         version="0.0.0",
         server_start_time=0.0,
+        page_mode="cameras",
     )
     assert 'id="server-status0"' in html
     assert 'title="カメラサーバ生存"' in html
@@ -48,6 +50,7 @@ def test_render_dashboard_includes_indicator_help_messages():
         cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
         version="0.0.0",
         server_start_time=0.0,
+        page_mode="cameras",
     )
     assert "ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）" in html
     assert "カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）" in html

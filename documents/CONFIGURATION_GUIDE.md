@@ -13,6 +13,12 @@ Licensed under the MIT License
 
 このガイドでは、流星検出システムの各種設定方法とチューニング手法について説明します。
 
+## サンプル画面
+
+全カメラ設定ページの例です。
+
+<img src="assets/dashboard-sample_3.png" alt="Meteo ダッシュボードの設定画面サンプル" width="920">
+
 ## 目次
 
 - [環境変数](#環境変数)
@@ -153,7 +159,7 @@ environment:
 
 **自動再起動で反映（再ビルド不要）:**
   - **基本設定**: `sensitivity`, `scale`, `buffer`, `extract_clips`
-  - **火球モード**: `fb_normalize`, `fb_delete_mov`
+  - **旧互換設定**: `fb_normalize`, `fb_delete_mov`（現在の標準MP4直出力では通常不要）
 
 #### 永続化
 
@@ -937,7 +943,6 @@ python generate_compose.py --buffer 10
 
 ```bash
 # 1週間運用後の統計
-find ./detections -name "*.mov" | wc -l
 find ./detections -name "*.mp4" | wc -l
 
 # 誤検出率を計算
@@ -1132,7 +1137,7 @@ environment:
 
 **自動再起動項目（再ビルド不要）**:
 - sensitivity, scale, buffer, extract_clips
-- 火球モード設定（fb_normalize, fb_delete_mov）
+- 旧互換のMP4正規化設定（fb_normalize, fb_delete_mov）
 
 **メリット**:
 - Docker再ビルド不要で設定変更可能

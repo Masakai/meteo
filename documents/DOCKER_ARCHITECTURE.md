@@ -311,7 +311,7 @@ graph TB
 ./detections/
   ├── camera1_10_0_1_25/
   │   ├── detections.jsonl
-  │   ├── meteor_20260202_065533.mov
+  │   ├── meteor_20260202_065533.mp4
   │   ├── meteor_20260202_065533_composite.jpg
   │   └── meteor_20260202_065533_composite_original.jpg
   ├── camera2_10_0_1_3/
@@ -537,7 +537,7 @@ ffmpeg -i "${RTSP_URL}" -frames:v 1 test.jpg
 
 ```bash
 # 検出結果のクリーンアップ
-rm -rf ./detections/*/meteor_*.mov ./detections/*/meteor_*.mp4  # 動画のみ削除
+rm -rf ./detections/*/meteor_*.mp4  # 動画のみ削除
 
 # Dockerのクリーンアップ
 docker system prune -a --volumes

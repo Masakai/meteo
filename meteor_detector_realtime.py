@@ -13,12 +13,134 @@ from collections import deque
 from threading import Thread, Lock, Event
 from queue import Queue, Empty
 import json
+import subprocess
+import sys
 import time
 
 import cv2
 import numpy as np
 
 from meteor_detector_common import calculate_linearity, calculate_confidence, open_video_writer
+
+
+def write_mp4_clip_ffmpeg(
+    output_path: Path,
+    frames: List[Tuple[float, np.ndarray]],
+    *,
+    fps: float,
+    size: Tuple[int, int],
+) -> bool:
+    """ffmpegで目的メタデータに近いMP4を直接出力する。"""
+    width, height = size
+    target_fps = sanitize_fps(fps, default=30.0)
+    target_fps = 30.0 if abs(target_fps - 30.0) > 0.01 else 30.0
+    gop = int(target_fps * 2)
+    cmd = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "bgr24",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        f"{target_fps:.0f}",
+        "-i",
+        "pipe:0",
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "18",
+        "-profile:v",
+        "baseline",
+        "-level",
+        "4.0",
+        "-pix_fmt",
+        "yuv420p",
+        "-bf",
+        "0",
+        "-refs",
+        "1",
+        "-coder",
+        "0",
+        "-x264-params",
+        "cabac=0:ref=1:bframes=0:weightp=0:8x8dct=0:force-cfr=1",
+        "-fps_mode",
+        "cfr",
+        "-g",
+        str(gop),
+        "-keyint_min",
+        str(gop),
+        "-sc_threshold",
+        "0",
+        "-video_track_timescale",
+        "15360",
+        "-tag:v",
+        "avc1",
+        "-brand",
+        "isom",
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    ]
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return False
+    except Exception:
+        return False
+
+    try:
+        assert proc.stdin is not None
+        for _, frame in frames:
+            proc.stdin.write(frame.tobytes())
+        proc.stdin.close()
+        stderr = b""
+        if proc.stderr is not None:
+            stderr = proc.stderr.read()
+        proc.wait()
+    except Exception:
+        proc.kill()
+        proc.wait()
+        return False
+
+    if proc.returncode != 0:
+        if stderr:
+            sys.stderr.write(stderr.decode("utf-8", errors="ignore"))
+        return False
+    return True
+
+
+def write_clip_with_fallback(
+    output_path: Path,
+    frames: List[Tuple[float, np.ndarray]],
+    *,
+    fps: float,
+    size: Tuple[int, int],
+) -> bool:
+    """ffmpeg優先でMP4を書き出し、失敗時のみOpenCVへフォールバックする。"""
+    if write_mp4_clip_ffmpeg(output_path, frames, fps=fps, size=size):
+        return True
+
+    writer = open_video_writer(output_path, fps, size)
+    if writer is None:
+        return False
+    for _, frame in frames:
+        writer.write(frame)
+    writer.release()
+    return True
 
 
 def sanitize_fps(value: Optional[float], default: float = 30.0) -> float:
@@ -628,15 +750,11 @@ def save_meteor_event(
 
     clip_path = None
     if extract_clips:
-        clip_path = output_dir / f"{base_name}.mov"
-        writer = open_video_writer(clip_path, clip_fps, (width, height))
-        if writer is None:
+        clip_path = output_dir / f"{base_name}.mp4"
+        ok = write_clip_with_fallback(clip_path, frames, fps=clip_fps, size=(width, height))
+        if not ok:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
             return None
-
-        for _, frame in frames:
-            writer.write(frame)
-        writer.release()
 
     composite_end = min(event.end_time + composite_after, end)
     event_frames = ring_buffer.get_range(event.start_time, composite_end)

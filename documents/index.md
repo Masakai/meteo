@@ -11,7 +11,17 @@
 
 ## サンプル画面
 
-<img src="assets/dashboard-sample.png" alt="Meteo ダッシュボードのサンプル画面" width="920">
+### トップ画面
+
+<img src="assets/dashboard-sample_1.png" alt="Meteo ダッシュボードのトップ画面" width="920">
+
+### カメラ画面
+
+<img src="assets/dashboard-sample_2.png" alt="Meteo ダッシュボードのカメラ画面" width="920">
+
+### 設定画面
+
+<img src="assets/dashboard-sample_3.png" alt="Meteo ダッシュボードの設定画面" width="920">
 
 ## まず読む
 

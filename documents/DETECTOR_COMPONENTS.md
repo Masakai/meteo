@@ -655,7 +655,7 @@ sequenceDiagram
 - 即時反映:
   - しきい値群、誤検出抑制パラメータ、マスク更新系
 - 自動再起動で反映:
-  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`
 - 起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、再起動後も維持
 
 ---
@@ -720,7 +720,7 @@ graph TD
     subgraph "save_meteor_event()"
         GetFrames["RingBuffer.get_range<br/>(start-1s, end+1s)"]
 
-        Video["MOV動画<br/>meteor_YYYYMMDD_HHMMSS.mov"]
+        Video["MP4動画<br/>meteor_YYYYMMDD_HHMMSS.mp4"]
         Composite["コンポジット画像<br/>meteor_YYYYMMDD_HHMMSS_composite.jpg"]
         Original["オリジナル合成<br/>meteor_YYYYMMDD_HHMMSS_composite_original.jpg"]
         JSONL["検出ログ<br/>detections.jsonl"]

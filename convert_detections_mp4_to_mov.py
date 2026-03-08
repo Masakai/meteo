@@ -55,23 +55,37 @@ def convert_one(
             "-profile:v",
             "baseline",
             "-level",
-            "3.1",
+            "4.0",
             "-pix_fmt",
             "yuv420p",
+            "-bf",
+            "0",
+            "-refs",
+            "1",
+            "-coder",
+            "0",
+            "-x264-params",
+            "cabac=0:ref=1:bframes=0:weightp=0:8x8dct=0:force-cfr=1",
             "-r",
             "30",
+            "-fps_mode",
+            "cfr",
             "-g",
             "60",
             "-keyint_min",
             "60",
             "-sc_threshold",
             "0",
+            "-video_track_timescale",
+            "15360",
             "-tag:v",
             "avc1",
             "-an",
         ]
     else:
         cmd += ["-c", "copy"]
+    if ffmpeg_dst.suffix.lower() == ".mp4":
+        cmd += ["-brand", "isom"]
     cmd += ["-movflags", "+faststart", str(ffmpeg_dst)]
 
     if dry_run:

@@ -2,7 +2,19 @@
 
 リアルタイムで流星を検出し、記録するシステムです。MP4動画とRTSPストリームの両方に対応しています。
 
-![ダッシュボード](dashboard.png)
+## サンプル画面
+
+### トップ画面
+
+![トップ画面](documents/assets/dashboard-sample_1.png)
+
+### カメラ画面
+
+![カメラ画面](documents/assets/dashboard-sample_2.png)
+
+### 設定画面
+
+![設定画面](documents/assets/dashboard-sample_3.png)
 
 ## 主な機能
 
@@ -172,7 +184,7 @@ python meteor_detector_rtsp_web.py rtsp://... --no-clips
   - `nuisance_*`, `min_track_points`, `max_stationary_ratio` など誤検出抑制パラメータ
   - マスク更新系（`mask_dilate`, `nuisance_dilate`, `mask_*`/`nuisance_*` の画像パス）
 - 自動再起動で反映（再ビルド不要）:
-  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`
 
 起動時に効く設定は `output/runtime_settings/<camera>.json` に保存され、
 コンテナ再起動後も維持されます。
@@ -436,13 +448,13 @@ input.meteors.json   # 検出結果のJSON
 
 ```
 detections/camera1/
-├── meteor_20240101_123456.mov              # 流星イベントの動画クリップ（--extract-clips時）
+├── meteor_20240101_123456.mp4              # 流星イベントの動画クリップ（--extract-clips時）
 ├── meteor_20240101_123456_composite.jpg    # 比較明合成（マーク付き）
 ├── meteor_20240101_123456_composite_original.jpg
 └── detections.jsonl                        # 検出ログ（JSONL形式）
 ```
 
-`--no-clips` を指定した場合、クリップ動画は生成されません（コンポジット画像とログのみ）。
+`--extract-clips` 有効時の標準出力は H.264 / `avc1` の `.mp4` です。`--no-clips` を指定した場合、クリップ動画は生成されません（コンポジット画像とログのみ）。
 
 ## 検出アルゴリズム
 

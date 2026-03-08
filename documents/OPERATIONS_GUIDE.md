@@ -13,6 +13,12 @@ Licensed under the MIT License
 
 このガイドでは、流星検出システムの日常的な運用方法について説明します。
 
+## サンプル画面
+
+運用時に常用するカメラ画面の例です。
+
+<img src="assets/dashboard-sample_2.png" alt="Meteo ダッシュボードのカメラ画面サンプル" width="920">
+
 ## 目次
 
 - [起動と停止](#起動と停止)
@@ -114,7 +120,8 @@ python generate_compose.py
 - 即時反映（再起動不要）:
   - 検出しきい値、追跡/結合、誤検出抑制（`nuisance_*`）など
 - 自動再起動で反映（再ビルド不要）:
-  - `sensitivity`, `scale`, `buffer`, `extract_clips`, `fb_normalize`, `fb_delete_mov`
+  - `sensitivity`, `scale`, `buffer`, `extract_clips`
+  - `fb_normalize`, `fb_delete_mov` は旧互換設定で、標準のMP4直出力では通常不要
 
 起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、
 コンテナ再起動後も維持されます。
@@ -266,7 +273,7 @@ meteor-dashboard  2.5%     78.3MiB / 8GiB       0.95%
 # 流星検出
 [06:55:33] 流星検出 #1
   長さ: 135.6px, 時間: 0.44秒
-  保存: meteor_20260202_065533.mov
+  保存: meteor_20260202_065533.mp4
 
 # 警告
 接続失敗: rtsp://...
@@ -550,7 +557,6 @@ sudo systemctl start meteor-cleanup.timer
 ./meteor-docker.sh clean
 
 # クリップ動画のみ削除（コンポジット画像は残す）
-find ./detections -name "*.mov" -mtime +7 -delete
 find ./detections -name "*.mp4" -mtime +7 -delete
 
 # 特定カメラのみ削除
@@ -909,7 +915,6 @@ docker compose logs --tail=1000 > logs-$(date +%Y%m%d).txt
 ./meteor-docker.sh cleanup
 
 # 検出統計の確認
-find ./detections -name "*.mov" | wc -l
 find ./detections -name "*.mp4" | wc -l
 ```
 
