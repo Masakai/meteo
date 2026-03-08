@@ -1,16 +1,23 @@
 """Dashboard HTML rendering."""
 
 import json
+from urllib.parse import urlparse
 
 
 def render_dashboard_html(cameras, version, server_start_time, page_mode="detections"):
     is_camera_page = page_mode == "cameras"
     is_detections_page = not is_camera_page
+    client_cameras = []
+    for cam in cameras:
+        parsed = urlparse(cam["url"])
+        client_cam = dict(cam)
+        client_cam["browser_stream_port"] = parsed.port or 80
+        client_cameras.append(client_cam)
 
     # カメラグリッドを生成
     camera_cards = ""
     if is_camera_page:
-        for i, cam in enumerate(cameras):
+        for i, cam in enumerate(client_cameras):
             display_name = cam.get('display_name', cam['name'])
             camera_cards += f'''
                 <div class="camera-card">
@@ -34,7 +41,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="camera-video">
-                        <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-stream-src="/camera_stream/{i}" alt="{cam['name']}"
+                        <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-stream-port="{cam['browser_stream_port']}" alt="{cam['name']}"
                              onerror="handleStreamError({i})"
                              onload="handleStreamLoad({i})">
                         <img class="mask-overlay" id="mask{i}" data-src="/camera_mask_image/{i}" alt="mask"
@@ -789,7 +796,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     </div>
 
     <script>
-        const cameras = {json.dumps(cameras)};
+        const cameras = {json.dumps(client_cameras)};
         const cameraPageEnabled = {str(is_camera_page).lower()};
         const detectionsPageEnabled = {str(is_detections_page).lower()};
         const serverStartTime = {int(server_start_time * 1000)};
@@ -1040,7 +1047,12 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const img = document.getElementById('stream' + i);
             const errorEl = document.getElementById('error' + i);
             if (!img) return;
-            const base = img.dataset.streamSrc || ('/camera_stream/' + i);
+            const port = Number(img.dataset.streamPort || cameras[i]?.browser_stream_port || 0);
+            const host = window.location.hostname;
+            const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:';
+            const base = (host && port > 0)
+                ? `${scheme}//${host}:${port}/stream`
+                : ('/camera_stream/' + i);
             if (errorEl) {{
                 errorEl.style.display = 'flex';
             }}
