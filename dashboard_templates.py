@@ -3,12 +3,16 @@
 import json
 
 
-def render_dashboard_html(cameras, version, server_start_time):
+def render_dashboard_html(cameras, version, server_start_time, page_mode="detections"):
+    is_camera_page = page_mode == "cameras"
+    is_detections_page = not is_camera_page
+
     # カメラグリッドを生成
     camera_cards = ""
-    for i, cam in enumerate(cameras):
-        display_name = cam.get('display_name', cam['name'])
-        camera_cards += f'''
+    if is_camera_page:
+        for i, cam in enumerate(cameras):
+            display_name = cam.get('display_name', cam['name'])
+            camera_cards += f'''
                 <div class="camera-card">
                     <div class="camera-header">
                         <span class="camera-name">{display_name}</span>
@@ -46,11 +50,53 @@ def render_dashboard_html(cameras, version, server_start_time):
                 </div>
                 '''
 
+    page_title = "Meteor Detection Cameras" if is_camera_page else "Meteor Detection Detections"
+    page_heading = "カメラライブ" if is_camera_page else "最近の検出"
+    nav_links = ['<a class="settings-link" href="/">検出一覧</a>' if is_camera_page else '<a class="settings-link" href="/cameras">カメラ表示</a>']
+    nav_links.append('<a class="settings-link" href="/settings">全カメラ設定</a>')
+    header_actions = "\n            ".join(nav_links)
+    stats_primary = (
+        f'''
+        <div class="stat">
+            <div class="stat-value" id="active-cameras">{len(cameras)}</div>
+            <div class="stat-label">カメラ数</div>
+        </div>
+        '''
+        if is_camera_page
+        else '''
+        <div class="stat">
+            <div class="stat-value" id="total-detections">0</div>
+            <div class="stat-label">総検出数</div>
+        </div>
+        '''
+    )
+    camera_grid_html = (
+        f'''
+    <div class="camera-grid">
+        {camera_cards}
+    </div>
+        '''
+        if is_camera_page
+        else ""
+    )
+    detections_section_html = (
+        '''
+    <div class="recent-detections">
+        <h3>最近の検出</h3>
+        <div class="detection-list" id="detection-list">
+            <div class="detection-item" style="color:#666">検出待機中...</div>
+        </div>
+    </div>
+        '''
+        if is_detections_page
+        else ""
+    )
+
     return f'''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Meteor Detection Dashboard</title>
+    <title>{page_title}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -691,22 +737,15 @@ def render_dashboard_html(cameras, version, server_start_time):
 </head>
 <body>
     <div class="header">
-        <h1>Meteor Detection Dashboard</h1>
+        <h1>{page_heading}</h1>
         <div class="subtitle">リアルタイム流星検出システム</div>
         <div class="header-actions">
-            <a class="settings-link" href="/settings">全カメラ設定</a>
+            {header_actions}
         </div>
     </div>
 
     <div class="stats-bar">
-        <div class="stat">
-            <div class="stat-value" id="total-detections">0</div>
-            <div class="stat-label">総検出数</div>
-        </div>
-        <div class="stat">
-            <div class="stat-value" id="active-cameras">{len(cameras)}</div>
-            <div class="stat-label">カメラ数</div>
-        </div>
+        {stats_primary}
         <div class="stat">
             <div class="stat-value" id="dashboard-cpu">--</div>
             <div class="stat-label">System CPU</div>
@@ -721,16 +760,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         </div>
     </div>
 
-    <div class="camera-grid">
-        {camera_cards}
-    </div>
+    {camera_grid_html}
 
-    <div class="recent-detections">
-        <h3>最近の検出</h3>
-        <div class="detection-list" id="detection-list">
-            <div class="detection-item" style="color:#666">検出待機中...</div>
-        </div>
-    </div>
+    {detections_section_html}
 
     <div class="footer">
         Meteor Detection System <span class="version-link" onclick="showChangelog()">v{version}</span> | Ctrl+C で終了<br>
@@ -758,6 +790,8 @@ def render_dashboard_html(cameras, version, server_start_time):
 
     <script>
         const cameras = {json.dumps(cameras)};
+        const cameraPageEnabled = {str(is_camera_page).lower()};
+        const detectionsPageEnabled = {str(is_detections_page).lower()};
         const serverStartTime = {int(server_start_time * 1000)};
         const streamPlaceholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
         const streamSelectionStorageKey = 'dashboard_stream_enabled_v1';
@@ -970,6 +1004,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function setStreamEnabled(i, enabled, persist = true) {{
+            if (!cameraPageEnabled) {{
+                return;
+            }}
             streamSelectionState[i] = enabled === true;
             applyStreamToggleUI(i);
             clearStreamRetryTimer(i);
@@ -992,7 +1029,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 statusEl.className = 'camera-status';
                 scheduleStreamRetry(i, 0);
             }} else {{
-                img.src = streamPlaceholderSrc;
+                img.removeAttribute('src');
                 img.style.display = 'none';
                 errorEl.style.display = 'flex';
                 setStreamErrorMessage(i, '常時表示オフ');
@@ -1034,7 +1071,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 const errorEl = document.getElementById('error' + i);
                 if (img) {{
                     // ハングした接続を明示的に破棄して再接続
-                    img.src = streamPlaceholderSrc;
+                    img.removeAttribute('src');
                     img.style.display = 'none';
                 }}
                 if (errorEl) {{
@@ -1216,6 +1253,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                 clearTimeout(detectionPollTimer);
                 detectionPollTimer = null;
             }}
+            if (!cameraPageEnabled) {{
+                return;
+            }}
             cameras.forEach((_, i) => {{
                 const state = ensureStreamRetryState(i);
                 state.connecting = false;
@@ -1226,7 +1266,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                 const statusEl = document.getElementById('status' + i);
                 const serverStatusEl = document.getElementById('server-status' + i);
                 if (img) {{
-                    img.src = streamPlaceholderSrc;
+                    img.removeAttribute('src');
                     img.style.display = 'none';
                 }}
                 if (errorEl) {{
@@ -1247,40 +1287,44 @@ def render_dashboard_html(cameras, version, server_start_time):
                 return;
             }}
             dashboardBackgroundPaused = false;
-            cameras.forEach((_, i) => {{
-                if (!isStreamEnabled(i)) {{
-                    return;
-                }}
-                const state = ensureStreamRetryState(i);
-                state.delay = STREAM_RETRY_MIN_MS;
-                state.connecting = false;
-                state.consecutiveTimeouts = 0;
-                clearStreamRetryTimer(i);
-                clearStreamConnectWatchdog(i);
-                const img = document.getElementById('stream' + i);
-                const errorEl = document.getElementById('error' + i);
-                const statusEl = document.getElementById('status' + i);
-                const serverStatusEl = document.getElementById('server-status' + i);
-                if (img) {{
-                    img.src = streamPlaceholderSrc;
-                    img.style.display = 'none';
-                }}
-                if (errorEl) {{
-                    errorEl.style.display = 'flex';
-                }}
-                if (statusEl) {{
-                    statusEl.className = 'camera-status';
-                }}
-                if (serverStatusEl) {{
-                    serverStatusEl.className = 'server-status unknown';
-                }}
-                setStreamErrorMessage(i, '接続待機...');
-            }});
-            beginStreamRecoveryWave('resume');
-            cameras.forEach((_, i) => {{
-                updateCameraStats(i);
-            }});
-            pollDetections();
+            if (cameraPageEnabled) {{
+                cameras.forEach((_, i) => {{
+                    if (!isStreamEnabled(i)) {{
+                        return;
+                    }}
+                    const state = ensureStreamRetryState(i);
+                    state.delay = STREAM_RETRY_MIN_MS;
+                    state.connecting = false;
+                    state.consecutiveTimeouts = 0;
+                    clearStreamRetryTimer(i);
+                    clearStreamConnectWatchdog(i);
+                    const img = document.getElementById('stream' + i);
+                    const errorEl = document.getElementById('error' + i);
+                    const statusEl = document.getElementById('status' + i);
+                    const serverStatusEl = document.getElementById('server-status' + i);
+                    if (img) {{
+                        img.removeAttribute('src');
+                        img.style.display = 'none';
+                    }}
+                    if (errorEl) {{
+                        errorEl.style.display = 'flex';
+                    }}
+                    if (statusEl) {{
+                        statusEl.className = 'camera-status';
+                    }}
+                    if (serverStatusEl) {{
+                        serverStatusEl.className = 'server-status unknown';
+                    }}
+                    setStreamErrorMessage(i, '接続待機...');
+                }});
+                beginStreamRecoveryWave('resume');
+                cameras.forEach((_, i) => {{
+                    updateCameraStats(i);
+                }});
+            }}
+            if (detectionsPageEnabled) {{
+                pollDetections();
+            }}
         }}
 
         function recoverForegroundActivity(reason = 'focus') {{
@@ -1298,22 +1342,26 @@ def render_dashboard_html(cameras, version, server_start_time):
                 return;
             }}
 
-            cameras.forEach((_, i) => {{
-                if (!isStreamEnabled(i)) {{
-                    return;
-                }}
-                const state = ensureStreamRetryState(i);
-                state.delay = STREAM_RETRY_MIN_MS;
-                state.connecting = false;
-                clearStreamRetryTimer(i);
-                clearStreamConnectWatchdog(i);
-                setStreamErrorMessage(i, `再同期待機... (${{reason}})`);
-            }});
-            beginStreamRecoveryWave(reason);
-            cameras.forEach((_, i) => {{
-                updateCameraStats(i);
-            }});
-            pollDetections();
+            if (cameraPageEnabled) {{
+                cameras.forEach((_, i) => {{
+                    if (!isStreamEnabled(i)) {{
+                        return;
+                    }}
+                    const state = ensureStreamRetryState(i);
+                    state.delay = STREAM_RETRY_MIN_MS;
+                    state.connecting = false;
+                    clearStreamRetryTimer(i);
+                    clearStreamConnectWatchdog(i);
+                    setStreamErrorMessage(i, `再同期待機... (${{reason}})`);
+                }});
+                beginStreamRecoveryWave(reason);
+                cameras.forEach((_, i) => {{
+                    updateCameraStats(i);
+                }});
+            }}
+            if (detectionsPageEnabled) {{
+                pollDetections();
+            }}
         }}
 
         function syncDashboardVisibilityState() {{
@@ -1325,6 +1373,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function scheduleCameraStats(i, delay) {{
+            if (!cameraPageEnabled) {{
+                return;
+            }}
             if (dashboardBackgroundPaused) {{
                 return;
             }}
@@ -1351,6 +1402,7 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function updateCameraStats(i) {{
+            if (!cameraPageEnabled) return;
             if (dashboardBackgroundPaused) return;
             const cam = cameras[i];
             if (!cam) return;
@@ -1456,6 +1508,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function startCameraSection() {{
+            if (!cameraPageEnabled) {{
+                return;
+            }}
             if (cameraSectionStarted) {{
                 return;
             }}
@@ -1811,6 +1866,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         window.addEventListener('pageshow', () => recoverForegroundActivity('pageshow'));
 
         function scheduleDetectionPoll(delay) {{
+            if (!detectionsPageEnabled) {{
+                return;
+            }}
             if (dashboardBackgroundPaused) {{
                 return;
             }}
@@ -1822,7 +1880,15 @@ def render_dashboard_html(cameras, version, server_start_time):
 
         // 検出一覧を更新
         function updateDetections() {{
+            if (!detectionsPageEnabled) {{
+                return Promise.resolve();
+            }}
             if (dashboardBackgroundPaused) {{
+                return Promise.resolve();
+            }}
+            const totalEl = document.getElementById('total-detections');
+            const listEl = document.getElementById('detection-list');
+            if (!totalEl || !listEl) {{
                 return Promise.resolve();
             }}
             return fetch('/detections', {{ cache: 'no-store' }})
@@ -1832,7 +1898,7 @@ def render_dashboard_html(cameras, version, server_start_time):
                         return;
                     }}
                     detectionPollDelay = detectionPollBaseDelay;
-                    document.getElementById('total-detections').textContent = data.total;
+                    totalEl.textContent = data.total;
                     if (data.recent.length > 0) {{
                         const detectionsKey = data.recent.map(d =>
                             `${{d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
@@ -1924,9 +1990,9 @@ def render_dashboard_html(cameras, version, server_start_time):
                                 </div>
                             `;
                         }}).join('');
-                        document.getElementById('detection-list').innerHTML = html;
+                        listEl.innerHTML = html;
                     }} else {{
-                        document.getElementById('detection-list').innerHTML = '<div class="detection-item" style="color:#666">検出待機中...</div>';
+                        listEl.innerHTML = '<div class="detection-item" style="color:#666">検出待機中...</div>';
                     }}
                 }})
                 .catch(err => {{
@@ -1936,6 +2002,9 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function pollDetections() {{
+            if (!detectionsPageEnabled) {{
+                return;
+            }}
             if (dashboardBackgroundPaused) {{
                 return;
             }}
@@ -1981,10 +2050,12 @@ def render_dashboard_html(cameras, version, server_start_time):
             }}, CAMERA_SECTION_START_DELAY_MS);
         }}
 
-        bootDetectionSection()
-            .finally(() => {{
-                bootCameraSectionAfterDetections();
-            }});
+        if (detectionsPageEnabled) {{
+            bootDetectionSection();
+        }}
+        if (cameraPageEnabled) {{
+            startCameraSection();
+        }}
 
         // CHANGELOG表示
         function showChangelog() {{

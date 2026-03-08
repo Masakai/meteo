@@ -81,7 +81,16 @@ def _dispatch(handler_func, path: str | None = None) -> Response:
 
 @app.get("/")
 def index() -> Response:
-    html = render_dashboard_html(CAMERAS, VERSION, routes._SERVER_START_TIME)
+    html = render_dashboard_html(CAMERAS, VERSION, routes._SERVER_START_TIME, page_mode="detections")
+    response = Response(html, content_type="text/html; charset=utf-8")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/cameras")
+def cameras_page() -> Response:
+    html = render_dashboard_html(CAMERAS, VERSION, routes._SERVER_START_TIME, page_mode="cameras")
     response = Response(html, content_type="text/html; charset=utf-8")
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
