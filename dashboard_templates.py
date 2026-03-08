@@ -1945,7 +1945,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
 
         function isDateInVisibleCalendar(dateStr) {{
             const monthKey = dateStr.slice(0, 7);
-            return getCalendarMonths().some(({ year, month }) => {{
+            return getCalendarMonths().some(({{ year, month }}) => {{
                 const visibleKey = `${{year}}-${{String(month + 1).padStart(2, '0')}}`;
                 return visibleKey === monthKey;
             }});
@@ -1991,7 +1991,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const monthNames = months.map((m) => monthLabel(m.year, m.month));
             summaryEl.textContent = `${{monthNames[0]}}${{monthNames.length > 1 ? ' 〜 ' + monthNames[monthNames.length - 1] : ''}} / 検出あり ${{activeDateCount}}日`;
             const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-            const html = months.map(({ year, month }) => {{
+            const html = months.map(({{ year, month }}) => {{
                 const firstDay = new Date(year, month, 1);
                 const startWeekday = firstDay.getDay();
                 const lastDate = new Date(year, month + 1, 0).getDate();
