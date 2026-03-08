@@ -891,12 +891,14 @@ def render_dashboard_html(cameras, version, server_start_time):
         const STREAM_FORCE_RETRY_AFTER_MS = 15000;
         const STREAM_RECOVERY_EXTRA_GRACE_MS = 8000;
         const CAMERA_STATS_FETCH_TIMEOUT_MS = 5000;
+        const CAMERA_SECTION_START_DELAY_MS = 1500;
         const FOCUS_RECOVERY_COOLDOWN_MS = 8000;
         let dashboardBackgroundPaused = document.hidden === true;
         let lastForegroundRecoveryAt = 0;
         let detectionPollTimer = null;
         let streamHealthTimer = null;
         let streamRecoveryWarmupUntil = 0;
+        let cameraSectionStarted = false;
 
         function ensureStreamRetryState(i) {{
             if (!streamRetryState[i]) {{
@@ -1454,6 +1456,10 @@ def render_dashboard_html(cameras, version, server_start_time):
         }}
 
         function startCameraSection() {{
+            if (cameraSectionStarted) {{
+                return;
+            }}
+            cameraSectionStarted = true;
             loadStreamSelection();
             cameras.forEach((cam, i) => {{
                 updateCameraStats(i);
@@ -1956,12 +1962,28 @@ def render_dashboard_html(cameras, version, server_start_time):
                 }});
         }}
 
-        // 初回表示時は検出時間帯に関係なく一覧を先に取得し、その後差分ポーリングへ移行
-        // カメラ接続状況に関わらず「最近の検出」を先に表示する
-        updateDetections()
+        function bootDetectionSection() {{
+            // 初回表示時はカメラ関連の接続より先に「最近の検出」を描画する。
+            // サムネイル取得が始まるまでカメラストリーム開始を少し遅らせ、接続枠の競合を避ける。
+            return updateDetections()
+                .finally(() => {{
+                    pollDetections();
+                }});
+        }}
+
+        function bootCameraSectionAfterDetections() {{
+            window.setTimeout(() => {{
+                window.requestAnimationFrame(() => {{
+                    window.requestAnimationFrame(() => {{
+                        startCameraSection();
+                    }});
+                }});
+            }}, CAMERA_SECTION_START_DELAY_MS);
+        }}
+
+        bootDetectionSection()
             .finally(() => {{
-                pollDetections();
-                startCameraSection();
+                bootCameraSectionAfterDetections();
             }});
 
         // CHANGELOG表示
