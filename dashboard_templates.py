@@ -101,6 +101,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         <div class="detection-calendar-toolbar">
             <div class="detection-range-switch" id="detection-range-switch">
                 <button type="button" class="range-btn active" data-range="current">今月</button>
+                <button type="button" class="range-btn" data-range="previous">先月</button>
                 <button type="button" class="range-btn" data-range="3m">過去3ヶ月</button>
                 <button type="button" class="range-btn" data-range="6m">過去6ヶ月</button>
                 <button type="button" class="range-btn" data-range="1y">過去1年</button>
@@ -1976,7 +1977,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 const dt = new Date(current.getFullYear(), current.getMonth() - offset, 1);
                 months.push({{ year: dt.getFullYear(), month: dt.getMonth() }});
             }};
-            if (detectionCalendarRange === '3m') {{
+            if (detectionCalendarRange === 'previous') {{
+                pushMonth(1);
+            }} else if (detectionCalendarRange === '3m') {{
                 for (let i = 2; i >= 0; i--) pushMonth(i);
             }} else if (detectionCalendarRange === '6m') {{
                 for (let i = 5; i >= 0; i--) pushMonth(i);
