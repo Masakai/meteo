@@ -90,6 +90,22 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         '''
     <div class="recent-detections">
         <h3>最近の検出</h3>
+        <div class="detection-calendar-toolbar">
+            <div class="detection-range-switch" id="detection-range-switch">
+                <button type="button" class="range-btn active" data-range="current">今月</button>
+                <button type="button" class="range-btn" data-range="3m">過去3ヶ月</button>
+                <button type="button" class="range-btn" data-range="6m">過去6ヶ月</button>
+                <button type="button" class="range-btn" data-range="1y">過去1年</button>
+                <button type="button" class="range-btn" data-range="year">年指定</button>
+            </div>
+            <label class="year-select-wrap">
+                <span>年</span>
+                <select id="detection-year-select"></select>
+            </label>
+        </div>
+        <div class="calendar-summary" id="calendar-summary">読み込み中...</div>
+        <div class="calendar-grid" id="detection-calendar-grid"></div>
+        <h4 class="selected-date-title" id="selected-date-title">日付を選択してください</h4>
         <div class="detection-list" id="detection-list">
             <div class="detection-item" style="color:#666">検出待機中...</div>
         </div>
@@ -434,6 +450,137 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         .recent-detections h3 {{
             color: #00d4ff;
             margin-bottom: 15px;
+        }}
+        .detection-calendar-toolbar {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }}
+        .detection-range-switch {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }}
+        .range-btn {{
+            background: #16213e;
+            border: 1px solid #3b5f9d;
+            color: #dce8ff;
+            padding: 8px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .range-btn.active {{
+            background: #00d4ff;
+            color: #10203c;
+            border-color: #00d4ff;
+            font-weight: bold;
+        }}
+        .year-select-wrap {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #9bb1d8;
+            font-size: 0.9em;
+        }}
+        .year-select-wrap select {{
+            background: #16213e;
+            border: 1px solid #3b5f9d;
+            color: #dce8ff;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }}
+        .calendar-summary {{
+            color: #9bb1d8;
+            margin-bottom: 14px;
+            font-size: 0.9em;
+        }}
+        .calendar-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-bottom: 22px;
+        }}
+        .calendar-month {{
+            background: rgba(13, 24, 44, 0.9);
+            border: 1px solid #355786;
+            border-radius: 12px;
+            padding: 14px;
+        }}
+        .calendar-month-title {{
+            color: #00d4ff;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }}
+        .calendar-weekdays,
+        .calendar-days {{
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 6px;
+        }}
+        .calendar-weekdays span {{
+            text-align: center;
+            color: #7f96bc;
+            font-size: 0.78em;
+        }}
+        .calendar-day,
+        .calendar-day-empty {{
+            min-height: 38px;
+            border-radius: 8px;
+        }}
+        .calendar-day-empty {{
+            background: rgba(255, 255, 255, 0.02);
+        }}
+        .calendar-day {{
+            position: relative;
+            border: 1px solid #274364;
+            background: #16213e;
+            color: #dce8ff;
+            cursor: pointer;
+            font-size: 0.85em;
+        }}
+        .calendar-day.has-data {{
+            background: #1f5b49;
+            border-color: #58d1aa;
+            color: #e8fff7;
+            font-weight: bold;
+        }}
+        .calendar-day.selected {{
+            outline: 2px solid #00d4ff;
+            outline-offset: 1px;
+        }}
+        .calendar-day:hover {{
+            transform: translateY(-1px);
+        }}
+        .calendar-day.has-data::after {{
+            content: attr(data-count-label);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 8px);
+            transform: translateX(-50%);
+            background: rgba(6, 11, 22, 0.96);
+            color: #f4fbff;
+            border: 1px solid #58d1aa;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.75em;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 5;
+        }}
+        .calendar-day.has-data:hover::after {{
+            opacity: 1;
+        }}
+        .selected-date-title {{
+            color: #9fe8ff;
+            margin-bottom: 12px;
+            font-size: 1em;
         }}
         .detection-list {{
             display: block;
@@ -1717,6 +1864,12 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
 
         let lastDetectionsKey = '';
         let lastDetectionsMtime = 0;
+        let detectionRecords = [];
+        let detectionCountsByDate = {{}};
+        let detectionAvailableYears = [];
+        let detectionCalendarRange = 'current';
+        let selectedDetectionDate = '';
+        let detectionCalendarYear = new Date().getFullYear();
         const detectionPollBaseDelay = 5000;
         const detectionPollMaxDelay = 30000;
         const detectionWindowIdleDelay = 60000;
@@ -1739,7 +1892,264 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             detectionPollTimer = setTimeout(pollDetections, delay);
         }}
 
-        // 検出一覧を更新
+        function dateLabel(dateStr) {{
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return `${{y}}年${{m}}月${{d}}日`;
+        }}
+
+        function monthLabel(year, monthIndex) {{
+            return `${{year}}年${{monthIndex + 1}}月`;
+        }}
+
+        function buildDetectionCounts(records) {{
+            const counts = {{}};
+            records.forEach((d) => {{
+                const dateKey = d.time.split(' ')[0];
+                counts[dateKey] = (counts[dateKey] || 0) + 1;
+            }});
+            return counts;
+        }}
+
+        function buildDetectionYearOptions(records) {{
+            const years = new Set();
+            records.forEach((d) => {{
+                years.add(Number(d.time.slice(0, 4)));
+            }});
+            years.add(new Date().getFullYear());
+            return Array.from(years).filter(Number.isFinite).sort((a, b) => b - a);
+        }}
+
+        function getCalendarMonths() {{
+            const now = new Date();
+            const current = new Date(now.getFullYear(), now.getMonth(), 1);
+            const months = [];
+            const pushMonth = (offset) => {{
+                const dt = new Date(current.getFullYear(), current.getMonth() - offset, 1);
+                months.push({{ year: dt.getFullYear(), month: dt.getMonth() }});
+            }};
+            if (detectionCalendarRange === '3m') {{
+                for (let i = 2; i >= 0; i--) pushMonth(i);
+            }} else if (detectionCalendarRange === '6m') {{
+                for (let i = 5; i >= 0; i--) pushMonth(i);
+            }} else if (detectionCalendarRange === '1y') {{
+                for (let i = 11; i >= 0; i--) pushMonth(i);
+            }} else if (detectionCalendarRange === 'year') {{
+                for (let month = 0; month < 12; month++) {{
+                    months.push({{ year: detectionCalendarYear, month }});
+                }}
+            }} else {{
+                months.push({{ year: current.getFullYear(), month: current.getMonth() }});
+            }}
+            return months;
+        }}
+
+        function isDateInVisibleCalendar(dateStr) {{
+            const monthKey = dateStr.slice(0, 7);
+            return getCalendarMonths().some(({ year, month }) => {{
+                const visibleKey = `${{year}}-${{String(month + 1).padStart(2, '0')}}`;
+                return visibleKey === monthKey;
+            }});
+        }}
+
+        function syncDetectionRangeControls() {{
+            document.querySelectorAll('#detection-range-switch .range-btn').forEach((btn) => {{
+                btn.classList.toggle('active', btn.dataset.range === detectionCalendarRange);
+            }});
+            const yearSelect = document.getElementById('detection-year-select');
+            if (yearSelect) {{
+                yearSelect.disabled = detectionCalendarRange !== 'year';
+                yearSelect.value = String(detectionCalendarYear);
+            }}
+        }}
+
+        function populateDetectionYearSelect() {{
+            const yearSelect = document.getElementById('detection-year-select');
+            if (!yearSelect) return;
+            yearSelect.innerHTML = detectionAvailableYears
+                .map((year) => `<option value="${{year}}">${{year}}年</option>`)
+                .join('');
+            if (!detectionAvailableYears.includes(detectionCalendarYear)) {{
+                detectionCalendarYear = detectionAvailableYears[0] || new Date().getFullYear();
+            }}
+            yearSelect.value = String(detectionCalendarYear);
+            syncDetectionRangeControls();
+        }}
+
+        function renderDetectionCalendar() {{
+            const gridEl = document.getElementById('detection-calendar-grid');
+            const summaryEl = document.getElementById('calendar-summary');
+            if (!gridEl || !summaryEl) return;
+            const months = getCalendarMonths();
+            const activeDateCount = Object.keys(detectionCountsByDate)
+                .filter((dateStr) => isDateInVisibleCalendar(dateStr))
+                .length;
+            if (months.length === 0) {{
+                gridEl.innerHTML = '';
+                summaryEl.textContent = '表示できる月がありません。';
+                return;
+            }}
+            const monthNames = months.map((m) => monthLabel(m.year, m.month));
+            summaryEl.textContent = `${{monthNames[0]}}${{monthNames.length > 1 ? ' 〜 ' + monthNames[monthNames.length - 1] : ''}} / 検出あり ${{activeDateCount}}日`;
+            const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+            const html = months.map(({ year, month }) => {{
+                const firstDay = new Date(year, month, 1);
+                const startWeekday = firstDay.getDay();
+                const lastDate = new Date(year, month + 1, 0).getDate();
+                const dayCells = [];
+                for (let i = 0; i < startWeekday; i++) {{
+                    dayCells.push('<div class="calendar-day-empty"></div>');
+                }}
+                for (let day = 1; day <= lastDate; day++) {{
+                    const dateStr = `${{year}}-${{String(month + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
+                    const count = detectionCountsByDate[dateStr] || 0;
+                    const classes = ['calendar-day'];
+                    if (count > 0) classes.push('has-data');
+                    if (dateStr === selectedDetectionDate) classes.push('selected');
+                    dayCells.push(
+                        `<button type="button" class="${{classes.join(' ')}}" data-date="${{dateStr}}" data-count-label="${{count}}件" title="${{count > 0 ? `${{dateLabel(dateStr)}}: ${{count}}件` : dateLabel(dateStr)}}">${{day}}</button>`
+                    );
+                }}
+                return `
+                    <div class="calendar-month">
+                        <div class="calendar-month-title">${{monthLabel(year, month)}}</div>
+                        <div class="calendar-weekdays">${{weekdays.map((d) => `<span>${{d}}</span>`).join('')}}</div>
+                        <div class="calendar-days">${{dayCells.join('')}}</div>
+                    </div>
+                `;
+            }}).join('');
+            gridEl.innerHTML = html;
+            gridEl.querySelectorAll('.calendar-day').forEach((btn) => {{
+                btn.addEventListener('click', () => {{
+                    selectedDetectionDate = btn.dataset.date || '';
+                    renderDetectionCalendar();
+                    renderSelectedDetections();
+                }});
+            }});
+        }}
+
+        function renderSelectedDetections() {{
+            const listEl = document.getElementById('detection-list');
+            const titleEl = document.getElementById('selected-date-title');
+            if (!listEl || !titleEl) return;
+            if (!selectedDetectionDate) {{
+                titleEl.textContent = '日付を選択してください';
+                listEl.innerHTML = '<div class="detection-item" style="color:#666">表示する日付を選択してください。</div>';
+                return;
+            }}
+            const dateItems = detectionRecords
+                .filter((d) => d.time.startsWith(selectedDetectionDate))
+                .sort((a, b) => b.time.localeCompare(a.time));
+            titleEl.textContent = `${{dateLabel(selectedDetectionDate)}} の検出`;
+            if (dateItems.length === 0) {{
+                listEl.innerHTML = '<div class="detection-item" style="color:#666">この日の検出はありません。</div>';
+                return;
+            }}
+
+            const cameraNonMeteorCount = {{}};
+            const cameraLabels = {{}};
+            dateItems.forEach((d) => {{
+                if (d.label === 'post_detected') {{
+                    cameraNonMeteorCount[d.camera] = (cameraNonMeteorCount[d.camera] || 0) + 1;
+                }}
+                cameraLabels[d.camera] = d.camera_display || d.camera;
+            }});
+
+            const bulkDeleteButtons = Object.keys(cameraNonMeteorCount)
+                .filter((camera) => cameraNonMeteorCount[camera] > 0)
+                .map((camera) =>
+                    `<button class="bulk-delete-btn" onclick="bulkDeleteNonMeteor('${{camera}}', event)">${{cameraLabels[camera] || camera}}: それ以外を一括削除 (${{cameraNonMeteorCount[camera]}}件)</button>`
+                ).join('');
+
+            const items = dateItems.map((d, idx) => {{
+                const cameraKey = d.camera;
+                const cameraLabel = d.camera_display || d.camera;
+                const thumb = d.image
+                    ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{cameraLabel}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">`
+                    : '';
+                const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
+                const radioName = `label-${{cameraKey}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const videoAction = d.mp4
+                    ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">VIDEO</span>`
+                    : '';
+                const imageAction = d.image
+                    ? `<span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">画像</span>`
+                    : '';
+                const originalAction = d.composite_original
+                    ? `<span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">元画像</span>`
+                    : '';
+                return `
+                    <div class="detection-item">
+                        <div class="time">${{d.time}} | ${{cameraLabel}}</div>
+                        ${{thumb}}
+                        <div>信頼度: ${{d.confidence}}</div>
+                        <div class="detection-actions">
+                            <div class="detection-view-actions">
+                                ${{videoAction}}
+                                ${{imageAction}}
+                                ${{originalAction}}
+                            </div>
+                            <div class="detection-manage-actions">
+                                <div class="label-radios" data-label="${{normalizedLabel}}">
+                                    <label class="label-radio">
+                                        <input type="radio" name="${{radioName}}" value="detected" ${{normalizedLabel === 'detected' ? 'checked' : ''}}
+                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'detected', this)">
+                                        <span>流星</span>
+                                    </label>
+                                    <label class="label-radio">
+                                        <input type="radio" name="${{radioName}}" value="post_detected" ${{normalizedLabel === 'post_detected' ? 'checked' : ''}}
+                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'post_detected', this)">
+                                        <span>それ以外</span>
+                                    </label>
+                                </div>
+                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.time}}', event)">削除</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }}).join('');
+
+            listEl.innerHTML = `
+                <div class="date-group">
+                    <div class="date-group-header">
+                        <span>${{dateLabel(selectedDetectionDate)}}</span>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">${{bulkDeleteButtons}}</div>
+                    </div>
+                    <div class="detection-group-grid">
+                        ${{items}}
+                    </div>
+                </div>
+            `;
+        }}
+
+        function syncSelectedDetectionDate() {{
+            if (selectedDetectionDate && detectionCountsByDate[selectedDetectionDate]) {{
+                return;
+            }}
+            const dates = Object.keys(detectionCountsByDate).sort((a, b) => b.localeCompare(a));
+            selectedDetectionDate = dates[0] || '';
+        }}
+
+        function syncSelectedDateToCalendarRange() {{
+            if (selectedDetectionDate && isDateInVisibleCalendar(selectedDetectionDate)) {{
+                return;
+            }}
+            const visibleDates = Object.keys(detectionCountsByDate)
+                .filter((dateStr) => isDateInVisibleCalendar(dateStr))
+                .sort((a, b) => b.localeCompare(a));
+            selectedDetectionDate = visibleDates[0] || '';
+        }}
+
+        function applyDetectionData(data) {{
+            detectionRecords = Array.isArray(data.recent) ? data.recent.slice() : [];
+            detectionCountsByDate = buildDetectionCounts(detectionRecords);
+            detectionAvailableYears = buildDetectionYearOptions(detectionRecords);
+            populateDetectionYearSelect();
+            syncSelectedDetectionDate();
+            syncSelectedDateToCalendarRange();
+            renderDetectionCalendar();
+            renderSelectedDetections();
+        }}
+
         function updateDetections() {{
             if (!detectionsPageEnabled) {{
                 return Promise.resolve();
@@ -1748,8 +2158,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 return Promise.resolve();
             }}
             const totalEl = document.getElementById('total-detections');
-            const listEl = document.getElementById('detection-list');
-            if (!totalEl || !listEl) {{
+            if (!totalEl) {{
                 return Promise.resolve();
             }}
             return fetch('/detections', {{ cache: 'no-store' }})
@@ -1760,114 +2169,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     }}
                     detectionPollDelay = detectionPollBaseDelay;
                     totalEl.textContent = data.total;
-                    if (data.recent.length > 0) {{
-                        const detectionsKey = data.recent.map(d =>
-                            `${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
-                        ).join('||');
-                        if (detectionsKey === lastDetectionsKey) {{
-                            return;
-                        }}
-                        lastDetectionsKey = detectionsKey;
-
-                        // 日付毎にグループ化（時系列順）
-                        const groupedByDate = {{}};
-                        data.recent.forEach(d => {{
-                            const dateKey = d.time.split(' ')[0]; // "YYYY-MM-DD HH:MM:SS" から日付部分を取得
-                            if (!groupedByDate[dateKey]) {{
-                                groupedByDate[dateKey] = [];
-                            }}
-                            groupedByDate[dateKey].push(d);
-                        }});
-
-                        // 日付を新しい順にソート
-                        const dateOrder = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
-
-                        const html = dateOrder.map(date => {{
-                            const dateItems = groupedByDate[date];
-                            // 時刻の新しい順にソート
-                            dateItems.sort((a, b) => b.time.localeCompare(a.time));
-
-                            const items = dateItems.map((d, idx) => {{
-                                const cameraKey = d.camera;
-                                const cameraLabel = d.camera_display || d.camera;
-                                const thumb = d.image
-                                    ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{cameraLabel}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">`
-                                    : '';
-                                const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
-                                const radioName = `label-${{cameraKey}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-                                const videoAction = d.mp4
-                                    ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">VIDEO</span>`
-                                    : '';
-                                const imageAction = d.image
-                                    ? `<span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">画像</span>`
-                                    : '';
-                                const originalAction = d.composite_original
-                                    ? `<span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">元画像</span>`
-                                    : '';
-                                return `
-                                    <div class="detection-item">
-                                        <div class="time">${{d.time}} | ${{cameraLabel}}</div>
-                                        ${{thumb}}
-                                        <div>信頼度: ${{d.confidence}}</div>
-                                        <div class="detection-actions">
-                                            <div class="detection-view-actions">
-                                                ${{videoAction}}
-                                                ${{imageAction}}
-                                                ${{originalAction}}
-                                            </div>
-                                            <div class="detection-manage-actions">
-                                                <div class="label-radios" data-label="${{normalizedLabel}}">
-                                                    <label class="label-radio">
-                                                        <input type="radio" name="${{radioName}}" value="detected" ${{normalizedLabel === 'detected' ? 'checked' : ''}}
-                                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'detected', this)">
-                                                        <span>流星</span>
-                                                    </label>
-                                                    <label class="label-radio">
-                                                        <input type="radio" name="${{radioName}}" value="post_detected" ${{normalizedLabel === 'post_detected' ? 'checked' : ''}}
-                                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'post_detected', this)">
-                                                        <span>それ以外</span>
-                                                    </label>
-                                                </div>
-                                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.time}}', event)">削除</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }}).join('');
-
-                            // カメラ別に「それ以外」をカウント
-                            const cameraNonMeteorCount = {{}};
-                            const cameraLabels = {{}};
-                            dateItems.forEach(d => {{
-                                if (d.label === 'post_detected') {{
-                                    cameraNonMeteorCount[d.camera] = (cameraNonMeteorCount[d.camera] || 0) + 1;
-                                }}
-                                cameraLabels[d.camera] = d.camera_display || d.camera;
-                            }});
-
-                            // 一括削除ボタンを生成
-                            const bulkDeleteButtons = Object.keys(cameraNonMeteorCount)
-                                .filter(camera => cameraNonMeteorCount[camera] > 0)
-                                .map(camera =>
-                                    `<button class="bulk-delete-btn" onclick="bulkDeleteNonMeteor('${{camera}}', event)">${{cameraLabels[camera] || camera}}: それ以外を一括削除 (${{cameraNonMeteorCount[camera]}}件)</button>`
-                                ).join('');
-
-                            return `
-                                <div class="date-group">
-                                    <div class="date-group-header">
-                                        <span>${{date}}</span>
-                                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">${{bulkDeleteButtons}}</div>
-                                    </div>
-                                    <div class="detection-group-grid">
-                                        ${{items}}
-                                    </div>
-                                </div>
-                            `;
-                        }}).join('');
-                        listEl.innerHTML = html;
-                    }} else {{
-                        listEl.innerHTML = '<div class="detection-item" style="color:#666">検出待機中...</div>';
+                    const detectionsKey = (data.recent || []).map(d =>
+                        `${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
+                    ).join('||');
+                    if (detectionsKey === lastDetectionsKey) {{
+                        return;
                     }}
+                    lastDetectionsKey = detectionsKey;
+                    applyDetectionData(data);
                 }})
                 .catch(err => {{
                     detectionPollDelay = Math.min(detectionPollDelay * 2, detectionPollMaxDelay);
@@ -1914,17 +2223,34 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 }});
         }}
 
-        function bootCameraSectionAfterDetections() {{
-            window.setTimeout(() => {{
-                window.requestAnimationFrame(() => {{
-                    window.requestAnimationFrame(() => {{
-                        startCameraSection();
-                    }});
+        function setupDetectionCalendarControls() {{
+            document.querySelectorAll('#detection-range-switch .range-btn').forEach((btn) => {{
+                btn.addEventListener('click', () => {{
+                    detectionCalendarRange = btn.dataset.range || 'current';
+                    syncDetectionRangeControls();
+                    syncSelectedDateToCalendarRange();
+                    renderDetectionCalendar();
+                    renderSelectedDetections();
                 }});
-            }}, CAMERA_SECTION_START_DELAY_MS);
+            }});
+            const yearSelect = document.getElementById('detection-year-select');
+            if (yearSelect) {{
+                yearSelect.addEventListener('change', (event) => {{
+                    const nextYear = Number(event.target.value);
+                    if (Number.isFinite(nextYear)) {{
+                        detectionCalendarYear = nextYear;
+                        detectionCalendarRange = 'year';
+                        syncDetectionRangeControls();
+                        syncSelectedDateToCalendarRange();
+                        renderDetectionCalendar();
+                        renderSelectedDetections();
+                    }}
+                }});
+            }}
         }}
 
         if (detectionsPageEnabled) {{
+            setupDetectionCalendarControls();
             bootDetectionSection();
         }}
         if (cameraPageEnabled) {{
