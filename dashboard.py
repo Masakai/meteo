@@ -10,6 +10,8 @@ Licensed under the MIT License
 from __future__ import annotations
 
 import atexit
+import logging
+import os
 import time
 from io import BytesIO
 from pathlib import Path
@@ -21,6 +23,11 @@ from flask import Flask, Response, jsonify, request
 import dashboard_routes as routes
 from dashboard_config import CAMERAS, PORT, VERSION
 from dashboard_templates import render_dashboard_html, render_settings_html
+
+logging.basicConfig(
+    level=os.environ.get("DASHBOARD_LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 app = Flask(__name__)
 STREAM_PROXY_TIMEOUT_SEC = 20

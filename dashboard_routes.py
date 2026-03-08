@@ -1,6 +1,7 @@
 """HTTP route handlers for the dashboard."""
 
 from datetime import datetime
+import logging
 from time import time
 import json
 import os
@@ -13,6 +14,8 @@ from urllib.error import URLError, HTTPError
 
 from dashboard_config import CAMERAS, DETECTIONS_DIR, VERSION, get_detection_window
 from dashboard_templates import render_dashboard_html, render_settings_html
+
+logger = logging.getLogger(__name__)
 
 
 _IN_DOCKER = os.path.exists("/.dockerenv")
@@ -185,12 +188,18 @@ def _build_detections_payload():
     detections = []
     total = 0
     labels = _load_detection_labels()
+    camera_summaries = []
 
     try:
         for cam_dir in Path(DETECTIONS_DIR).iterdir():
             if cam_dir.is_dir():
                 jsonl_file = cam_dir / "detections.jsonl"
                 if jsonl_file.exists():
+                    processed_lines = 0
+                    missing_composite = 0
+                    missing_original = 0
+                    missing_video = 0
+                    camera_errors = 0
                     with open(jsonl_file, "r", encoding="utf-8") as f:
                         for line in f:
                             try:
@@ -212,12 +221,22 @@ def _build_detections_payload():
                                     )
                                     composite_path = f"{cam_dir.name}/{base_filename}_composite.jpg"
                                     composite_orig_path = f"{cam_dir.name}/{base_filename}_composite_original.jpg"
+                                    if not (cam_dir / f"{base_filename}_composite.jpg").exists():
+                                        missing_composite += 1
+                                    if not (cam_dir / f"{base_filename}_composite_original.jpg").exists():
+                                        missing_original += 1
+                                    if not clip_ext:
+                                        missing_video += 1
                                 else:
                                     mp4_path = ""
                                     composite_path = ""
                                     composite_orig_path = ""
+                                    missing_composite += 1
+                                    missing_original += 1
+                                    missing_video += 1
 
                                 total += 1
+                                processed_lines += 1
                                 display_time = timestamp_str[:19].replace("T", " ")
                                 label_key = _detection_label_key(cam_dir.name, display_time)
                                 detections.append(
@@ -232,11 +251,45 @@ def _build_detections_payload():
                                     }
                                 )
                             except Exception:
-                                pass
+                                camera_errors += 1
+                                logger.exception(
+                                    "Failed to parse detection entry: camera=%s line=%r",
+                                    cam_dir.name,
+                                    line.strip()[:200],
+                                )
+                    camera_summaries.append(
+                        {
+                            "camera": cam_dir.name,
+                            "processed": processed_lines,
+                            "missing_composite": missing_composite,
+                            "missing_original": missing_original,
+                            "missing_video": missing_video,
+                            "errors": camera_errors,
+                        }
+                    )
+                else:
+                    camera_summaries.append(
+                        {
+                            "camera": cam_dir.name,
+                            "processed": 0,
+                            "missing_composite": 0,
+                            "missing_original": 0,
+                            "missing_video": 0,
+                            "errors": 0,
+                            "note": "detections.jsonl not found",
+                        }
+                    )
     except Exception:
-        pass
+        logger.exception("Failed to build detections payload: detections_dir=%s", DETECTIONS_DIR)
 
     detections.sort(key=lambda x: x["time"], reverse=True)
+    logger.info(
+        "Detections payload rebuilt: detections_dir=%s total=%d recent=%d cameras=%s",
+        DETECTIONS_DIR,
+        total,
+        len(detections),
+        camera_summaries,
+    )
     return {"total": total, "recent": detections}
 
 
@@ -251,6 +304,14 @@ def _refresh_detection_cache(force=False):
     if not should_rebuild:
         return
 
+    logger.info(
+        "Refreshing detection cache: force=%s current_dir=%s previous_dir=%s latest_mtime=%s previous_mtime=%s",
+        force,
+        current_dir,
+        cache_dir,
+        latest_mtime,
+        cache_mtime,
+    )
     payload = _build_detections_payload()
     with _detection_cache_lock:
         _detection_cache["detections_dir"] = current_dir
@@ -593,6 +654,14 @@ def handle_image(handler):
             camera_name = unquote(parts[0])
             filename = unquote(parts[1])
             image_path = Path(DETECTIONS_DIR) / camera_name / filename
+            logger.info(
+                "Image request: raw_path=%s camera=%s filename=%s resolved=%s exists=%s",
+                handler.path,
+                camera_name,
+                filename,
+                image_path,
+                image_path.exists(),
+            )
 
             if image_path.exists() and image_path.is_file():
                 file_size = image_path.stat().st_size
@@ -635,7 +704,11 @@ def handle_image(handler):
                                 chunk = f.read(length)
                                 handler.wfile.write(chunk)
                         except Exception as e:
-                            print(f"Range request error: {e}")
+                            logger.exception(
+                                "Range request error: path=%s range=%s",
+                                image_path,
+                                range_header,
+                            )
                             handler.send_response(200)
                             content_type = (
                                 "video/quicktime"
@@ -675,8 +748,17 @@ def handle_image(handler):
                     with open(image_path, "rb") as f:
                         handler.wfile.write(f.read())
                 return True
+            logger.warning(
+                "Image request resolved to missing file: raw_path=%s resolved=%s is_file=%s detections_dir=%s",
+                handler.path,
+                image_path,
+                image_path.is_file(),
+                DETECTIONS_DIR,
+            )
+        else:
+            logger.warning("Image request path format invalid: raw_path=%s parts=%s", handler.path, parts)
     except Exception as e:
-        print(f"Error serving file: {e}")
+        logger.exception("Error serving file: raw_path=%s", handler.path)
 
     handler.send_response(404)
     handler.end_headers()
