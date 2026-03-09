@@ -60,6 +60,11 @@ camera_display_name = ""  # Web表示用のカメラ名
 last_frame_time = 0  # 最後にフレームを受信した時刻
 stream_timeout = 10.0  # ストリームがタイムアウトとみなす秒数
 is_detecting_now = False  # 現在検出処理中かどうか
+current_detection_window_enabled = False
+current_detection_window_active = True
+current_detection_window_start = ""
+current_detection_window_end = ""
+current_detection_status = "INITIALIZING"
 current_detector = None
 current_proc_size = (0, 0)
 current_mask_dilate = 20
@@ -362,6 +367,8 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         .status.offline {{ color: #ff4444; }}
         .status.detecting {{ color: #ff4444; }}
         .status.idle {{ color: #888; }}
+        .status.out-of-window {{ color: #58d68d; }}
+        .status.waiting {{ color: #f4d03f; }}
     </style>
 </head>
 <body>
@@ -377,7 +384,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         </div>
         <div class="stats">
             <span>Stream: <b class="status online" id="stream-status">ONLINE</b></span>
-            <span>Detect: <b class="status idle" id="detect-status">IDLE</b></span>
+            <span>Detect: <b class="status idle" id="detect-status">INITIALIZING</b></span>
             <span>Mask: <b class="status idle" id="mask-status">OFF</b></span>
             <span>Detections: <b class="count" id="count">-</b></span>
         </div>
@@ -468,8 +475,21 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                     streamStatus.className = data.stream_alive ? 'status online' : 'status offline';
                 }}
                 if (detectStatus) {{
-                    detectStatus.textContent = data.is_detecting ? 'DETECTING' : 'IDLE';
-                    detectStatus.className = data.is_detecting ? 'status detecting' : 'status idle';
+                    detectStatus.textContent = data.detection_status || (data.is_detecting ? 'DETECTING' : 'IDLE');
+                    if (data.detection_status === 'DETECTING') {{
+                        detectStatus.className = 'status detecting';
+                    }} else if (data.detection_status === 'OUT_OF_WINDOW') {{
+                        detectStatus.className = 'status out-of-window';
+                    }} else if (data.detection_status === 'WAITING_FRAME' || data.detection_status === 'STREAM_LOST') {{
+                        detectStatus.className = 'status waiting';
+                    }} else {{
+                        detectStatus.className = 'status idle';
+                    }}
+                    if (data.detection_window_enabled && data.detection_window_start && data.detection_window_end) {{
+                        detectStatus.title = `window: ${data.detection_window_start} - ${data.detection_window_end}`;
+                    }} else {{
+                        detectStatus.title = '';
+                    }}
                 }}
                 if (maskStatus) {{
                     const maskActive = data.mask_active === true;
@@ -566,6 +586,8 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
+            global current_detection_window_enabled, current_detection_window_active
+            global current_detection_window_start, current_detection_window_end, current_detection_status
             elapsed = time.time() - start_time_global if start_time_global else 0
             current_time = time.time()
             time_since_last_frame = current_time - last_frame_time if last_frame_time > 0 else 0
@@ -585,6 +607,11 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "stream_alive": is_stream_alive,
                 "time_since_last_frame": round(time_since_last_frame, 1),
                 "is_detecting": is_detecting_now,
+                "detection_status": current_detection_status,
+                "detection_window_enabled": current_detection_window_enabled,
+                "detection_window_active": current_detection_window_active,
+                "detection_window_start": current_detection_window_start,
+                "detection_window_end": current_detection_window_end,
                 "mask_active": mask_active,
                 "mask_update_pending": has_pending_mask,
             }
@@ -1340,6 +1367,8 @@ def detection_thread_worker(
     global current_clip_margin_before, current_clip_margin_after
     global current_output_dir, current_camera_name
     global current_pending_exclusion_mask, current_pending_mask_save_path
+    global current_detection_window_enabled, current_detection_window_active
+    global current_detection_window_start, current_detection_window_end, current_detection_status
 
     width, height = reader.frame_size
     proc_width = int(width * process_scale)
@@ -1421,12 +1450,23 @@ def detection_thread_worker(
     is_detection_time = True  # デフォルトは有効
     detection_start = None
     detection_end = None
+    current_detection_window_enabled = bool(enable_time_window and is_detection_active)
     if enable_time_window and is_detection_active:
         is_detection_time, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
+        current_detection_window_active = is_detection_time
+        current_detection_window_start = detection_start.strftime("%Y-%m-%d %H:%M:%S")
+        current_detection_window_end = detection_end.strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        current_detection_window_active = True
+        current_detection_window_start = ""
+        current_detection_window_end = ""
+    current_detection_status = "WAITING_FRAME"
 
     while not stop_flag.is_set():
         ret, timestamp, frame = reader.read()
         if not ret:
+            is_detecting_now = False
+            current_detection_status = "STREAM_LOST"
             break
         if frame is None:
             continue
@@ -1460,7 +1500,11 @@ def detection_thread_worker(
                     is_detection_time, detection_start, detection_end = is_detection_active(latitude, longitude, timezone)
                 else:
                     is_detection_time = detection_start <= now <= detection_end
+            current_detection_window_active = is_detection_time
+            current_detection_window_start = detection_start.strftime("%Y-%m-%d %H:%M:%S")
+            current_detection_window_end = detection_end.strftime("%Y-%m-%d %H:%M:%S")
 
+        objects = []
         if prev_gray is not None:
             # 検出期間内の場合のみ検出処理を実行
             if is_detection_time:
@@ -1468,43 +1512,30 @@ def detection_thread_worker(
                 tracking_mode = len(detector.active_tracks) > 0
                 objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
                 is_detecting_now = True
+                current_detection_status = "DETECTING"
             else:
                 objects = []
                 is_detecting_now = False
+                current_detection_status = "OUT_OF_WINDOW"
+        else:
+            is_detecting_now = False
+            current_detection_status = "WAITING_FRAME"
 
-            if process_scale != 1.0:
-                for obj in objects:
-                    cx, cy = obj["centroid"]
-                    obj["centroid"] = (int(cx * scale_factor), int(cy * scale_factor))
+        if process_scale != 1.0:
+            for obj in objects:
+                cx, cy = obj["centroid"]
+                obj["centroid"] = (int(cx * scale_factor), int(cy * scale_factor))
 
-            events = detector.track_objects(objects, timestamp)
+        events = detector.track_objects(objects, timestamp)
 
-            for event in events:
-                merged_events = merger.add_event(event)
-                for merged_event in merged_events:
-                    detection_count += 1
-                    print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
-                    print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
-                    clip_path = save_meteor_event(
-                        merged_event,
-                        ring_buffer,
-                        output_path,
-                        fps=fps,
-                        extract_clips=extract_clips,
-                        clip_margin_before=current_clip_margin_before,
-                        clip_margin_after=current_clip_margin_after,
-                        composite_after=current_clip_margin_after,
-                    )
-                    if fb_normalize and clip_path is not None:
-                        fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
-
-            expired_events = merger.flush_expired(timestamp)
-            for expired_event in expired_events:
+        for event in events:
+            merged_events = merger.add_event(event)
+            for merged_event in merged_events:
                 detection_count += 1
-                print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
-                print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
+                print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+                print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
                 clip_path = save_meteor_event(
-                    expired_event,
+                    merged_event,
                     ring_buffer,
                     output_path,
                     fps=fps,
@@ -1516,29 +1547,47 @@ def detection_thread_worker(
                 if fb_normalize and clip_path is not None:
                     fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
-            # プレビュー用フレーム生成
-            display = frame.copy()
+        expired_events = merger.flush_expired(timestamp)
+        for expired_event in expired_events:
+            detection_count += 1
+            print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}")
+            print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
+            clip_path = save_meteor_event(
+                expired_event,
+                ring_buffer,
+                output_path,
+                fps=fps,
+                extract_clips=extract_clips,
+                clip_margin_before=current_clip_margin_before,
+                clip_margin_after=current_clip_margin_after,
+                composite_after=current_clip_margin_after,
+            )
+            if fb_normalize and clip_path is not None:
+                fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
-            for obj in objects:
-                cx, cy = obj["centroid"]
-                cv2.circle(display, (cx, cy), 5, (0, 255, 0), 2)
+        # プレビュー用フレーム生成
+        display = frame.copy()
 
-            with detector.lock:
-                for track_points in detector.active_tracks.values():
-                    if len(track_points) >= 2:
-                        for i in range(1, len(track_points)):
-                            pt1 = (track_points[i-1][1], track_points[i-1][2])
-                            pt2 = (track_points[i][1], track_points[i][2])
-                            cv2.line(display, pt1, pt2, (0, 255, 255), 2)
+        for obj in objects:
+            cx, cy = obj["centroid"]
+            cv2.circle(display, (cx, cy), 5, (0, 255, 0), 2)
 
-            elapsed = time.time() - start_time_global
-            overlay_name = camera_display_name or camera_name
-            cv2.putText(display, f"{overlay_name} | {elapsed:.0f}s | Detections: {detection_count}",
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        with detector.lock:
+            for track_points in detector.active_tracks.values():
+                if len(track_points) >= 2:
+                    for i in range(1, len(track_points)):
+                        pt1 = (track_points[i-1][1], track_points[i-1][2])
+                        pt2 = (track_points[i][1], track_points[i][2])
+                        cv2.line(display, pt1, pt2, (0, 255, 255), 2)
 
-            with current_frame_lock:
-                current_frame = display
-                current_frame_seq += 1
+        elapsed = time.time() - start_time_global
+        overlay_name = camera_display_name or camera_name
+        cv2.putText(display, f"{overlay_name} | {elapsed:.0f}s | Detections: {detection_count}",
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+        with current_frame_lock:
+            current_frame = display
+            current_frame_seq += 1
 
         prev_gray = gray.copy()
         frame_count += 1

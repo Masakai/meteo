@@ -34,7 +34,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         <div class="status-indicators">
                             <span class="camera-status indicator-help" id="status{i}" title="ストリーム接続" data-help="ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）">●</span>
                             <span class="server-status unknown indicator-help" id="server-status{i}" title="カメラサーバ生存" data-help="カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）">●</span>
-                            <span class="detection-status indicator-help" id="detection{i}" title="検出処理" data-help="検出処理状態（赤点滅: 検出中 / 灰: 待機中）">●</span>
+                            <span class="detection-status indicator-help" id="detection{i}" title="検出処理" data-help="検出処理状態（赤点滅: 検出中 / 緑: 期間外 / 黄: 期間内だが停止疑い / 灰: 状態確認中）">●</span>
                             <span class="mask-status indicator-help" id="mask-status{i}" title="マスク適用" data-help="マスク適用状態（赤: マスク有効 / 灰: マスク無効）">MASK</span>
                         </div>
                     </div>
@@ -308,6 +308,15 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         .detection-status.detecting {{
             color: #ff4444;
             animation: blink 1s infinite;
+        }}
+        .detection-status.inactive {{
+            color: #58d68d;
+        }}
+        .detection-status.warning {{
+            color: #f4d03f;
+        }}
+        .detection-status.unknown {{
+            color: #888;
         }}
         @keyframes blink {{
             0%, 50% {{ opacity: 1; }}
@@ -1032,7 +1041,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         const detectionWindowState = {{
             enabled: false,
             start: null,
-            end: null
+            end: null,
+            loaded: false
         }};
 
         function parseDetectionWindowTime(value) {{
@@ -1043,10 +1053,61 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
 
         function isWithinDetectionWindow() {{
+            if (!detectionWindowState.loaded) return null;
             if (!detectionWindowState.enabled) return true;
             if (!detectionWindowState.start || !detectionWindowState.end) return true;
             const now = new Date();
             return now >= detectionWindowState.start && now <= detectionWindowState.end;
+        }}
+
+        function setDetectionIndicatorState(i, state, helpText) {{
+            const detectionEl = document.getElementById('detection' + i);
+            if (!detectionEl) {{
+                return;
+            }}
+            detectionEl.className = 'detection-status indicator-help' + (state ? ' ' + state : '');
+            detectionEl.title = '検出処理';
+            detectionEl.dataset.help = helpText;
+        }}
+
+        function updateDetectionIndicator(i, data, statsFetchOk) {{
+            if (!statsFetchOk) {{
+                setDetectionIndicatorState(i, 'unknown', '検出処理状態（灰: カメラ統計の取得失敗または確認中）');
+                return;
+            }}
+
+            const withinWindow = isWithinDetectionWindow();
+            const streamAlive = data.stream_alive !== false;
+            const stopReason = String(data.monitor_stop_reason || '');
+            const statsFailures = Number(data.monitor_stats_failures || 0);
+            const failThreshold = Number(data.monitor_fail_threshold || 8);
+            const statsUnavailable = stopReason === 'stats_unreachable' || stopReason === 'stats_unreachable_transient';
+            const likelyError = !streamAlive || statsUnavailable || (stopReason && stopReason !== 'none' && stopReason !== 'unknown');
+
+            if (withinWindow === null) {{
+                setDetectionIndicatorState(i, 'unknown', '検出処理状態（灰: 検出時間帯を確認中）');
+                return;
+            }}
+
+            if (data.is_detecting === true) {{
+                setDetectionIndicatorState(i, 'detecting', '検出処理状態（赤点滅: 検出期間内で処理中）');
+                return;
+            }}
+
+            if (!withinWindow) {{
+                setDetectionIndicatorState(i, 'inactive', '検出処理状態（緑: 検出期間外）');
+                return;
+            }}
+
+            if (likelyError) {{
+                const detail = statsUnavailable
+                    ? `統計取得失敗 ${{statsFailures}}/${{failThreshold}}`
+                    : (!streamAlive ? '映像更新停止' : `停止理由: ${{stopReason}}`);
+                setDetectionIndicatorState(i, 'warning', `検出処理状態（黄: 検出期間内だが停止疑い / ${{detail}}）`);
+                return;
+            }}
+
+            setDetectionIndicatorState(i, 'unknown', '検出処理状態（灰: 検出期間内だが状態未確定）');
         }}
 
         // 検出時間帯を取得・更新
@@ -1054,6 +1115,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             fetch('/detection_window')
                 .then(r => r.json())
                 .then(data => {{
+                    detectionWindowState.loaded = true;
                     detectionWindowState.enabled = data.enabled === true;
                     detectionWindowState.start = parseDetectionWindowTime(data.start);
                     detectionWindowState.end = parseDetectionWindowTime(data.end);
@@ -1105,6 +1167,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 .catch((err) => {{
                     console.error('Detection window fetch error:', err);
                     document.getElementById('detection-window').textContent = '--:-- ~ --:--';
+                    detectionWindowState.loaded = false;
                     detectionWindowState.enabled = false;
                     detectionWindowState.start = null;
                     detectionWindowState.end = null;
@@ -1529,11 +1592,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status';
                     }}
-                    if (data.is_detecting === true) {{
-                        document.getElementById('detection' + i).className = 'detection-status detecting';
-                    }} else {{
-                        document.getElementById('detection' + i).className = 'detection-status';
-                    }}
+                    updateDetectionIndicator(i, data, true);
                     const maskActive = data.mask_active === true;
                     const maskStatusEl = document.getElementById('mask-status' + i);
                     if (maskStatusEl) {{
@@ -1562,7 +1621,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     }} else {{
                         document.getElementById('status' + i).className = 'camera-status paused';
                     }}
-                    document.getElementById('detection' + i).className = 'detection-status';
+                    updateDetectionIndicator(i, {{}}, false);
                 }})
                 .finally(() => {{
                     scheduleCameraStats(i, cameraStatsState[i].delay);

@@ -54,5 +54,17 @@ def test_render_dashboard_includes_indicator_help_messages():
     )
     assert "ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）" in html
     assert "カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）" in html
-    assert "検出処理状態（赤点滅: 検出中 / 灰: 待機中）" in html
+    assert "検出処理状態（赤点滅: 検出中 / 緑: 期間外 / 黄: 期間内だが停止疑い / 灰: 状態確認中）" in html
     assert "マスク適用状態（赤: マスク有効 / 灰: マスク無効）" in html
+
+
+def test_render_dashboard_includes_detection_indicator_state_logic():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+        page_mode="cameras",
+    )
+    assert "function updateDetectionIndicator(i, data, statsFetchOk)" in html
+    assert "検出処理状態（黄: 検出期間内だが停止疑い" in html
+    assert "検出処理状態（緑: 検出期間外）" in html

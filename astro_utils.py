@@ -48,7 +48,7 @@ def get_detection_window_for_date(
 def get_detection_window(latitude: float = 35.3606, longitude: float = 138.7274,
                          timezone: str = "Asia/Tokyo") -> Tuple[datetime, datetime]:
     """
-    天文薄暮期間（前日の日の入りから翌日の日出まで）を取得
+    現在時刻を含む検出ウィンドウ（当日日没から翌日の日出、または前日日没から当日日出）を取得
 
     Args:
         latitude: 緯度
@@ -58,17 +58,22 @@ def get_detection_window(latitude: float = 35.3606, longitude: float = 138.7274,
     Returns:
         (検出開始時刻, 検出終了時刻) のタプル
     """
+    location = LocationInfo(
+        name="Observer",
+        region="",
+        timezone=timezone,
+        latitude=latitude,
+        longitude=longitude
+    )
     tz = ZoneInfo(timezone)
     now = datetime.now(tz)
     today = now.date()
 
-    # 天文薄暮（astronomical twilight）の判定
-    # 太陽の高度が-18度以下の時間帯 = 天文薄暮終了後の完全な夜
-    # 検出期間は前日の日没（sunset）から翌日の日出（sunrise）まで
-
-    # 今日の日出で終了（まだ過ぎていない場合）
+    # 深夜から当日日出までは、前日日没から当日日出のウィンドウ。
+    # 当日日出以降は、当日日没から翌日の日出のウィンドウ。
+    today_sunrise = sun(location.observer, date=today, tzinfo=tz)["sunrise"]
     yesterday = today - timedelta(days=1)
-    if now < get_detection_window_for_date(today, latitude, longitude, timezone)[1]:
+    if now < today_sunrise:
         detection_start, detection_end = get_detection_window_for_date(
             yesterday, latitude, longitude, timezone
         )

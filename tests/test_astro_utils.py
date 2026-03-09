@@ -56,3 +56,14 @@ def test_get_detection_window_for_date_returns_cross_midnight_window():
     assert start.date().isoformat() == "2024-01-15"
     assert end.date().isoformat() == "2024-01-16"
     assert end > start
+
+
+def test_get_detection_window_evening_returns_today_to_tomorrow(monkeypatch):
+    tz = ZoneInfo("Asia/Tokyo")
+    FixedDatetime.fixed = datetime(2024, 1, 15, 21, 0, 0, tzinfo=tz)
+    monkeypatch.setattr(astro_utils, "datetime", FixedDatetime)
+
+    start, end = astro_utils.get_detection_window(35.6762, 139.6503, "Asia/Tokyo")
+    assert start.date().isoformat() == "2024-01-15"
+    assert end.date().isoformat() == "2024-01-16"
+    assert start <= FixedDatetime.fixed <= end
