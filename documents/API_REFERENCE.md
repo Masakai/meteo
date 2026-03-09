@@ -27,6 +27,15 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v1.23.1 - 検出時間帯判定と状態表示の修正
+- **修正**: 検出時間帯の計算を「当日日没から翌日の日出まで」に是正
+- **機能追加**: `GET /stats` レスポンスに検出状態詳細フィールドを追加
+  - `detection_status`: `DETECTING` / `OUT_OF_WINDOW` / `WAITING_FRAME` / `STREAM_LOST`
+  - `detection_window_enabled`: 検出時間帯制限の有効/無効
+  - `detection_window_active`: 現在が検出時間帯内か
+  - `detection_window_start`: 現在参照中の検出開始時刻
+  - `detection_window_end`: 現在参照中の検出終了時刻
+
 ### v1.18.0 - 一括削除機能
 - **新規エンドポイント**: `POST /bulk_delete_non_meteor/{camera_name}`
   - カメラごとに非流星検出（`label="non-meteor"`）を一括削除
@@ -876,7 +885,12 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
   "runtime_fps": 19.83,
   "stream_alive": true,
   "time_since_last_frame": 0.03,
-  "is_detecting": true
+  "is_detecting": true,
+  "detection_status": "DETECTING",
+  "detection_window_enabled": true,
+  "detection_window_active": true,
+  "detection_window_start": "2026-03-09 17:46:53",
+  "detection_window_end": "2026-03-10 06:03:38"
 }
 ```
 
@@ -915,6 +929,11 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `stream_alive` | boolean | ストリーム生存確認 |
 | `time_since_last_frame` | float | 最終フレームからの経過時間（秒） |
 | `is_detecting` | boolean | 現在検出処理中か |
+| `detection_status` | string | 検出状態詳細。`DETECTING` / `OUT_OF_WINDOW` / `WAITING_FRAME` / `STREAM_LOST` |
+| `detection_window_enabled` | boolean | 検出時間帯制限が有効か |
+| `detection_window_active` | boolean | 現在が検出時間帯内か |
+| `detection_window_start` | string | 現在参照中の検出開始時刻 |
+| `detection_window_end` | string | 現在参照中の検出終了時刻 |
 
 **使用例**:
 ```bash

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.1] - 2026-03-09
+### Changed
+- ダッシュボードの検出インディケータを、検出中・期間外・期間内だが停止疑い・状態確認中で判別できる表示へ変更。
+- カメラサーバの `Detect` 表示を `IDLE` 一括表示から見直し、`DETECTING` / `OUT_OF_WINDOW` / `WAITING_FRAME` / `STREAM_LOST` を返せるよう改善。
+
+### Fixed
+- 検出時間帯の計算ロジックを修正し、定義どおり「当日日没から翌日の日出まで」を夜間ウィンドウとして扱うよう是正。
+- 検出時間帯判定まわりとダッシュボード表示まわりの回帰テストを追加。
+
 ## [1.23.0] - 2026-03-09
 ### Added
 - 短く暗い流星の取りこぼし低減を目的とした新しい感度プリセット `faint` を追加。既存の `medium` / `high` を崩さず、設定UIやランタイム設定から切り替え可能に。
