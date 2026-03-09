@@ -53,6 +53,16 @@ def process_rtsp_stream(
         params.diff_threshold = 20
         params.min_brightness = 180
         params.min_length = 15
+    elif sensitivity == "faint":
+        params.diff_threshold = 16
+        params.min_brightness = 135
+        params.min_length = 10
+        params.min_duration = 0.06
+        params.min_speed = 10.0
+        params.min_linearity = 0.55
+        params.min_track_points = 3
+        params.min_area = 3
+        params.max_distance = 110
     elif sensitivity == "fireball":
         params.diff_threshold = 15
         params.min_brightness = 150
@@ -61,7 +71,11 @@ def process_rtsp_stream(
         params.min_speed = 20.0
         params.min_linearity = 0.6
 
-    params.min_brightness_tracking = params.min_brightness
+    params.min_brightness_tracking = (
+        max(1, int(params.min_brightness * 0.8))
+        if sensitivity == "faint"
+        else params.min_brightness
+    )
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -345,13 +359,14 @@ def main():
              "プレビューウィンドウで 'q' キーを押すと終了。")
 
     parser.add_argument("--sensitivity",
-        choices=["low", "medium", "high", "fireball"],
+        choices=["low", "medium", "high", "faint", "fireball"],
         default="medium",
         metavar="LEVEL",
         help="検出感度のプリセット。\n"
              "  low:      誤検出を減らす（明るい流星のみ）\n"
              "  medium:   バランス（デフォルト）\n"
              "  high:     暗い流星も検出\n"
+             "  faint:    取りこぼし低減（短く暗い流星向け）\n"
              "  fireball: 火球検出モード（長時間・高輝度）")
 
     parser.add_argument("--scale",

@@ -878,6 +878,16 @@ def process_video_realtime(
     elif sensitivity == "high":
         params.diff_threshold = 20
         params.min_brightness = 180
+    elif sensitivity == "faint":
+        params.diff_threshold = 16
+        params.min_brightness = 135
+        params.min_length = 10
+        params.min_duration = 0.06
+        params.min_speed = 10.0
+        params.min_linearity = 0.55
+        params.min_track_points = 3
+        params.min_area = 3
+        params.max_distance = 110
     elif sensitivity == "fireball":
         params.diff_threshold = 15
         params.min_brightness = 150
@@ -885,7 +895,11 @@ def process_video_realtime(
         params.min_speed = 20.0
         params.min_linearity = 0.6
 
-    params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+    params.min_brightness_tracking = (
+        max(1, int(params.min_brightness * 0.8))
+        if sensitivity == "faint"
+        else params.min_brightness
+    )
 
     required_buffer = params.max_duration + clip_margin_before + clip_margin_after
     effective_buffer_seconds = min(buffer_seconds, required_buffer)
@@ -1070,6 +1084,7 @@ def main():
   low      - 誤検出を減らす（明るい流星のみ）
   medium   - バランス（デフォルト）
   high     - 暗い流星も検出
+  faint    - 取りこぼし低減（短く暗い流星向け）
   fireball - 火球検出（長時間・長距離・明滅対応）
 
 高速化オプション:
@@ -1084,8 +1099,8 @@ def main():
     parser.add_argument("-o", "--output", help="出力動画ファイル")
     parser.add_argument("--preview", action="store_true",
                        help="プレビューを表示")
-    parser.add_argument("--sensitivity", choices=["low", "medium", "high", "fireball"],
-                       default="medium", help="検出感度 (default: medium, fireball=火球検出モード)")
+    parser.add_argument("--sensitivity", choices=["low", "medium", "high", "faint", "fireball"],
+                       default="medium", help="検出感度 (default: medium, faint=取りこぼし低減, fireball=火球検出モード)")
     parser.add_argument("--extract-clips", dest="extract_clips", action="store_true", default=True,
                        help="流星クリップを切り出して保存 (デフォルト: 有効)")
     parser.add_argument("--no-clips", dest="extract_clips", action="store_false",
@@ -1152,6 +1167,15 @@ def main():
         params.min_brightness = 180
         params.min_length = 15
         params.min_speed = 3.0
+    elif args.sensitivity == "faint":
+        params.diff_threshold = 16
+        params.min_brightness = 135
+        params.min_length = 10
+        params.min_duration = 2
+        params.min_speed = 2.0
+        params.min_linearity = 0.55
+        params.min_area = 3
+        params.max_distance = 110
     elif args.sensitivity == "fireball":
         # 火球検出モード: 長時間・長距離・明るい流星に最適化
         params.diff_threshold = 15        # 低い閾値で検出しやすく

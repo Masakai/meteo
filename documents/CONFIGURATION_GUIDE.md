@@ -529,6 +529,7 @@ environment:
 | `low` | 40 | 220 | 明るい流星のみ | 低 |
 | `medium` | 30 | 200 | バランス型（推奨） | 中 |
 | `high` | 20 | 180 | 暗い流星も検出 | やや高 |
+| `faint` | 16 | 135 | 短く暗い流星の取りこぼし低減 | 高 |
 | `fireball` | 15 | 150 | 火球専用 | 高 |
 
 ### プリセットの適用
@@ -920,6 +921,9 @@ python generate_compose.py --exclude-bottom 0.125
 ```bash
 # 感度を上げる
 python generate_compose.py --sensitivity high
+
+# さらに短く暗い流星を拾いたい
+python generate_compose.py --sensitivity faint
 ```
 
 ---
@@ -998,7 +1002,7 @@ environment:
 **推奨設定**:
 ```yaml
 environment:
-  - SENSITIVITY=high
+  - SENSITIVITY=faint
   - SCALE=0.75
   - EXCLUDE_BOTTOM=0.0
   - ENABLE_TIME_WINDOW=true
@@ -1006,8 +1010,8 @@ environment:
 
 **params調整**:
 ```python
-params.min_brightness = 180
-params.diff_threshold = 20
+params.min_brightness = 135
+params.diff_threshold = 16
 ```
 
 ---
@@ -1024,6 +1028,9 @@ params.diff_threshold = 20
 ```bash
 # 感度を上げる
 python generate_compose.py --sensitivity high
+
+# さらに取りこぼしを減らす
+python generate_compose.py --sensitivity faint
 
 # 時間帯制限を無効化
 python generate_compose.py --enable-time-window false

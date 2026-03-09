@@ -102,6 +102,9 @@ python meteor_detector.py input.mp4 --preview
 # 検出感度を調整
 python meteor_detector.py input.mp4 --sensitivity high
 
+# 取りこぼし低減モード（短く暗い流星向け）
+python meteor_detector.py input.mp4 --sensitivity faint
+
 # 火球検出モード（長時間・長距離・明るい流星）
 python meteor_detector.py input.mp4 --sensitivity fireball
 ```
@@ -111,6 +114,7 @@ python meteor_detector.py input.mp4 --sensitivity fireball
 - `low` - 誤検出を減らす（明るい流星のみ）
 - `medium` - バランス（デフォルト）
 - `high` - 暗い流星も検出
+- `faint` - 取りこぼし低減（短く暗い流星向け、誤検出は増えやすい）
 - `fireball` - 火球検出（長時間・長距離・明滅対応）
 
 #### 高速化オプション
@@ -524,7 +528,7 @@ camera1:
     - TZ=Asia/Tokyo
     - RTSP_URL=rtsp://user:pass@10.0.1.25/live
     - CAMERA_NAME=camera1_10.0.1.25
-    - SENSITIVITY=medium        # low/medium/high/fireball
+    - SENSITIVITY=medium        # low/medium/high/faint/fireball
     - SCALE=0.5                 # 処理解像度スケール
     - BUFFER=15                 # バッファ秒数
     - EXCLUDE_BOTTOM=0.0625     # 下部除外範囲（1/16）

@@ -1017,8 +1017,8 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 value = str(payload.get(field, "")).strip().lower()
                 if not value:
                     continue
-                if field == "sensitivity" and value not in ("low", "medium", "high", "fireball"):
-                    errors.append("sensitivity must be one of low/medium/high/fireball")
+                if field == "sensitivity" and value not in ("low", "medium", "high", "faint", "fireball"):
+                    errors.append("sensitivity must be one of low/medium/high/faint/fireball")
                     continue
                 overrides_update[field] = value
                 applied[field] = value
@@ -1685,6 +1685,16 @@ def process_rtsp_stream(
     elif sensitivity == "high":
         params.diff_threshold = 20
         params.min_brightness = 180
+    elif sensitivity == "faint":
+        params.diff_threshold = 16
+        params.min_brightness = 135
+        params.min_length = 10
+        params.min_duration = 0.06
+        params.min_speed = 10.0
+        params.min_linearity = 0.55
+        params.min_track_points = 3
+        params.min_area = 3
+        params.max_distance = 110
     elif sensitivity == "fireball":
         params.diff_threshold = 15
         params.min_brightness = 150
@@ -1697,7 +1707,11 @@ def process_rtsp_stream(
 
     # 追跡中は検出閾値より低めにして追跡継続を優先
     if "min_brightness_tracking" not in runtime_overrides:
-        params.min_brightness_tracking = max(1, int(params.min_brightness * 0.8))
+        params.min_brightness_tracking = (
+            max(1, int(params.min_brightness * 0.8))
+            if sensitivity == "faint"
+            else params.min_brightness
+        )
     params.nuisance_overlap_threshold = nuisance_overlap_threshold
 
     required_buffer = params.max_duration + 2.0
@@ -1853,7 +1867,7 @@ def main():
 
     parser.add_argument("url", help="RTSP URL")
     parser.add_argument("-o", "--output", default="meteor_detections", help="出力ディレクトリ")
-    parser.add_argument("--sensitivity", choices=["low", "medium", "high", "fireball"], default="medium")
+    parser.add_argument("--sensitivity", choices=["low", "medium", "high", "faint", "fireball"], default="medium")
     parser.add_argument("--scale", type=float, default=0.5, help="処理スケール")
     parser.add_argument("--buffer", type=float, default=15.0, help="バッファ秒数")
     parser.add_argument("--exclude-bottom", type=float, default=1/16)

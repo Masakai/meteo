@@ -33,6 +33,11 @@ Licensed under the MIT License
 --sensitivity high
 ```
 
+**短く暗い流星を優先**
+```bash
+--sensitivity faint
+```
+
 **火球向け**
 ```bash
 --sensitivity fireball
@@ -79,7 +84,7 @@ RTSP版は CLI から調整できる項目が限定されています。
 また、ダッシュボードの `/settings` から全カメラへ一括設定することも可能です。
 
 **有効な調整**
-- `--sensitivity`（low / medium / high / fireball）
+- `--sensitivity`（low / medium / high / faint / fireball）
 - `--scale`（処理解像度）
 - `--exclude-bottom`（画面下部の除外率）
 - マスク関連 (`--mask-image`, `--mask-from-day`)

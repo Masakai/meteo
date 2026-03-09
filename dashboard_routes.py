@@ -1,6 +1,6 @@
 """HTTP route handlers for the dashboard."""
 
-from datetime import date, datetime, timedelta
+from datetime import datetime
 import logging
 from time import time
 import json
@@ -14,12 +14,6 @@ from urllib.error import URLError, HTTPError
 
 from dashboard_config import CAMERAS, DETECTIONS_DIR, VERSION, get_detection_window
 from dashboard_templates import render_dashboard_html, render_settings_html
-import requests
-
-try:
-    from astro_utils import get_detection_window_for_date
-except ImportError:
-    get_detection_window_for_date = None
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +49,6 @@ _dashboard_cpu = {
     "last_total": None,
     "last_idle": None,
 }
-_night_weather_cache_lock = Lock()
-_night_weather_cache = {}
-_NIGHT_WEATHER_CACHE_TTL_SEC = float(os.environ.get("NIGHT_WEATHER_CACHE_TTL_SEC", "1800"))
-_OPEN_METEO_JMA_URL = "https://api.open-meteo.com/v1/jma"
 
 
 def _read_system_cpu_totals():
@@ -110,177 +100,6 @@ def get_dashboard_cpu_snapshot(refresh=True):
         return {
             "cpu_percent": round(float(_dashboard_cpu["cpu_percent"]), 1),
         }
-
-
-def _iter_dates(start_date: date, end_date: date):
-    current = start_date
-    while current <= end_date:
-        yield current
-        current += timedelta(days=1)
-
-
-def _weather_label_from_code(weather_code: int | None, cloud_cover: float | None) -> str:
-    code = int(weather_code) if weather_code is not None else -1
-    cloud = float(cloud_cover) if cloud_cover is not None else 0.0
-    if code in {95, 96, 99}:
-        return "雷"
-    if code in {71, 73, 75, 77, 85, 86}:
-        return "雪"
-    if code in {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82}:
-        return "雨"
-    if code in {45, 48}:
-        return "霧"
-    if code in {1, 2, 3}:
-        if cloud < 20:
-            return "快晴"
-        if cloud < 60:
-            return "晴"
-        return "曇"
-    if code == 0:
-        return "快晴" if cloud < 20 else "晴"
-    if cloud >= 80:
-        return "曇"
-    if cloud >= 40:
-        return "薄曇"
-    return "晴"
-
-
-def _weather_rank(entry: dict) -> tuple[int, float]:
-    label = entry.get("label", "")
-    order = {
-        "雷": 6,
-        "雪": 5,
-        "雨": 4,
-        "霧": 3,
-        "曇": 2,
-        "薄曇": 1,
-        "晴": 0,
-        "快晴": 0,
-    }
-    return order.get(label, 0), float(entry.get("cloud_cover_avg", 0.0))
-
-
-def _aggregate_night_weather(
-    hourly_data: dict,
-    start_date: date,
-    end_date: date,
-    latitude: float,
-    longitude: float,
-    timezone: str,
-) -> dict:
-    if get_detection_window_for_date is None:
-        return {}
-
-    timestamps = hourly_data.get("time") or []
-    cloud_covers = hourly_data.get("cloud_cover") or []
-    weather_codes = hourly_data.get("weather_code") or []
-    points = []
-    for idx, ts in enumerate(timestamps):
-        if idx >= len(cloud_covers) or idx >= len(weather_codes):
-            break
-        try:
-            dt = datetime.fromisoformat(ts)
-        except ValueError:
-            continue
-        points.append(
-            {
-                "time": dt,
-                "cloud_cover": float(cloud_covers[idx]),
-                "weather_code": int(weather_codes[idx]),
-            }
-        )
-
-    summary = {}
-    for target_date in _iter_dates(start_date, end_date):
-        night_start, night_end = get_detection_window_for_date(
-            target_date, latitude, longitude, timezone
-        )
-        if night_start.tzinfo is not None:
-            for point in points:
-                if point["time"].tzinfo is None:
-                    point["time"] = point["time"].replace(tzinfo=night_start.tzinfo)
-        night_points = [p for p in points if night_start <= p["time"] <= night_end]
-        if not night_points:
-            summary[target_date.isoformat()] = {
-                "label": "不明",
-                "cloud_cover_avg": None,
-                "weather_code": None,
-                "hours": 0,
-            }
-            continue
-        avg_cloud = sum(p["cloud_cover"] for p in night_points) / len(night_points)
-        representative = max(
-            (
-                {
-                    "label": _weather_label_from_code(p["weather_code"], p["cloud_cover"]),
-                    "cloud_cover_avg": avg_cloud,
-                    "weather_code": p["weather_code"],
-                    "hours": len(night_points),
-                }
-                for p in night_points
-            ),
-            key=_weather_rank,
-        )
-        representative["cloud_cover_avg"] = round(avg_cloud, 1)
-        summary[target_date.isoformat()] = representative
-    return summary
-
-
-def _fetch_night_weather_summary(
-    start_date: date,
-    end_date: date,
-    latitude: float,
-    longitude: float,
-    timezone: str,
-) -> dict:
-    cache_key = (
-        start_date.isoformat(),
-        end_date.isoformat(),
-        round(latitude, 4),
-        round(longitude, 4),
-        timezone,
-    )
-    now_ts = time()
-    with _night_weather_cache_lock:
-        cached = _night_weather_cache.get(cache_key)
-        if cached and now_ts - cached["fetched_at"] < _NIGHT_WEATHER_CACHE_TTL_SEC:
-            return cached["payload"]
-
-    api_end_date = end_date + timedelta(days=1)
-    response = requests.get(
-        _OPEN_METEO_JMA_URL,
-        params={
-            "latitude": latitude,
-            "longitude": longitude,
-            "hourly": "cloud_cover,weather_code",
-            "timezone": timezone,
-            "start_date": start_date.isoformat(),
-            "end_date": api_end_date.isoformat(),
-        },
-        timeout=10,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    summary = _aggregate_night_weather(
-        payload.get("hourly") or {},
-        start_date,
-        end_date,
-        latitude,
-        longitude,
-        timezone,
-    )
-    result = {
-        "source": "open-meteo-jma",
-        "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
-        "latitude": latitude,
-        "longitude": longitude,
-        "timezone": timezone,
-        "days": summary,
-    }
-    with _night_weather_cache_lock:
-        _night_weather_cache[cache_key] = {"fetched_at": now_ts, "payload": result}
-    return result
 
 
 def _parse_camera_index(path):
@@ -789,48 +608,6 @@ def handle_detection_window(handler):
             "start": "",
             "end": "",
             "enabled": False,
-            "error": str(e),
-        }
-
-    handler.wfile.write(json.dumps(result).encode("utf-8"))
-
-
-def handle_night_weather(handler):
-    handler.send_response(200)
-    handler.send_header("Content-type", "application/json")
-    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-    handler.end_headers()
-
-    query = parse_qs(urlparse(handler.path).query)
-    timezone = os.environ.get("TIMEZONE", "Asia/Tokyo")
-    latitude = float(query.get("lat", [os.environ.get("LATITUDE", "35.3606")])[0])
-    longitude = float(query.get("lon", [os.environ.get("LONGITUDE", "138.7274")])[0])
-    start_raw = query.get("start", [""])[0]
-    end_raw = query.get("end", [""])[0]
-
-    try:
-        if not start_raw or not end_raw:
-            raise ValueError("start と end は YYYY-MM-DD で指定してください")
-        start_date = date.fromisoformat(start_raw)
-        end_date = date.fromisoformat(end_raw)
-        if end_date < start_date:
-            raise ValueError("end は start 以降で指定してください")
-        result = _fetch_night_weather_summary(
-            start_date,
-            end_date,
-            latitude,
-            longitude,
-            timezone,
-        )
-    except Exception as e:
-        result = {
-            "source": "open-meteo-jma",
-            "start_date": start_raw,
-            "end_date": end_raw,
-            "latitude": latitude,
-            "longitude": longitude,
-            "timezone": timezone,
-            "days": {},
             "error": str(e),
         }
 

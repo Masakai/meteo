@@ -173,7 +173,7 @@ graph TB
 | `TZ` | `Asia/Tokyo` | タイムゾーン |
 | `RTSP_URL` | `rtsp://6199:4003@10.0.1.25/live` | RTSPストリームURL |
 | `CAMERA_NAME` | `camera1_10_0_1_25` | カメラ識別名（ディレクトリ名） |
-| `SENSITIVITY` | `medium` | 感度 (low/medium/high/fireball) |
+| `SENSITIVITY` | `medium` | 感度 (low/medium/high/faint/fireball) |
 | `SCALE` | `0.5` | 処理スケール (0.0-1.0) |
 | `BUFFER` | `15` | リングバッファ秒数 |
 | `EXCLUDE_BOTTOM` | `0.0625` | 画面下部除外率 (1/16) |
@@ -685,7 +685,7 @@ docker compose ps
 |-----------|------------|------|
 | `-s, --streamers` | `streamers` | RTSP URLリストファイル |
 | `-o, --output` | `docker-compose.yml` | 出力ファイル名 |
-| `--sensitivity` | `medium` | 検出感度 (low/medium/high/fireball) |
+| `--sensitivity` | `medium` | 検出感度 (low/medium/high/faint/fireball) |
 | `--scale` | `0.5` | 処理スケール (0.0-1.0) |
 | `--buffer` | `15` | リングバッファ秒数 |
 | `--exclude-bottom` | `0.0625` | 画面下部除外率 (1/16) |

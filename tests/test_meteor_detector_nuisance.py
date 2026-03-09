@@ -90,4 +90,3 @@ def test_finalize_track_rejects_by_nuisance_path_overlap():
     ]
 
     assert detector._finalize_track(0) is None
-

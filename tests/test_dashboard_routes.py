@@ -1,7 +1,6 @@
 import dashboard_routes as dr
 import io
 import json
-from datetime import datetime
 
 
 class _DummyResponse:
@@ -16,17 +15,6 @@ class _DummyResponse:
 
     def read(self):
         return self.payload
-
-
-class _DummyJSONResponse:
-    def __init__(self, payload):
-        self._payload = payload
-
-    def raise_for_status(self):
-        return None
-
-    def json(self):
-        return self._payload
 
 
 class _DummyHandler:
@@ -179,66 +167,6 @@ def test_handle_dashboard_stats(monkeypatch):
     assert handler.status == 200
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["cpu_percent"] == 12.3
-
-
-def test_aggregate_night_weather(monkeypatch):
-    monkeypatch.setattr(
-        dr,
-        "get_detection_window_for_date",
-        lambda target_date, latitude, longitude, timezone: (
-            datetime.fromisoformat(f"{target_date.isoformat()}T18:00:00+09:00"),
-            datetime.fromisoformat(f"{target_date.isoformat()}T23:59:59+09:00"),
-        ),
-    )
-    hourly = {
-        "time": [
-            "2026-03-01T17:00",
-            "2026-03-01T19:00",
-            "2026-03-01T21:00",
-        ],
-        "cloud_cover": [10, 85, 90],
-        "weather_code": [0, 3, 61],
-    }
-
-    payload = dr._aggregate_night_weather(
-        hourly,
-        datetime(2026, 3, 1).date(),
-        datetime(2026, 3, 1).date(),
-        35.0,
-        139.0,
-        "Asia/Tokyo",
-    )
-    assert payload["2026-03-01"]["label"] == "雨"
-    assert payload["2026-03-01"]["cloud_cover_avg"] == 87.5
-
-
-def test_handle_night_weather_success(monkeypatch):
-    monkeypatch.setattr(
-        dr,
-        "get_detection_window_for_date",
-        lambda target_date, latitude, longitude, timezone: (
-            datetime.fromisoformat(f"{target_date.isoformat()}T18:00:00+09:00"),
-            datetime.fromisoformat(f"{target_date.isoformat()}T23:59:59+09:00"),
-        ),
-    )
-    monkeypatch.setattr(
-        dr.requests,
-        "get",
-        lambda *args, **kwargs: _DummyJSONResponse(
-            {
-                "hourly": {
-                    "time": ["2026-03-01T19:00", "2026-03-01T22:00"],
-                    "cloud_cover": [5, 15],
-                    "weather_code": [0, 1],
-                }
-            }
-        ),
-    )
-    handler = _DummyHandler("/night_weather?start=2026-03-01&end=2026-03-01")
-    assert dr.handle_night_weather(handler) is None
-    assert handler.status == 200
-    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
-    assert payload["days"]["2026-03-01"]["label"] in {"快晴", "晴"}
 
 
 def test_handle_camera_stats_returns_monitor_snapshot(monkeypatch):

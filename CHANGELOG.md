@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-03-09
+### Added
+- 短く暗い流星の取りこぼし低減を目的とした新しい感度プリセット `faint` を追加。既存の `medium` / `high` を崩さず、設定UIやランタイム設定から切り替え可能に。
+
+### Changed
+- `README.md`、検出チューニング、構成ガイド、Docker関連ドキュメントを改版し、感度プリセットに `faint` を反映。
+
+### Fixed
+- カレンダービューに追加していた夜間天気表示を撤去し、API仕様上の期間制限で `--` 表示に落ちる問題を解消。
+
 ## [1.22.0] - 2026-03-08
 ### Added
 - ダッシュボードにカメラ専用ページ `GET /cameras` を追加し、検出一覧中心のトップページとライブカメラ表示を分離。

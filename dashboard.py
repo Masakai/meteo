@@ -110,12 +110,6 @@ def settings() -> Response:
 def detection_window() -> Response:
     return _dispatch(routes.handle_detection_window)
 
-
-@app.get("/night_weather")
-def night_weather() -> Response:
-    return _dispatch(routes.handle_night_weather)
-
-
 @app.get("/changelog")
 def changelog() -> Response:
     changelog_path = Path(__file__).parent / "CHANGELOG.md"
