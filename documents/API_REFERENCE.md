@@ -935,6 +935,17 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `detection_window_start` | string | 現在参照中の検出開始時刻 |
 | `detection_window_end` | string | 現在参照中の検出終了時刻 |
 
+**`detection_status` の意味**:
+- `DETECTING`: 検出期間内で検出処理中
+- `OUT_OF_WINDOW`: 検出期間外
+- `WAITING_FRAME`: 起動直後などで比較用フレーム待ち
+- `STREAM_LOST`: ストリーム断またはフレーム取得停止
+
+**ダッシュボードのカメラライブ画面での表現**:
+- ストリーム接続: 緑は接続中、赤は切断または映像更新停止、灰は常時表示オフ
+- カメラサーバ生存: 緑は `/stats` 応答あり、赤は応答なし、灰は判定保留
+- 検出処理: 赤点滅は検出期間内で処理中、緑は検出期間外、黄は検出期間内だが停止疑い、灰は状態確認中
+
 **使用例**:
 ```bash
 # curlで取得
