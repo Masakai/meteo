@@ -27,6 +27,13 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v1.24.0 - YouTube アップロード
+- **新規エンドポイント**: `GET /youtube_status`
+  - ダッシュボードから YouTube 投稿が利用可能かどうかを返却
+- **新規エンドポイント**: `POST /youtube_upload`
+  - 指定した検出動画を YouTube へアップロード
+  - 事前に `authorize_youtube.py` で OAuth トークン作成が必要
+
 ### v1.23.1 - 検出時間帯判定と状態表示の修正
 - **修正**: 検出時間帯の計算を「当日日没から翌日の日出まで」に是正
 - **機能追加**: `GET /stats` レスポンスに検出状態詳細フィールドを追加
@@ -90,6 +97,8 @@ Licensed under the MIT License
 | `/detection_window` | GET | 検出時間帯取得 |
 | `/detections` | GET | 検出一覧取得 |
 | `/detections_mtime` | GET | 検出ログ更新時刻取得 |
+| `/youtube_status` | GET | YouTube アップロード状態取得 |
+| `/youtube_upload` | POST | 検出動画を YouTube にアップロード |
 | `/camera_settings/current` | GET | カメラ設定の現在値取得 |
 | `/camera_settings/apply_all` | POST | 設定を全カメラへ一括適用 |
 | `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） |
@@ -209,6 +218,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
   "total": 15,
   "recent": [
     {
+      "id": "det_0e4f7b88f3c8c9b90f24",
       "time": "2026-02-02 06:55:33",
       "camera": "camera1_10_0_1_25",
       "confidence": "87%",
@@ -217,6 +227,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
       "composite_original": "camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg"
     },
     {
+      "id": "det_7b7d19db250a8b1f9cc0",
       "time": "2026-02-02 05:32:18",
       "camera": "camera2_10_0_1_3",
       "confidence": "92%",
@@ -234,6 +245,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
 |-----------|-----|------|
 | `total` | integer | 総検出数 |
 | `recent` | array | 検出リスト（時刻降順） |
+| `recent[].id` | string | 検出を一意に識別するID |
 | `recent[].time` | string | 検出時刻 |
 | `recent[].camera` | string | カメラ名 |
 | `recent[].confidence` | string | 信頼度（パーセント表示） |
@@ -260,6 +272,57 @@ fetch('/detections')
     console.log('Total:', data.total);
     data.recent.forEach(d => console.log(d.time, d.camera));
   });
+```
+
+---
+
+### GET /youtube_status
+
+**説明**: YouTube アップロード機能の利用可否と設定状態を取得
+
+**レスポンスボディ**:
+```json
+{
+  "enabled": true,
+  "configured": true,
+  "setup_ready": true,
+  "privacy_status": "unlisted",
+  "token_file": "/app/youtube_token.json",
+  "client_secrets_file": "/app/client_secret.json",
+  "issues": []
+}
+```
+
+---
+
+### POST /youtube_upload
+
+**説明**: 指定した検出動画を YouTube へアップロード
+
+**リクエストボディ**:
+```json
+{
+  "camera": "camera1",
+  "id": "det_0e4f7b88f3c8c9b90f24",
+  "title": "流星検出 2026/02/07 22:00:00 東側",
+  "description": "検出時刻: 2026-02-07 22:00:00\nカメラ: 東側",
+  "privacy_status": "unlisted"
+}
+```
+
+**レスポンスボディ**:
+```json
+{
+  "success": true,
+  "camera": "camera1",
+  "id": "det_0e4f7b88f3c8c9b90f24",
+  "time": "2026-02-07 22:00:00",
+  "video_path": "/output/camera1/meteor_20260207_220000.mp4",
+  "video_id": "abc123",
+  "url": "https://www.youtube.com/watch?v=abc123",
+  "privacy_status": "unlisted",
+  "title": "流星検出 2026/02/07 22:00:00 東側"
+}
 ```
 
 ---
@@ -546,7 +609,7 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 
 ---
 
-### DELETE /detection/{camera}/{timestamp}
+### DELETE /detection/{camera}/{id}
 
 **説明**: 検出結果を削除（動画、画像、JSONLエントリ）
 
@@ -555,7 +618,7 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 | パラメータ | 型 | 説明 | 例 |
 |-----------|-----|------|-----|
 | `camera` | string | カメラディレクトリ名 | `camera1_10_0_1_25` |
-| `timestamp` | string | 検出時刻（URL encoded） | `2026-02-02 06:55:33` |
+| `id` | string | 検出ID | `det_0e4f7b88f3c8c9b90f24` |
 
 **レスポンス**:
 - Content-Type: `application/json`
@@ -585,10 +648,10 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 **使用例**:
 ```bash
 # curlで削除
-curl -X DELETE "http://localhost:8080/detection/camera1_10_0_1_25/2026-02-02%2006:55:33"
+curl -X DELETE "http://localhost:8080/detection/camera1_10_0_1_25/det_0e4f7b88f3c8c9b90f24"
 
 # JavaScriptから削除
-fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
+fetch('/detection/camera1_10_0_1_25/det_0e4f7b88f3c8c9b90f24', {
   method: 'DELETE'
 })
 .then(r => r.json())
@@ -681,8 +744,8 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 ```json
 {
   "camera": "camera1_10_0_1_25",
-  "timestamp": "2026-02-02 06:55:33",
-  "label": "meteor"
+  "id": "det_0e4f7b88f3c8c9b90f24",
+  "label": "detected"
 }
 ```
 
@@ -691,8 +754,8 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 | パラメータ | 型 | 必須 | 説明 | 例 |
 |-----------|-----|------|------|-----|
 | `camera` | string | Yes | カメラディレクトリ名 | `camera1_10_0_1_25` |
-| `timestamp` | string | Yes | 検出時刻 | `2026-02-02 06:55:33` |
-| `label` | string | Yes | ラベル（`meteor`, `non-meteor`, 空文字など） | `meteor` |
+| `id` | string | Yes | 検出ID | `det_0e4f7b88f3c8c9b90f24` |
+| `label` | string | Yes | ラベル（`detected` / `post_detected`） | `detected` |
 
 **レスポンス**:
 - Content-Type: `application/json`
@@ -702,7 +765,9 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 ```json
 {
   "success": true,
-  "message": "Label updated"
+  "camera": "camera1_10_0_1_25",
+  "id": "det_0e4f7b88f3c8c9b90f24",
+  "label": "detected"
 }
 ```
 
@@ -721,8 +786,8 @@ curl -X POST "http://localhost:8080/detection_label" \
   -H "Content-Type: application/json" \
   -d '{
     "camera": "camera1_10_0_1_25",
-    "timestamp": "2026-02-02 06:55:33",
-    "label": "meteor"
+    "id": "det_0e4f7b88f3c8c9b90f24",
+    "label": "detected"
   }' | jq
 
 # JavaScriptからラベル設定
@@ -731,8 +796,8 @@ fetch('/detection_label', {
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify({
     camera: 'camera1_10_0_1_25',
-    timestamp: '2026-02-02 06:55:33',
-    label: 'meteor'
+    id: 'det_0e4f7b88f3c8c9b90f24',
+    label: 'detected'
   })
 })
 .then(r => r.json())
@@ -746,10 +811,8 @@ fetch('/detection_label', {
 ```
 
 **ラベルの活用**:
-- `meteor`: 流星として確認済み
-- `non-meteor`: 非流星（誤検出）
-- 空文字: 未確認
-- カスタムラベル: 任意の文字列（例: `satellite`, `aircraft`, `noise`）
+- `detected`: 流星として扱う
+- `post_detected`: それ以外として扱う
 
 ---
 

@@ -1,6 +1,7 @@
 """HTTP route handlers for the dashboard."""
 
 from datetime import datetime
+import hashlib
 import logging
 from time import time
 import json
@@ -12,7 +13,16 @@ from urllib.parse import urlparse, parse_qs, unquote
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-from dashboard_config import CAMERAS, DETECTIONS_DIR, VERSION, get_detection_window
+from dashboard_config import (
+    CAMERAS,
+    DETECTIONS_DIR,
+    VERSION,
+    YOUTUBE_CATEGORY_ID,
+    YOUTUBE_CLIENT_SECRETS_FILE,
+    YOUTUBE_PRIVACY_STATUS,
+    YOUTUBE_TOKEN_FILE,
+    get_detection_window,
+)
 from dashboard_templates import render_dashboard_html, render_settings_html
 
 logger = logging.getLogger(__name__)
@@ -49,6 +59,7 @@ _dashboard_cpu = {
     "last_total": None,
     "last_idle": None,
 }
+_YOUTUBE_UPLOAD_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
 
 def _read_system_cpu_totals():
@@ -154,6 +165,163 @@ def _detection_label_key(camera_name, detection_time):
     return f"{camera_name}|{detection_time}"
 
 
+def _make_detection_id(camera_name, record):
+    source = {
+        "camera": camera_name,
+        "timestamp": record.get("timestamp", ""),
+        "start_time": record.get("start_time", ""),
+        "end_time": record.get("end_time", ""),
+        "start_point": record.get("start_point", ""),
+        "end_point": record.get("end_point", ""),
+    }
+    digest = hashlib.sha1(json.dumps(source, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return f"det_{digest[:20]}"
+
+
+def _normalize_detection_id(camera_name, record):
+    value = str(record.get("id", "")).strip()
+    return value or _make_detection_id(camera_name, record)
+
+
+def _safe_datetime_from_record(record):
+    timestamp_str = str(record.get("timestamp", "")).strip()
+    if not timestamp_str:
+        return None
+    try:
+        return datetime.fromisoformat(timestamp_str)
+    except Exception:
+        return None
+
+
+def _legacy_base_name_from_record(record):
+    dt = _safe_datetime_from_record(record)
+    if dt is None:
+        return ""
+    return f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
+
+
+def _normalize_relative_asset_path(camera_name, path_value):
+    path_str = str(path_value or "").strip()
+    if not path_str:
+        return ""
+    if "/" in path_str:
+        return path_str
+    return f"{camera_name}/{path_str}"
+
+
+def _resolve_asset_path(cam_dir, camera_name, record, field_name, legacy_suffix):
+    explicit_rel = _normalize_relative_asset_path(camera_name, record.get(field_name, ""))
+    if explicit_rel:
+        explicit_path = Path(DETECTIONS_DIR) / explicit_rel
+        if explicit_path.exists():
+            return explicit_rel
+    base_name = str(record.get("base_name", "")).strip() or _legacy_base_name_from_record(record)
+    if not base_name:
+        return ""
+    rel = f"{camera_name}/{base_name}{legacy_suffix}"
+    abs_path = cam_dir / f"{base_name}{legacy_suffix}"
+    return rel if abs_path.exists() else ""
+
+
+def _resolve_detection_assets(cam_dir, camera_name, record):
+    clip_rel = ""
+    for field_name, suffix in (("clip_path", ".mp4"), ("clip_path", ".mov")):
+        candidate = _resolve_asset_path(cam_dir, camera_name, record, field_name, suffix)
+        if candidate:
+            clip_rel = candidate
+            break
+    image_rel = _resolve_asset_path(cam_dir, camera_name, record, "image_path", "_composite.jpg")
+    original_rel = _resolve_asset_path(
+        cam_dir,
+        camera_name,
+        record,
+        "composite_original_path",
+        "_composite_original.jpg",
+    )
+    return clip_rel, image_rel, original_rel
+
+
+def _normalize_detection_record(camera_name, cam_dir, record):
+    normalized = dict(record)
+    detection_id = _normalize_detection_id(camera_name, normalized)
+    dt = _safe_datetime_from_record(normalized)
+    display_time = dt.isoformat(sep=" ")[:19] if dt else str(normalized.get("timestamp", "")).replace("T", " ")[:19]
+    clip_rel, image_rel, original_rel = _resolve_detection_assets(cam_dir, camera_name, normalized)
+    normalized["id"] = detection_id
+    normalized["time"] = display_time
+    normalized["camera"] = camera_name
+    normalized["camera_display"] = _camera_display_name(camera_name)
+    normalized["clip_path"] = clip_rel
+    normalized["image_path"] = image_rel
+    normalized["composite_original_path"] = original_rel
+    normalized["legacy_label_key"] = _detection_label_key(camera_name, display_time) if display_time else ""
+    return normalized
+
+
+def _iter_camera_detection_records(camera_name):
+    cam_dir = Path(DETECTIONS_DIR) / camera_name
+    jsonl_file = cam_dir / "detections.jsonl"
+    records = []
+    if not jsonl_file.exists():
+        return records, cam_dir, jsonl_file
+    with open(jsonl_file, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                raw = json.loads(line)
+                records.append((line, raw, _normalize_detection_record(camera_name, cam_dir, raw)))
+            except Exception:
+                logger.exception("Failed to parse detection entry for camera=%s line=%r", camera_name, line[:200])
+    return records, cam_dir, jsonl_file
+
+
+def _find_detection_record(camera_name, detection_id):
+    records, cam_dir, jsonl_file = _iter_camera_detection_records(camera_name)
+    for index, (line, raw, normalized) in enumerate(records):
+        if normalized["id"] == detection_id:
+            return {
+                "records": records,
+                "cam_dir": cam_dir,
+                "jsonl_file": jsonl_file,
+                "index": index,
+                "line": line,
+                "raw": raw,
+                "normalized": normalized,
+            }
+    raise FileNotFoundError(f"detection id not found: {camera_name} {detection_id}")
+
+
+def _records_referencing_relpath(records, relpath, *, exclude_id=None):
+    target = str(relpath or "").strip()
+    if not target:
+        return 0
+    count = 0
+    for _, _, normalized in records:
+        if exclude_id and normalized["id"] == exclude_id:
+            continue
+        for key in ("clip_path", "image_path", "composite_original_path"):
+            if normalized.get(key) == target:
+                count += 1
+                break
+    return count
+
+
+def _delete_detection_assets_if_unreferenced(records, normalized):
+    deleted_files = []
+    for key in ("clip_path", "image_path", "composite_original_path"):
+        relpath = normalized.get(key, "")
+        if not relpath:
+            continue
+        if _records_referencing_relpath(records, relpath, exclude_id=normalized["id"]) > 0:
+            continue
+        abs_path = Path(DETECTIONS_DIR) / relpath
+        if abs_path.exists() and abs_path.is_file():
+            abs_path.unlink()
+            deleted_files.append(abs_path.name)
+    return deleted_files
+
+
 def _normalize_detection_label(label):
     value = str(label or "").strip()
     if value == "post_detected":
@@ -166,6 +334,119 @@ def _camera_display_name(camera_name):
         if cam.get("name") == camera_name:
             return cam.get("display_name") or camera_name
     return camera_name
+
+
+def _youtube_dependencies_available():
+    try:
+        from google.auth.transport.requests import Request as GoogleAuthRequest
+        from google.oauth2.credentials import Credentials
+        from googleapiclient.discovery import build
+        from googleapiclient.errors import HttpError as GoogleApiHttpError
+        from googleapiclient.http import MediaFileUpload
+    except ImportError as e:
+        return {
+            "ok": False,
+            "error": f"google api libraries not installed: {e}",
+        }
+    return {
+        "ok": True,
+        "GoogleAuthRequest": GoogleAuthRequest,
+        "Credentials": Credentials,
+        "build": build,
+        "GoogleApiHttpError": GoogleApiHttpError,
+        "MediaFileUpload": MediaFileUpload,
+    }
+
+
+def _youtube_config_snapshot():
+    token_path = Path(YOUTUBE_TOKEN_FILE).expanduser() if YOUTUBE_TOKEN_FILE else None
+    client_secrets_path = Path(YOUTUBE_CLIENT_SECRETS_FILE).expanduser() if YOUTUBE_CLIENT_SECRETS_FILE else None
+    deps = _youtube_dependencies_available()
+    configured = bool(token_path and token_path.exists())
+    setup_ready = bool(client_secrets_path and client_secrets_path.exists())
+    enabled = deps["ok"] and configured
+    issues = []
+    if not deps["ok"]:
+        issues.append(deps["error"])
+    if not configured:
+        issues.append("YouTube token file not found")
+    if not setup_ready:
+        issues.append("YouTube client secrets file not found")
+    return {
+        "enabled": enabled,
+        "configured": configured,
+        "setup_ready": setup_ready,
+        "token_file": str(token_path) if token_path else "",
+        "client_secrets_file": str(client_secrets_path) if client_secrets_path else "",
+        "privacy_status": YOUTUBE_PRIVACY_STATUS,
+        "category_id": YOUTUBE_CATEGORY_ID,
+        "issues": issues,
+        "deps": deps,
+    }
+
+
+def _sanitize_youtube_privacy_status(value):
+    normalized = str(value or "").strip().lower()
+    if normalized in {"public", "unlisted", "private"}:
+        return normalized
+    return YOUTUBE_PRIVACY_STATUS if YOUTUBE_PRIVACY_STATUS in {"public", "unlisted", "private"} else "unlisted"
+
+
+def _resolve_detection_video_path(camera_name, detection_id):
+    match = _find_detection_record(camera_name, detection_id)
+    relpath = match["normalized"].get("clip_path", "")
+    if relpath:
+        candidate = Path(DETECTIONS_DIR) / relpath
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    raise FileNotFoundError(f"detection video not found for {camera_name} {detection_id}")
+
+
+def _build_default_youtube_title(camera_name, detection_time):
+    display_name = _camera_display_name(camera_name)
+    compact_time = detection_time.replace("-", "/")
+    return f"流星検出 {compact_time} {display_name}"
+
+
+def _load_youtube_credentials(config):
+    deps = config["deps"]
+    credentials = deps["Credentials"].from_authorized_user_file(config["token_file"], _YOUTUBE_UPLOAD_SCOPES)
+    if credentials.expired and credentials.refresh_token:
+        credentials.refresh(deps["GoogleAuthRequest"]())
+        token_path = Path(config["token_file"])
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(credentials.to_json(), encoding="utf-8")
+    if not credentials.valid:
+        raise RuntimeError("YouTube credentials are invalid. Re-run authorize_youtube.py.")
+    return credentials
+
+
+def _upload_video_to_youtube(config, *, video_path, title, description, privacy_status):
+    deps = config["deps"]
+    credentials = _load_youtube_credentials(config)
+    youtube = deps["build"]("youtube", "v3", credentials=credentials, cache_discovery=False)
+    body = {
+        "snippet": {
+            "title": title,
+            "description": description,
+            "categoryId": str(YOUTUBE_CATEGORY_ID),
+        },
+        "status": {
+            "privacyStatus": _sanitize_youtube_privacy_status(privacy_status),
+        },
+    }
+    media = deps["MediaFileUpload"](str(video_path), resumable=True)
+    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
+    response = None
+    while response is None:
+        _, response = request.next_chunk()
+    video_id = response.get("id", "")
+    return {
+        "video_id": video_id,
+        "url": f"https://www.youtube.com/watch?v={video_id}" if video_id else "",
+        "privacy_status": body["status"]["privacyStatus"],
+        "title": title,
+    }
 
 
 def _compute_latest_mtime():
@@ -211,57 +492,26 @@ def _build_detections_payload():
                         for line in f:
                             try:
                                 d = json.loads(line)
-                                timestamp_str = d.get("timestamp", "")
-                                if timestamp_str:
-                                    dt = datetime.fromisoformat(timestamp_str)
-                                    base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-                                    clip_ext = None
-                                    if (cam_dir / f"{base_filename}.mp4").exists():
-                                        clip_ext = ".mp4"
-                                    elif (cam_dir / f"{base_filename}.mov").exists():
-                                        clip_ext = ".mov"
-
-                                    mp4_path = (
-                                        f"{cam_dir.name}/{base_filename}{clip_ext}"
-                                        if clip_ext
-                                        else ""
-                                    )
-                                    composite_exists = (cam_dir / f"{base_filename}_composite.jpg").exists()
-                                    composite_original_exists = (
-                                        cam_dir / f"{base_filename}_composite_original.jpg"
-                                    ).exists()
-                                    composite_path = (
-                                        f"{cam_dir.name}/{base_filename}_composite.jpg"
-                                        if composite_exists
-                                        else ""
-                                    )
-                                    composite_orig_path = (
-                                        f"{cam_dir.name}/{base_filename}_composite_original.jpg"
-                                        if composite_original_exists
-                                        else ""
-                                    )
-                                    image_path = composite_path or composite_orig_path
-                                    if not composite_exists:
-                                        missing_composite += 1
-                                    if not composite_original_exists:
-                                        missing_original += 1
-                                    if not clip_ext:
-                                        missing_video += 1
-                                else:
-                                    mp4_path = ""
-                                    composite_path = ""
-                                    composite_orig_path = ""
-                                    image_path = ""
+                                normalized = _normalize_detection_record(cam_dir.name, cam_dir, d)
+                                mp4_path = normalized["clip_path"]
+                                composite_path = normalized["image_path"]
+                                composite_orig_path = normalized["composite_original_path"]
+                                image_path = composite_path or composite_orig_path
+                                if not composite_path:
                                     missing_composite += 1
+                                if not composite_orig_path:
                                     missing_original += 1
+                                if not mp4_path:
                                     missing_video += 1
 
                                 total += 1
                                 processed_lines += 1
-                                display_time = timestamp_str[:19].replace("T", " ")
-                                label_key = _detection_label_key(cam_dir.name, display_time)
+                                display_time = normalized["time"]
+                                label_key = normalized["legacy_label_key"]
+                                detection_id = normalized["id"]
                                 detections.append(
                                     {
+                                        "id": detection_id,
                                         "time": display_time,
                                         "camera": cam_dir.name,
                                         "camera_display": _camera_display_name(cam_dir.name),
@@ -269,7 +519,9 @@ def _build_detections_payload():
                                         "image": image_path,
                                         "mp4": mp4_path,
                                         "composite_original": composite_orig_path,
-                                        "label": _normalize_detection_label(labels.get(label_key, "")),
+                                        "label": _normalize_detection_label(
+                                            labels.get(detection_id, labels.get(label_key, ""))
+                                        ),
                                     }
                                 )
                             except Exception:
@@ -655,6 +907,97 @@ def handle_detections_mtime(handler):
     return True
 
 
+def handle_youtube_status(handler):
+    if handler.path != "/youtube_status":
+        return False
+
+    config = _youtube_config_snapshot()
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.end_headers()
+    handler.wfile.write(
+        json.dumps(
+            {
+                "enabled": config["enabled"],
+                "configured": config["configured"],
+                "setup_ready": config["setup_ready"],
+                "privacy_status": config["privacy_status"],
+                "token_file": config["token_file"],
+                "client_secrets_file": config["client_secrets_file"],
+                "issues": config["issues"],
+            }
+        ).encode("utf-8")
+    )
+    return True
+
+
+def handle_youtube_upload(handler):
+    if handler.path != "/youtube_upload":
+        return False
+
+    try:
+        config = _youtube_config_snapshot()
+        if not config["enabled"]:
+            raise RuntimeError("YouTube upload is not configured")
+
+        length = int(handler.headers.get("Content-Length", "0"))
+        raw_body = handler.rfile.read(length)
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+
+        camera = str(payload.get("camera", "")).strip()
+        detection_id = str(payload.get("id", "")).strip()
+        title = str(payload.get("title", "")).strip()
+        description = str(payload.get("description", "")).strip()
+        privacy_status = _sanitize_youtube_privacy_status(payload.get("privacy_status", ""))
+
+        if not camera or not detection_id:
+            raise ValueError("camera and id are required")
+
+        match = _find_detection_record(camera, detection_id)
+        detection_time = match["normalized"]["time"]
+        video_path = _resolve_detection_video_path(camera, detection_id)
+        if not title:
+            title = _build_default_youtube_title(camera, detection_time)
+        if not description:
+            description = f"検出時刻: {detection_time}\nカメラ: {_camera_display_name(camera)}"
+
+        result = _upload_video_to_youtube(
+            config,
+            video_path=video_path,
+            title=title,
+            description=description,
+            privacy_status=privacy_status,
+        )
+
+        handler.send_response(200)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(
+            json.dumps(
+                {
+                    "success": True,
+                    "camera": camera,
+                    "id": detection_id,
+                    "time": detection_time,
+                    "video_path": str(video_path),
+                    "video_id": result["video_id"],
+                    "url": result["url"],
+                    "privacy_status": result["privacy_status"],
+                    "title": result["title"],
+                },
+                ensure_ascii=False,
+            ).encode("utf-8")
+        )
+        return True
+    except Exception as e:
+        handler.send_response(400)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False).encode("utf-8"))
+        return True
+
+
 def handle_dashboard_stats(handler):
     if handler.path != "/dashboard_stats":
         return False
@@ -823,52 +1166,35 @@ def handle_delete_detection(handler):
         parts = handler.path[11:].split("/", 1)
         if len(parts) == 2:
             camera_name = unquote(parts[0])
-            timestamp_str = unquote(parts[1])
+            detection_id = unquote(parts[1])
+            match = _find_detection_record(camera_name, detection_id)
+            records = match["records"]
+            cam_dir = match["cam_dir"]
+            jsonl_file = match["jsonl_file"]
+            normalized = match["normalized"]
 
-            dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-            base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-
-            cam_dir = Path(DETECTIONS_DIR) / camera_name
-
-            files_to_delete = [
-                cam_dir / f"{base_filename}.mov",
-                cam_dir / f"{base_filename}.mp4",
-                cam_dir / f"{base_filename}_composite.jpg",
-                cam_dir / f"{base_filename}_composite_original.jpg",
-            ]
-
-            deleted_files = []
-            for file_path in files_to_delete:
-                if file_path.exists():
-                    file_path.unlink()
-                    deleted_files.append(file_path.name)
-
-            jsonl_file = cam_dir / "detections.jsonl"
+            deleted_files = _delete_detection_assets_if_unreferenced(records, normalized)
             if jsonl_file.exists():
-                target_timestamp = dt.isoformat()
                 temp_file = cam_dir / "detections.jsonl.tmp"
-                removed_count = 0
-
                 with open(jsonl_file, "r", encoding="utf-8") as f_in, open(
                     temp_file, "w", encoding="utf-8"
                 ) as f_out:
                     for line in f_in:
                         try:
                             d = json.loads(line)
-                            if not d.get("timestamp", "").startswith(target_timestamp):
+                            if _normalize_detection_id(camera_name, d) != detection_id:
                                 f_out.write(line)
-                            else:
-                                removed_count += 1
                         except Exception:
                             f_out.write(line)
 
                 temp_file.replace(jsonl_file)
 
             labels = _load_detection_labels()
-            label_key = _detection_label_key(camera_name, timestamp_str)
-            if label_key in labels:
-                del labels[label_key]
-                _save_detection_labels(labels)
+            labels.pop(detection_id, None)
+            legacy_label_key = normalized.get("legacy_label_key", "")
+            if legacy_label_key:
+                labels.pop(legacy_label_key, None)
+            _save_detection_labels(labels)
             _refresh_detection_cache(force=True)
 
             handler.send_response(200)
@@ -877,6 +1203,7 @@ def handle_delete_detection(handler):
 
             response = {
                 "success": True,
+                "id": detection_id,
                 "deleted_files": deleted_files,
                 "message": f"{len(deleted_files)}個のファイルを削除しました",
             }
@@ -909,21 +1236,25 @@ def handle_set_detection_label(handler):
         payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
 
         camera = str(payload.get("camera", "")).strip()
-        detection_time = str(payload.get("time", "")).strip()
+        detection_id = str(payload.get("id", "")).strip()
         label = str(payload.get("label", "")).strip()
 
         allowed_labels = {"detected", "post_detected"}
         if label not in allowed_labels:
             raise ValueError("invalid label")
-        if not camera or not detection_time:
-            raise ValueError("camera and time are required")
+        if not camera or not detection_id:
+            raise ValueError("camera and id are required")
 
         labels = _load_detection_labels()
-        key = _detection_label_key(camera, detection_time)
+        match = _find_detection_record(camera, detection_id)
+        key = detection_id
         if label:
             labels[key] = label
         else:
             labels.pop(key, None)
+        legacy_label_key = match["normalized"].get("legacy_label_key", "")
+        if legacy_label_key:
+            labels.pop(legacy_label_key, None)
         _save_detection_labels(labels)
         _refresh_detection_cache(force=True)
 
@@ -931,7 +1262,7 @@ def handle_set_detection_label(handler):
         handler.send_header("Content-type", "application/json")
         handler.end_headers()
         handler.wfile.write(
-            json.dumps({"success": True, "camera": camera, "time": detection_time, "label": label}).encode("utf-8")
+            json.dumps({"success": True, "camera": camera, "id": detection_id, "label": label}).encode("utf-8")
         )
         return True
     except Exception as e:
@@ -1261,6 +1592,17 @@ def handle_bulk_delete_non_meteor(handler):
 
         jsonl_file = cam_dir / "detections.jsonl"
         if jsonl_file.exists():
+            records, _, _ = _iter_camera_detection_records(camera_name)
+            records_by_id = {normalized["id"]: (line, raw, normalized) for line, raw, normalized in records}
+            ids_to_delete = []
+            for _, _, normalized in records:
+                label = _normalize_detection_label(
+                    labels.get(normalized["id"], labels.get(normalized.get("legacy_label_key", ""), ""))
+                )
+                if label == "post_detected":
+                    ids_to_delete.append(normalized["id"])
+            remaining_records = [entry for entry in records if entry[2]["id"] not in ids_to_delete]
+
             temp_file = cam_dir / "detections.jsonl.tmp"
             with open(jsonl_file, "r", encoding="utf-8") as f_in, open(
                 temp_file, "w", encoding="utf-8"
@@ -1268,33 +1610,16 @@ def handle_bulk_delete_non_meteor(handler):
                 for line in f_in:
                     try:
                         d = json.loads(line)
-                        timestamp_str = d.get("timestamp", "")
-                        if timestamp_str:
-                            dt = datetime.fromisoformat(timestamp_str)
-                            display_time = timestamp_str[:19].replace("T", " ")
-                            label_key = _detection_label_key(camera_name, display_time)
-                            label = _normalize_detection_label(labels.get(label_key, ""))
-
-                            if label == "post_detected":
-                                base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-                                files_to_delete = [
-                                    cam_dir / f"{base_filename}.mov",
-                                    cam_dir / f"{base_filename}.mp4",
-                                    cam_dir / f"{base_filename}_composite.jpg",
-                                    cam_dir / f"{base_filename}_composite_original.jpg",
-                                ]
-
-                                for file_path in files_to_delete:
-                                    if file_path.exists():
-                                        file_path.unlink()
-
-                                if label_key in labels:
-                                    del labels[label_key]
-
-                                deleted_count += 1
-                                deleted_detections.append(display_time)
-                            else:
-                                f_out.write(line)
+                        detection_id = _normalize_detection_id(camera_name, d)
+                        if detection_id in ids_to_delete:
+                            normalized = records_by_id[detection_id][2]
+                            _delete_detection_assets_if_unreferenced(remaining_records, normalized)
+                            labels.pop(detection_id, None)
+                            legacy_label_key = normalized.get("legacy_label_key", "")
+                            if legacy_label_key:
+                                labels.pop(legacy_label_key, None)
+                            deleted_count += 1
+                            deleted_detections.append(normalized["time"])
                         else:
                             f_out.write(line)
                     except Exception:

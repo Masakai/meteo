@@ -5,7 +5,7 @@ Copyright (c) 2026 Masanori Sakai
 Licensed under the MIT License
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict
@@ -16,6 +16,7 @@ import json
 import subprocess
 import sys
 import time
+from uuid import uuid4
 
 import cv2
 import numpy as np
@@ -191,6 +192,7 @@ class MeteorEvent:
     peak_brightness: float
     confidence: float
     frames: List[Tuple[float, np.ndarray]]
+    id: str = field(default_factory=lambda: uuid4().hex)
 
     @property
     def duration(self) -> float:
@@ -204,6 +206,7 @@ class MeteorEvent:
 
     def to_dict(self) -> dict:
         return {
+            "id": self.id,
             "timestamp": self.timestamp.isoformat(),
             "start_time": round(self.start_time, 3),
             "end_time": round(self.end_time, 3),
@@ -742,19 +745,23 @@ def save_meteor_event(
         return None
 
     ts = event.timestamp.strftime("%Y%m%d_%H%M%S")
-    base_name = f"meteor_{ts}"
+    base_name = f"meteor_{ts}_{event.id}"
 
     height, width = frames[0][1].shape[:2]
 
     clip_fps = estimate_fps_from_frames(frames, fallback_fps=fps)
 
     clip_path = None
+    clip_relpath = ""
+    image_relpath = ""
+    original_relpath = ""
     if extract_clips:
         clip_path = output_dir / f"{base_name}.mp4"
         ok = write_clip_with_fallback(clip_path, frames, fps=clip_fps, size=(width, height))
         if not ok:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
             return None
+        clip_relpath = clip_path.name
 
     composite_end = min(event.end_time + composite_after, end)
     event_frames = ring_buffer.get_range(event.start_time, composite_end)
@@ -780,12 +787,21 @@ def save_meteor_event(
                 2,
             )
 
-        cv2.imwrite(str(output_dir / f"{base_name}_composite.jpg"), marked)
-        cv2.imwrite(str(output_dir / f"{base_name}_composite_original.jpg"), composite)
+        image_path = output_dir / f"{base_name}_composite.jpg"
+        original_path = output_dir / f"{base_name}_composite_original.jpg"
+        cv2.imwrite(str(image_path), marked)
+        cv2.imwrite(str(original_path), composite)
+        image_relpath = image_path.name
+        original_relpath = original_path.name
 
     log_path = output_dir / "detections.jsonl"
+    payload = event.to_dict()
+    payload["base_name"] = base_name
+    payload["clip_path"] = clip_relpath
+    payload["image_path"] = image_relpath
+    payload["composite_original_path"] = original_relpath
     with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
     if extract_clips and clip_path is not None:
         print(f"  保存: {clip_path.name}")

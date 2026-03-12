@@ -108,8 +108,14 @@ def test_handle_camera_snapshot_invalid_index(monkeypatch):
 
 def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_dir = tmp_path / "camera1"
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    (cam_dir / "detections.jsonl").write_text(
+        json.dumps({"id": "det_001", "timestamp": "2026-02-07T22:00:00", "confidence": 0.9}) + "\n",
+        encoding="utf-8",
+    )
     body = json.dumps(
-        {"camera": "camera1", "time": "2026-02-07 22:00:00", "label": "post_detected"}
+        {"camera": "camera1", "id": "det_001", "label": "post_detected"}
     ).encode("utf-8")
     handler = _DummyHandler("/detection_label", body=body, headers={"Content-Type": "application/json"})
 
@@ -118,7 +124,7 @@ def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["success"] is True
     saved = json.loads((tmp_path / "detection_labels.json").read_text(encoding="utf-8"))
-    assert saved["camera1|2026-02-07 22:00:00"] == "post_detected"
+    assert saved["det_001"] == "post_detected"
 
 
 def test_handle_detections_includes_label(monkeypatch, tmp_path):
@@ -138,6 +144,7 @@ def test_handle_detections_includes_label(monkeypatch, tmp_path):
     assert dr.handle_detections(handler) is None
     assert handler.status == 200
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["recent"][0]["id"].startswith("det_")
     assert payload["recent"][0]["label"] == "post_detected"
 
 
@@ -167,6 +174,122 @@ def test_handle_dashboard_stats(monkeypatch):
     assert handler.status == 200
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["cpu_percent"] == 12.3
+
+
+def test_handle_youtube_status_reports_enabled(monkeypatch):
+    monkeypatch.setattr(
+        dr,
+        "_youtube_config_snapshot",
+        lambda: {
+            "enabled": True,
+            "configured": True,
+            "setup_ready": True,
+            "privacy_status": "unlisted",
+            "token_file": "/tmp/youtube_token.json",
+            "client_secrets_file": "/tmp/client_secret.json",
+            "issues": [],
+        },
+    )
+    handler = _DummyHandler("/youtube_status")
+    assert dr.handle_youtube_status(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["enabled"] is True
+    assert payload["privacy_status"] == "unlisted"
+
+
+def test_handle_youtube_upload_success(monkeypatch, tmp_path):
+    video_path = tmp_path / "camera1" / "meteor_20260207_220000.mp4"
+    video_path.parent.mkdir(parents=True, exist_ok=True)
+    video_path.write_bytes(b"video")
+    monkeypatch.setattr(
+        dr,
+        "_youtube_config_snapshot",
+        lambda: {
+            "enabled": True,
+            "configured": True,
+            "setup_ready": True,
+            "privacy_status": "unlisted",
+            "token_file": "/tmp/youtube_token.json",
+            "client_secrets_file": "/tmp/client_secret.json",
+            "issues": [],
+            "deps": {"ok": True},
+        },
+    )
+    monkeypatch.setattr(
+        dr,
+        "_find_detection_record",
+        lambda camera, detection_id: {"normalized": {"time": "2026-02-07 22:00:00", "clip_path": "camera1/meteor_20260207_220000.mp4"}},
+    )
+    monkeypatch.setattr(dr, "_resolve_detection_video_path", lambda camera, detection_id: video_path)
+    monkeypatch.setattr(
+        dr,
+        "_upload_video_to_youtube",
+        lambda config, **kwargs: {
+            "video_id": "abc123",
+            "url": "https://www.youtube.com/watch?v=abc123",
+            "privacy_status": kwargs["privacy_status"],
+            "title": kwargs["title"],
+        },
+    )
+
+    body = json.dumps({"camera": "camera1", "id": "det_001"}).encode("utf-8")
+    handler = _DummyHandler("/youtube_upload", body=body, headers={"Content-Type": "application/json"})
+    assert dr.handle_youtube_upload(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["id"] == "det_001"
+    assert payload["video_id"] == "abc123"
+    assert payload["url"] == "https://www.youtube.com/watch?v=abc123"
+
+
+def test_handle_youtube_upload_rejects_when_not_configured(monkeypatch):
+    monkeypatch.setattr(
+        dr,
+        "_youtube_config_snapshot",
+        lambda: {
+            "enabled": False,
+            "configured": False,
+            "setup_ready": False,
+            "privacy_status": "unlisted",
+            "token_file": "",
+            "client_secrets_file": "",
+            "issues": ["YouTube token file not found"],
+        },
+    )
+    body = json.dumps({"camera": "camera1", "id": "det_001"}).encode("utf-8")
+    handler = _DummyHandler("/youtube_upload", body=body, headers={"Content-Type": "application/json"})
+    assert dr.handle_youtube_upload(handler) is True
+    assert handler.status == 400
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is False
+    assert "configured" in payload["error"]
+
+
+def test_handle_delete_detection_keeps_shared_files_for_other_record(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_dir = tmp_path / "camera1"
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    shared_mp4 = cam_dir / "meteor_20260207_220000.mp4"
+    shared_img = cam_dir / "meteor_20260207_220000_composite.jpg"
+    shared_orig = cam_dir / "meteor_20260207_220000_composite_original.jpg"
+    for path in (shared_mp4, shared_img, shared_orig):
+        path.write_bytes(b"x")
+    records = [
+        {"id": "det_a", "timestamp": "2026-02-07T22:00:00.100000", "clip_path": shared_mp4.name, "image_path": shared_img.name, "composite_original_path": shared_orig.name},
+        {"id": "det_b", "timestamp": "2026-02-07T22:00:00.200000", "clip_path": shared_mp4.name, "image_path": shared_img.name, "composite_original_path": shared_orig.name},
+    ]
+    (cam_dir / "detections.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records), encoding="utf-8")
+    handler = _DummyHandler("/detection/camera1/det_a")
+
+    assert dr.handle_delete_detection(handler) is True
+    assert handler.status == 200
+    remaining = (cam_dir / "detections.jsonl").read_text(encoding="utf-8")
+    assert '"id": "det_b"' in remaining
+    assert shared_mp4.exists()
+    assert shared_img.exists()
+    assert shared_orig.exists()
 
 
 def test_handle_camera_stats_returns_monitor_snapshot(monkeypatch):

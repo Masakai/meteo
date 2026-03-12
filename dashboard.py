@@ -134,6 +134,16 @@ def detections_mtime() -> Response:
     return response
 
 
+@app.get("/youtube_status")
+def youtube_status() -> Response:
+    return _dispatch(routes.handle_youtube_status, path="/youtube_status")
+
+
+@app.post("/youtube_upload")
+def youtube_upload() -> Response:
+    return _dispatch(routes.handle_youtube_upload, path="/youtube_upload")
+
+
 @app.get("/dashboard_stats")
 def dashboard_stats() -> Response:
     snapshot = routes.get_dashboard_cpu_snapshot(refresh=True)

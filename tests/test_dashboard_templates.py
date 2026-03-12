@@ -68,3 +68,15 @@ def test_render_dashboard_includes_detection_indicator_state_logic():
     assert "function updateDetectionIndicator(i, data, statsFetchOk)" in html
     assert "検出処理状態（黄: 検出期間内だが停止疑い" in html
     assert "検出処理状態（緑: 検出期間外）" in html
+
+
+def test_render_dashboard_includes_youtube_upload_ui():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+        page_mode="detections",
+    )
+    assert "function loadYoutubeStatus()" in html
+    assert "function uploadDetectionToYoutube(camera, detectionId, cameraLabel, time, event)" in html
+    assert "YOUTUBE" in html
