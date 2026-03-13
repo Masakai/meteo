@@ -47,7 +47,6 @@ services:
       - "8080:8080"
     volumes:
       - ./detections:/output
-      - ./imo_meteor_calender.json:/app/imo_meteor_calender.json:ro
     networks:
       - meteor-net
     depends_on:
