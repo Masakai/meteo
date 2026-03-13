@@ -7,10 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.23.2] - 2026-03-09
-### Fixed
-- カメラサーバ画面の検出時間帯ツールチップ生成で JavaScript テンプレート文字列と Python f-string が衝突し、ページ表示時に `NameError` で何も表示されなくなる不具合を修正。
-
 ## [1.23.1] - 2026-03-09
 ### Changed
 - ダッシュボードの検出インディケータを、検出中・期間外・期間内だが停止疑い・状態確認中で判別できる表示へ変更。

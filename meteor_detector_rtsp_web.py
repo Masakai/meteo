@@ -486,7 +486,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                         detectStatus.className = 'status idle';
                     }}
                     if (data.detection_window_enabled && data.detection_window_start && data.detection_window_end) {{
-                        detectStatus.title = 'window: ' + data.detection_window_start + ' - ' + data.detection_window_end;
+                        detectStatus.title = `window: ${data.detection_window_start} - ${data.detection_window_end}`;
                     }} else {{
                         detectStatus.title = '';
                     }}
