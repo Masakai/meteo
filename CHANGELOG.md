@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-03-13
+
+### Changed
+- ダッシュボードのカメラライブページで、画像クリック時に対象カメラサーバを新規タブで開けるよう改善。
+
+### Fixed
+- カメラサーバのライブ映像オーバーレイで、表示名ではなく内部カメラ名 (`CAMERA_NAME`) を表示するよう修正。
+
 ## [1.24.0] - 2026-03-13
 
 ### Added

@@ -50,6 +50,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     </div>
                     <div class="camera-video">
                         <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-stream-port="{cam['browser_stream_port']}" alt="{cam['name']}"
+                             title="クリックでカメラサーバを開く"
+                             onclick="openCameraServer({i})"
                              onerror="handleStreamError({i})"
                              onload="handleStreamLoad({i})">
                         <img class="mask-overlay" id="mask{i}" data-src="/camera_mask_image/{i}" alt="mask"
@@ -421,6 +423,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             width: 100%;
             height: 100%;
             object-fit: contain;
+            cursor: pointer;
         }}
         .mask-overlay {{
             position: absolute;
@@ -1359,17 +1362,32 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const img = document.getElementById('stream' + i);
             const errorEl = document.getElementById('error' + i);
             if (!img) return;
-            const port = Number(img.dataset.streamPort || cameras[i]?.browser_stream_port || 0);
-            const host = window.location.hostname;
-            const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:';
-            const base = (host && port > 0)
-                ? `${{scheme}}//${{host}}:${{port}}/stream`
-                : ('/camera_stream/' + i);
+            const baseUrl = getCameraBrowserBaseUrl(i);
+            const base = baseUrl ? `${{baseUrl}}/stream` : ('/camera_stream/' + i);
             if (errorEl) {{
                 errorEl.style.display = 'flex';
             }}
             img.style.display = 'none';
             img.src = base + '?t=' + Date.now();
+        }}
+
+        function getCameraBrowserBaseUrl(i) {{
+            const cam = cameras[i];
+            if (!cam) {{
+                return '';
+            }}
+            const port = Number(cam.browser_stream_port || 0);
+            const host = window.location.hostname;
+            const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:';
+            return (host && port > 0) ? `${{scheme}}//${{host}}:${{port}}` : '';
+        }}
+
+        function openCameraServer(i) {{
+            const url = getCameraBrowserBaseUrl(i);
+            if (!url) {{
+                return;
+            }}
+            window.open(url, '_blank', 'noopener,noreferrer');
         }}
 
         function scheduleStreamRetry(i, delay = STREAM_RETRY_DELAY_MS) {{

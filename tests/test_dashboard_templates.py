@@ -25,6 +25,20 @@ def test_render_dashboard_includes_stream_toggle_controls():
     assert "toggleStreamEnabled(0, this.checked)" in html
 
 
+def test_render_dashboard_camera_image_opens_camera_server():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+        page_mode="cameras",
+    )
+    assert 'onclick="openCameraServer(0)"' in html
+    assert 'title="クリックでカメラサーバを開く"' in html
+    assert "function getCameraBrowserBaseUrl(i)" in html
+    assert "function openCameraServer(i)" in html
+    assert "window.open(url, '_blank', 'noopener,noreferrer');" in html
+
+
 def test_render_dashboard_includes_settings_link():
     html = render_dashboard_html(
         cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
