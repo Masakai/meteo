@@ -280,18 +280,13 @@ streamersファイルの形式:
   1行に1つのRTSP URLを記載
   # で始まる行はコメント
   | で区切ってマスク画像パスと表示名を指定可能
-    形式:
-      URL
-      URL|マスク画像
-      URL||表示名
-      URL|マスク画像|表示名
+    形式: URL|マスク画像|表示名
 
 例:
   rtsp://user:pass@192.168.1.100/live
   rtsp://user:pass@192.168.1.101/live|mask1.png|玄関カメラ
-  rtsp://192.168.1.102:554/stream||駐車場
   # これはコメント
-  rtsp://192.168.1.103:554/stream|./masks/camera4.png
+  rtsp://192.168.1.102:554/stream||駐車場
         """
     )
 
