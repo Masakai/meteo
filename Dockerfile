@@ -14,9 +14,10 @@ RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # OpenCV実行に必要な最小限のシステムライブラリをインストール
 # libxcb1はopencv-python-headlessでも必要
-# ffmpeg追加により /dev/shm のキャッシュ容量を超えやすいため通常キャッシュを使い、直後に削除する
-RUN apt-get update --allow-releaseinfo-change && \
-    apt-get install -y --no-install-recommends \
+# aptの取得済みパッケージを保持しないようにして、ビルド時の一時ディスク使用量を抑える
+RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* && \
+    apt-get update --allow-releaseinfo-change && \
+    apt-get install -y --no-install-recommends -o APT::Keep-Downloaded-Packages=false \
         ffmpeg \
         libxcb1 \
         libglib2.0-0 \

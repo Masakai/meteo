@@ -94,3 +94,18 @@ def test_render_dashboard_includes_youtube_upload_ui():
     assert "function loadYoutubeStatus()" in html
     assert "function uploadDetectionToYoutube(camera, detectionId, cameraLabel, time, event)" in html
     assert "YOUTUBE" in html
+
+
+def test_render_dashboard_includes_meteor_calendar_data_and_styles():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+        page_mode="detections",
+    )
+    assert "const meteorCalendarEntries =" in html
+    assert "しぶんぎ座流星群" in html
+    assert ".calendar-day.meteor-active" in html
+    assert ".calendar-day.meteor-peak" in html
+    assert "function getMeteorShowersForDate(dateStr)" in html
+    assert "function buildCalendarTooltip(count, meteorInfo)" in html

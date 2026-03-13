@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements-docker.txt
 COPY dashboard*.py .
 COPY astro_utils.py .
 COPY documents/assets/meteo-logotype.svg ./documents/assets/meteo-logotype.svg
+COPY imo_meteor_calender.json ./imo_meteor_calender.json
 
 # タイムゾーン設定
 ENV TZ=Asia/Tokyo
