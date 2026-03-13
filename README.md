@@ -22,7 +22,6 @@
 - **RTSPストリームのリアルタイム検出** - ライブカメラストリームから流星を自動検出
 - **Webプレビュー** - ブラウザで検出状況をリアルタイム確認
 - **ダッシュボード** - 複数カメラの検出状況を一画面で表示
-- **YouTubeアップロード** - 検出済みの動画を選んで自分のチャンネルへ投稿
 - **Docker対応** - 複数カメラを並列監視可能
 
 ## 天文観測者向けの直感的な目安
@@ -193,40 +192,6 @@ python meteor_detector_rtsp_web.py rtsp://... --no-clips
 
 起動時に効く設定は `output/runtime_settings/<camera>.json` に保存され、
 コンテナ再起動後も維持されます。
-
-#### 検出動画を YouTube にアップロード
-
-ダッシュボードの検出一覧では、動画付きの検出に `YOUTUBE` ボタンが表示されます。
-利用前に Google OAuth の準備が1回必要です。
-
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt
-python authorize_youtube.py \
-  --client-secrets ./client_secret.json \
-  --token-file ./youtube_token.json
-```
-
-環境変数でダッシュボードへ設定します。
-
-```bash
-export YOUTUBE_CLIENT_SECRETS_FILE=./client_secret.json
-export YOUTUBE_TOKEN_FILE=./youtube_token.json
-export YOUTUBE_PRIVACY_STATUS=unlisted
-export YOUTUBE_CATEGORY_ID=22
-```
-
-- `YOUTUBE_CLIENT_SECRETS_FILE`: Google Cloud で作成した OAuth クライアント JSON
-- `YOUTUBE_TOKEN_FILE`: `authorize_youtube.py` が保存するトークン JSON
-- `YOUTUBE_PRIVACY_STATUS`: `public` / `unlisted` / `private`
-- `YOUTUBE_CATEGORY_ID`: YouTube 動画カテゴリ ID（既定値 `22`）
-
-既存の `detections/` を `id` ベースへ移行し、整合性を確認するには次を実行します。
-
-```bash
-python scripts/migrate_detection_ids.py --detections-dir detections
-python scripts/migrate_detection_ids.py --detections-dir detections --apply
-```
 
 ### 3. Web版と同じ検出ロジックでファイル再検証
 

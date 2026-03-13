@@ -178,27 +178,6 @@ cd ~/meteor-detector
 ls -lh detections/
 ```
 
-### YouTubeアップロードの有効化
-
-検出一覧から YouTube へアップロードするには、Google OAuth のクライアントシークレットとトークンを用意します。
-
-```bash
-source .venv/bin/activate
-pip install -r requirements.txt
-python authorize_youtube.py \
-  --client-secrets ./client_secret.json \
-  --token-file ./youtube_token.json
-```
-
-その後、ダッシュボード起動前に次を設定します。
-
-```bash
-export YOUTUBE_CLIENT_SECRETS_FILE=./client_secret.json
-export YOUTUBE_TOKEN_FILE=./youtube_token.json
-export YOUTUBE_PRIVACY_STATUS=unlisted
-export YOUTUBE_CATEGORY_ID=22
-```
-
 ---
 
 ## マスク画像の設定（オプション）

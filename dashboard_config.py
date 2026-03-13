@@ -4,7 +4,7 @@ Dashboard configuration and environment setup.
 
 import os
 
-VERSION = "1.24.0"
+VERSION = "1.23.2"
 
 # 検出時間の取得用
 try:
@@ -36,7 +36,3 @@ _local_detections = os.path.join(_base_dir, "detections")
 if os.path.isdir(_local_detections):
     _default_detections = _local_detections
 DETECTIONS_DIR = os.environ.get("DETECTIONS_DIR", _default_detections)
-YOUTUBE_CLIENT_SECRETS_FILE = os.environ.get("YOUTUBE_CLIENT_SECRETS_FILE", "")
-YOUTUBE_TOKEN_FILE = os.environ.get("YOUTUBE_TOKEN_FILE", os.path.join(_base_dir, "youtube_token.json"))
-YOUTUBE_PRIVACY_STATUS = os.environ.get("YOUTUBE_PRIVACY_STATUS", "unlisted")
-YOUTUBE_CATEGORY_ID = os.environ.get("YOUTUBE_CATEGORY_ID", "22")

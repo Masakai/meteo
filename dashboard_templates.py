@@ -761,18 +761,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             background: #00d4ff;
             color: #0f1530;
         }}
-        .detection-link.disabled {{
-            opacity: 0.45;
-            border-color: #7085aa;
-            color: #9fb0cc;
-            cursor: not-allowed;
-            pointer-events: none;
-        }}
-        .youtube-status {{
-            margin-top: 8px;
-            color: #9fb0cc;
-            font-size: 0.78em;
-        }}
         .delete-btn {{
             background: #ff4444;
             border: none;
@@ -1020,13 +1008,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         const serverStartTime = {int(server_start_time * 1000)};
         const streamPlaceholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
         const streamSelectionStorageKey = 'dashboard_stream_enabled_v1';
-        let youtubeStatus = {{
-            enabled: false,
-            configured: false,
-            setup_ready: false,
-            privacy_status: 'unlisted',
-            issues: [],
-        }};
 
         // 稼働時間を更新
         setInterval(() => {{
@@ -1264,39 +1245,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             return fetch(url, {{ ...options, signal: controller.signal }})
                 .then((r) => r.json())
                 .finally(() => clearTimeout(timeoutId));
-        }}
-
-        function youtubeStatusMessage() {{
-            if (youtubeStatus.enabled) {{
-                return `YouTube: ${{youtubeStatus.privacy_status || 'unlisted'}} でアップロード可能`;
-            }}
-            if (Array.isArray(youtubeStatus.issues) && youtubeStatus.issues.length > 0) {{
-                return 'YouTube未設定: ' + youtubeStatus.issues.join(' / ');
-            }}
-            return 'YouTube未設定';
-        }}
-
-        function loadYoutubeStatus() {{
-            return fetch('/youtube_status', {{ cache: 'no-store' }})
-                .then(r => r.json())
-                .then(data => {{
-                    youtubeStatus = {{
-                        enabled: data.enabled === true,
-                        configured: data.configured === true,
-                        setup_ready: data.setup_ready === true,
-                        privacy_status: data.privacy_status || 'unlisted',
-                        issues: Array.isArray(data.issues) ? data.issues : [],
-                    }};
-                }})
-                .catch(() => {{
-                    youtubeStatus = {{
-                        enabled: false,
-                        configured: false,
-                        setup_ready: false,
-                        privacy_status: 'unlisted',
-                        issues: ['status fetch failed'],
-                    }};
-                }});
         }}
 
         function applyStreamToggleUI(i) {{
@@ -1896,14 +1844,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }});
 
         // 検出削除関数
-        function deleteDetection(camera, detectionId, time, event) {{
+        function deleteDetection(camera, time, event) {{
             event.stopPropagation(); // 画像表示イベントを防止
 
             if (!confirm(`この検出を削除しますか?\n${{time}} - ${{camera}}`)) {{
                 return;
             }}
 
-            fetch(`/detection/${{camera}}/${{detectionId}}`, {{
+            fetch(`/detection/${{camera}}/${{time}}`, {{
                 method: 'DELETE'
             }})
             .then(r => r.json())
@@ -1918,70 +1866,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }})
             .catch(err => {{
                 alert('削除に失敗しました: ' + err.message);
-            }});
-        }}
-
-        function uploadDetectionToYoutube(camera, detectionId, cameraLabel, time, event) {{
-            event.stopPropagation();
-
-            if (!youtubeStatus.enabled) {{
-                alert(youtubeStatusMessage());
-                return;
-            }}
-
-            const defaultTitle = `流星検出 ${{time.replace(/-/g, '/')}} ${{cameraLabel}}`;
-            const defaultDescription = `検出時刻: ${{time}}\nカメラ: ${{cameraLabel}}`;
-            const title = prompt('YouTube タイトルを入力してください', defaultTitle);
-            if (title === null) {{
-                return;
-            }}
-            const description = prompt('説明文を入力してください', defaultDescription);
-            if (description === null) {{
-                return;
-            }}
-
-            const triggerEl = event.currentTarget || event.target;
-            const previousText = triggerEl ? triggerEl.textContent : '';
-            if (triggerEl) {{
-                triggerEl.textContent = 'UPLOADING...';
-                triggerEl.classList.add('disabled');
-            }}
-
-            fetch('/youtube_upload', {{
-                method: 'POST',
-                headers: {{
-                    'Content-Type': 'application/json'
-                }},
-                body: JSON.stringify({{
-                    camera,
-                    id: detectionId,
-                    title: title.trim(),
-                    description,
-                    privacy_status: youtubeStatus.privacy_status || 'unlisted'
-                }})
-            }})
-            .then(r => r.json())
-            .then(data => {{
-                if (!data.success) {{
-                    throw new Error(data.error || 'upload failed');
-                }}
-                const watchUrl = data.url || '';
-                if (watchUrl) {{
-                    if (confirm(`アップロードしました。\n\n${{data.title}}\n${{watchUrl}}\n\nYouTube を開きますか？`)) {{
-                        window.open(watchUrl, '_blank', 'noopener');
-                    }}
-                }} else {{
-                    alert('アップロードしました。');
-                }}
-            }})
-            .catch(err => {{
-                alert('YouTubeアップロードに失敗しました: ' + err.message);
-            }})
-            .finally(() => {{
-                if (triggerEl) {{
-                    triggerEl.textContent = previousText || 'YOUTUBE';
-                    triggerEl.classList.remove('disabled');
-                }}
             }});
         }}
 
@@ -2059,7 +1943,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
         }}
 
-        function updateDetectionLabel(camera, detectionId, label, radioEl) {{
+        function updateDetectionLabel(camera, time, label, radioEl) {{
             const groupEl = radioEl.closest('.label-radios');
             if (!groupEl) return;
             const normalized = label === 'post_detected' ? 'post_detected' : 'detected';
@@ -2070,7 +1954,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 headers: {{
                     'Content-Type': 'application/json'
                 }},
-                body: JSON.stringify({{ camera, id: detectionId, label: normalized }})
+                body: JSON.stringify({{ camera, time, label: normalized }})
             }})
             .then(r => r.json())
             .then(data => {{
@@ -2304,11 +2188,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 const originalAction = d.composite_original
                     ? `<span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">元画像</span>`
                     : '';
-                const youtubeActionClass = youtubeStatus.enabled ? 'detection-link' : 'detection-link disabled';
-                const youtubeActionTitle = youtubeStatus.enabled ? 'YouTubeにアップロード' : youtubeStatusMessage();
-                const youtubeAction = d.mp4
-                    ? `<span class="${{youtubeActionClass}}" title="${{youtubeActionTitle}}" onclick="uploadDetectionToYoutube('${{cameraKey}}', '${{d.id}}', '${{cameraLabel}}', '${{d.time}}', event)">YOUTUBE</span>`
-                    : '';
                 return `
                     <div class="detection-item">
                         <div class="time">${{d.time}} | ${{cameraLabel}}</div>
@@ -2319,22 +2198,21 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 ${{videoAction}}
                                 ${{imageAction}}
                                 ${{originalAction}}
-                                ${{youtubeAction}}
                             </div>
                             <div class="detection-manage-actions">
                                 <div class="label-radios" data-label="${{normalizedLabel}}">
                                     <label class="label-radio">
                                         <input type="radio" name="${{radioName}}" value="detected" ${{normalizedLabel === 'detected' ? 'checked' : ''}}
-                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.id}}', 'detected', this)">
+                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'detected', this)">
                                         <span>流星</span>
                                     </label>
                                     <label class="label-radio">
                                         <input type="radio" name="${{radioName}}" value="post_detected" ${{normalizedLabel === 'post_detected' ? 'checked' : ''}}
-                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.id}}', 'post_detected', this)">
+                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'post_detected', this)">
                                         <span>それ以外</span>
                                     </label>
                                 </div>
-                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
+                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.time}}', event)">削除</button>
                             </div>
                         </div>
                     </div>
@@ -2347,7 +2225,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         <span>${{dateLabel(selectedDetectionDate)}}</span>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">${{bulkDeleteButtons}}</div>
                     </div>
-                    <div class="youtube-status">${{youtubeStatusMessage()}}</div>
                     <div class="detection-group-grid">
                         ${{items}}
                     </div>
@@ -2404,7 +2281,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     detectionPollDelay = detectionPollBaseDelay;
                     totalEl.textContent = data.total;
                     const detectionsKey = (data.recent || []).map(d =>
-                        `${{d.id || ''}}|${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
+                        `${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
                     ).join('||');
                     if (detectionsKey === lastDetectionsKey) {{
                         return;
@@ -2451,8 +2328,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         function bootDetectionSection() {{
             // 初回表示時はカメラ関連の接続より先に「最近の検出」を描画する。
             // サムネイル取得が始まるまでカメラストリーム開始を少し遅らせ、接続枠の競合を避ける。
-            return loadYoutubeStatus()
-                .then(() => updateDetections())
+            return updateDetections()
                 .finally(() => {{
                     pollDetections();
                 }});

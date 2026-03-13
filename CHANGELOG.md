@@ -7,17 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.24.0] - 2026-03-13
-
-### Added
-- ダッシュボードの検出一覧から、指定した検出動画を YouTube チャンネルへ直接アップロードする機能を追加。
-- `authorize_youtube.py` を追加し、Google OAuth クライアントシークレットから `youtube_token.json` を生成できるようにした。
-
-### Changed
-- ダッシュボード設定に YouTube 連携用の環境変数（`YOUTUBE_CLIENT_SECRETS_FILE`, `YOUTUBE_TOKEN_FILE`, `YOUTUBE_PRIVACY_STATUS`, `YOUTUBE_CATEGORY_ID`）を追加。
-- 検出レコードの識別を `camera + time` 依存から一意 `id` ベースへ変更し、ラベル更新・個別削除・YouTube アップロード対象の特定に利用するよう見直し。
-- 新規検出の保存ファイル名に一意 `id` を含め、既存データ向けに `scripts/migrate_detection_ids.py` を追加。
-
 ## [1.23.2] - 2026-03-09
 ### Fixed
 - カメラサーバ画面の検出時間帯ツールチップ生成で JavaScript テンプレート文字列と Python f-string が衝突し、ページ表示時に `NameError` で何も表示されなくなる不具合を修正。
