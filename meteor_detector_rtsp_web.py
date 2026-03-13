@@ -1581,7 +1581,8 @@ def detection_thread_worker(
                         cv2.line(display, pt1, pt2, (0, 255, 255), 2)
 
         elapsed = time.time() - start_time_global
-        cv2.putText(display, f"{camera_name} | {elapsed:.0f}s | Detections: {detection_count}",
+        overlay_name = camera_display_name or camera_name
+        cv2.putText(display, f"{overlay_name} | {elapsed:.0f}s | Detections: {detection_count}",
                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         with current_frame_lock:
@@ -1659,6 +1660,8 @@ def process_rtsp_stream(
 
     params = params or DetectionParams()
     camera_name = cam_name
+    # 環境変数からWeb表示用の名前を取得（オプション）
+    import os
     camera_display_name = os.environ.get("CAMERA_NAME_DISPLAY", "")
 
     override_paths = _runtime_override_paths(output_dir, cam_name)
