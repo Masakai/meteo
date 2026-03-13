@@ -403,8 +403,9 @@ def _resolve_detection_video_path(camera_name, detection_id):
 
 
 def _build_default_youtube_title(camera_name, detection_time):
+    display_name = _camera_display_name(camera_name)
     compact_time = detection_time.replace("-", "/")
-    return f"流星検出 {compact_time}"
+    return f"流星検出 {compact_time} {display_name}"
 
 
 def _load_youtube_credentials(config):
@@ -959,7 +960,7 @@ def handle_youtube_upload(handler):
         if not title:
             title = _build_default_youtube_title(camera, detection_time)
         if not description:
-            description = f"検出時刻: {detection_time}"
+            description = f"検出時刻: {detection_time}\nカメラ: {_camera_display_name(camera)}"
 
         result = _upload_video_to_youtube(
             config,

@@ -1947,8 +1947,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 return;
             }}
 
-            const defaultTitle = `流星検出 ${{time.replace(/-/g, '/')}}`;
-            const defaultDescription = `検出時刻: ${{time}}`;
+            const defaultTitle = `流星検出 ${{time.replace(/-/g, '/')}} ${{cameraLabel}}`;
+            const defaultDescription = `検出時刻: ${{time}}\nカメラ: ${{cameraLabel}}`;
             const title = prompt('YouTube タイトルを入力してください', defaultTitle);
             if (title === null) {{
                 return;

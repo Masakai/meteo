@@ -7,11 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.24.2] - 2026-03-13
-
-### Fixed
-- YouTube アップロード時のタイトル・説明の初期値からカメラ名を除外し、IP を含む内部名が混ざらないよう修正。
-
 ## [1.24.1] - 2026-03-13
 
 ### Changed
