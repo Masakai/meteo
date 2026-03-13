@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 
 def render_dashboard_html(cameras, version, server_start_time, page_mode="detections"):
+    fps_warning_ratio = 0.8
     is_camera_page = page_mode == "cameras"
     is_detections_page = not is_camera_page
     logotype_path = Path(__file__).parent / "documents" / "assets" / "meteo-logotype.svg"
@@ -69,6 +70,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     page_heading = "カメラライブ" if is_camera_page else "最近の検出"
     nav_links = ['<a class="settings-link" href="/">検出一覧</a>' if is_camera_page else '<a class="settings-link" href="/cameras">カメラ表示</a>']
     nav_links.append('<a class="settings-link" href="/settings">全カメラ設定</a>')
+    nav_links.append('<button class="settings-link action-button" type="button" onclick="setGlobalDetectionEnabled(false)">検出停止</button>')
+    nav_links.append('<button class="settings-link action-button" type="button" onclick="setGlobalDetectionEnabled(true)">検出再開</button>')
     header_actions = "\n            ".join(nav_links)
     stats_primary = (
         f'''
@@ -189,10 +192,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #00d4ff;
             text-decoration: none;
             font-size: 0.9em;
+            background: transparent;
         }}
         .settings-link:hover {{
             background: #00d4ff;
             color: #10203c;
+        }}
+        .action-button {{
+            cursor: pointer;
         }}
         .stats-bar {{
             display: flex;
@@ -311,6 +318,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .detection-status.inactive {{
             color: #58d68d;
+        }}
+        .detection-status.paused {{
+            color: #f5b041;
         }}
         .detection-status.warning {{
             color: #f4d03f;
@@ -473,6 +483,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .camera-params .param-no-clip {{
             color: #ff8844;
+        }}
+        .camera-params .param-fps-warning {{
+            background: #5a3b14;
+            color: #ffd27a;
         }}
         .mask-status {{
             color: #666;
@@ -955,6 +969,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         <div class="header-actions">
             {header_actions}
         </div>
+        <div class="subtitle" id="global-detection-control-status"></div>
     </div>
 
     <div class="stats-bar">
@@ -1083,9 +1098,17 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const failThreshold = Number(data.monitor_fail_threshold || 8);
             const statsUnavailable = stopReason === 'stats_unreachable' || stopReason === 'stats_unreachable_transient';
             const likelyError = !streamAlive || statsUnavailable || (stopReason && stopReason !== 'none' && stopReason !== 'unknown');
+            const sourceFps = Number(data?.settings?.source_fps || 0);
+            const runtimeFps = Number(data.runtime_fps || 0);
+            const fpsLow = sourceFps > 0 && runtimeFps > 0 && runtimeFps < (sourceFps * {fps_warning_ratio});
 
             if (withinWindow === null) {{
                 setDetectionIndicatorState(i, 'unknown', '検出処理状態（灰: 検出時間帯を確認中）');
+                return;
+            }}
+
+            if (data.detection_enabled === false) {{
+                setDetectionIndicatorState(i, 'paused', '検出処理状態（橙: 手動停止中）');
                 return;
             }}
 
@@ -1104,6 +1127,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     ? `統計取得失敗 ${{statsFailures}}/${{failThreshold}}`
                     : (!streamAlive ? '映像更新停止' : `停止理由: ${{stopReason}}`);
                 setDetectionIndicatorState(i, 'warning', `検出処理状態（黄: 検出期間内だが停止疑い / ${{detail}}）`);
+                return;
+            }}
+
+            if (fpsLow) {{
+                setDetectionIndicatorState(i, 'warning', `検出処理状態（黄: runtime_fps=${{runtimeFps.toFixed(1)}} が source_fps=${{sourceFps.toFixed(1)}} の80%未満）`);
                 return;
             }}
 
@@ -1538,14 +1566,48 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const s = data.settings;
             const clipClass = s.extract_clips ? 'param-clip' : 'param-no-clip';
             const clipText = s.extract_clips ? 'CLIP:ON' : 'CLIP:OFF';
+            const detectText = data.detection_enabled === false ? 'DET:OFF' : 'DET:ON';
             const sourceFps = Number(s.source_fps || 0);
             const runtimeFps = Number(data.runtime_fps || 0);
             const fpsText = runtimeFps > 0 ? runtimeFps.toFixed(1) : (sourceFps > 0 ? sourceFps.toFixed(1) : '-');
+            const fpsWarning = sourceFps > 0 && runtimeFps > 0 && runtimeFps < (sourceFps * {fps_warning_ratio});
+            const fpsClass = fpsWarning ? 'param-fps-warning' : '';
             el.innerHTML =
                 `<span class="param">${{s.sensitivity}}</span>` +
                 `<span class="param">x${{s.scale}}</span>` +
-                `<span class="param">FPS:${{fpsText}}</span>` +
+                `<span class="param ${{fpsClass}}" title="${{fpsWarning ? 'runtime_fps が source_fps の 80% 未満' : '処理FPS'}}">FPS:${{fpsText}}</span>` +
+                `<span class="param">${{detectText}}</span>` +
                 `<span class="param ${{clipClass}}">${{clipText}}</span>`;
+        }}
+
+        function setGlobalDetectionControlStatus(message) {{
+            const el = document.getElementById('global-detection-control-status');
+            if (!el) {{
+                return;
+            }}
+            el.textContent = message || '';
+        }}
+
+        async function setGlobalDetectionEnabled(enabled) {{
+            const label = enabled ? '再開' : '停止';
+            setGlobalDetectionControlStatus(`検出${{label}}を適用中...`);
+            try {{
+                const res = await fetch('/camera_settings/apply_all', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ detection_enabled: enabled }}),
+                }});
+                const data = await res.json();
+                if (!res.ok || data.success === false) {{
+                    throw new Error(data.error || ('HTTP ' + res.status));
+                }}
+                setGlobalDetectionControlStatus(`検出${{label}}完了: ${{data.applied_count}}/${{data.total}}台`);
+                if (cameraPageEnabled) {{
+                    cameras.forEach((_, i) => updateCameraStats(i));
+                }}
+            }} catch (e) {{
+                setGlobalDetectionControlStatus(`検出${{label}}失敗: ${{e}}`);
+            }}
         }}
 
         function updateCameraStats(i) {{

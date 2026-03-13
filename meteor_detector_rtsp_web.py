@@ -53,6 +53,8 @@ except ImportError:
 current_frame = None
 current_frame_lock = Lock()
 current_frame_seq = 0
+current_stream_jpeg = None
+current_stream_jpeg_seq = 0
 detection_count = 0
 start_time_global = None
 camera_name = ""
@@ -65,6 +67,7 @@ current_detection_window_active = True
 current_detection_window_start = ""
 current_detection_window_end = ""
 current_detection_status = "INITIALIZING"
+current_detection_enabled = True
 current_detector = None
 current_proc_size = (0, 0)
 current_mask_dilate = 20
@@ -73,13 +76,22 @@ current_nuisance_dilate = 3
 current_clip_margin_before = 1.0
 current_clip_margin_after = 1.0
 current_output_dir = None
-current_camera_name = ""
+current_camera_name = ""  # 保存先・永続化用の識別子。display名は使わない
 current_stop_flag = None
 current_runtime_fps = 0.0
 current_runtime_overrides_paths = []
 current_pending_exclusion_mask = None
 current_pending_mask_save_path = None
 current_pending_mask_lock = Lock()
+try:
+    STREAM_JPEG_QUALITY = max(30, min(95, int(os.environ.get("STREAM_JPEG_QUALITY", "60"))))
+except ValueError:
+    STREAM_JPEG_QUALITY = 60
+try:
+    STREAM_MAX_FPS = max(1.0, min(30.0, float(os.environ.get("STREAM_MAX_FPS", "12"))))
+except ValueError:
+    STREAM_MAX_FPS = 12.0
+STREAM_FRAME_INTERVAL = 1.0 / STREAM_MAX_FPS
 # 設定情報（ダッシュボード表示用）
 current_settings = {
     "sensitivity": "medium",
@@ -96,6 +108,7 @@ current_settings = {
     "nuisance_overlap_threshold": 0.60,
     "clip_margin_before": 1.0,
     "clip_margin_after": 1.0,
+    "detection_enabled": True,
 }
 
 
@@ -107,8 +120,14 @@ def _to_bool(value, default=False):
     return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _storage_camera_name(cam_name: str) -> str:
+    """保存先・永続化ファイル名に使うカメラ識別子。表示名は使わない。"""
+    safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in str(cam_name)).strip("_")
+    return safe or "camera"
+
+
 def _runtime_override_paths(output_dir: str, cam_name: str) -> List[Path]:
-    safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in cam_name).strip("_") or "camera"
+    safe = _storage_camera_name(cam_name)
     output_path = Path(output_dir)
     primary = output_path.parent / "runtime_settings" / f"{safe}.json"
     legacy = output_path / "runtime_settings" / f"{safe}.json"
@@ -526,32 +545,29 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             last_send_at = 0.0
             while True:
                 with current_frame_lock:
-                    frame = None if current_frame is None else current_frame.copy()
-                    frame_seq = current_frame_seq
+                    jpeg = current_stream_jpeg
+                    frame_seq = current_stream_jpeg_seq
 
-                if frame is None:
+                if jpeg is None:
                     time.sleep(0.03)
                     continue
 
                 now = time.time()
-                if frame_seq == last_sent_seq and (now - last_send_at) < 1.0:
+                if frame_seq == last_sent_seq:
                     time.sleep(0.02)
                     continue
-
-                ok, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                if not ok:
-                    time.sleep(0.02)
+                if (now - last_send_at) < STREAM_FRAME_INTERVAL:
+                    time.sleep(min(0.02, STREAM_FRAME_INTERVAL / 2.0))
                     continue
 
                 try:
                     self.wfile.write(b'--frame\r\n')
                     self.wfile.write(b'Content-Type: image/jpeg\r\n\r\n')
-                    self.wfile.write(jpeg.tobytes())
+                    self.wfile.write(jpeg)
                     self.wfile.write(b'\r\n')
                     self.wfile.flush()
                     last_sent_seq = frame_seq
                     last_send_at = now
-                    time.sleep(0.033)  # ~30fps
                 except (BrokenPipeError, ConnectionResetError, socket.timeout, TimeoutError, OSError):
                     break
 
@@ -612,6 +628,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "detection_window_active": current_detection_window_active,
                 "detection_window_start": current_detection_window_start,
                 "detection_window_end": current_detection_window_end,
+                "detection_enabled": current_detection_enabled,
                 "mask_active": mask_active,
                 "mask_update_pending": has_pending_mask,
             }
@@ -663,7 +680,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        global current_mask_dilate, current_nuisance_dilate
+        global current_mask_dilate, current_nuisance_dilate, current_detection_enabled
         global current_clip_margin_before, current_clip_margin_after
         global current_pending_exclusion_mask, current_pending_mask_save_path
         if self.path == '/restart':
@@ -718,7 +735,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             if current_output_dir and current_camera_name:
                 save_dir = current_output_dir / "masks"
                 save_dir.mkdir(parents=True, exist_ok=True)
-                save_path = save_dir / f"{current_camera_name}_mask.png"
+                save_path = save_dir / f"{_storage_camera_name(current_camera_name)}_mask.png"
 
             mask = build_exclusion_mask_from_frame(
                 frame,
@@ -924,6 +941,11 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 errors.append(str(e))
 
             try:
+                new_detection_enabled = _to_bool_field("detection_enabled")
+                if new_detection_enabled is not None:
+                    current_detection_enabled = new_detection_enabled
+                    applied["detection_enabled"] = new_detection_enabled
+                    overrides_update["detection_enabled"] = new_detection_enabled
                 new_mask_dilate = _to_int("mask_dilate", 0, 255)
                 if new_mask_dilate is not None:
                     current_mask_dilate = new_mask_dilate
@@ -1137,6 +1159,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "nuisance_dilate",
                 "clip_margin_before",
                 "clip_margin_after",
+                "detection_enabled",
                 "mask_image",
                 "mask_from_day",
                 "nuisance_mask_image",
@@ -1361,7 +1384,8 @@ def detection_thread_worker(
     fb_delete_mov=False,
 ):
     """検出処理を行うワーカースレッド"""
-    global current_frame, current_frame_seq, detection_count, last_frame_time, is_detecting_now, current_runtime_fps
+    global current_frame, current_frame_seq, current_stream_jpeg, current_stream_jpeg_seq
+    global detection_count, last_frame_time, is_detecting_now, current_runtime_fps
     global current_detector, current_proc_size, current_mask_dilate, current_mask_save
     global current_nuisance_dilate
     global current_clip_margin_before, current_clip_margin_after
@@ -1369,6 +1393,7 @@ def detection_thread_worker(
     global current_pending_exclusion_mask, current_pending_mask_save_path
     global current_detection_window_enabled, current_detection_window_active
     global current_detection_window_start, current_detection_window_end, current_detection_status
+    global current_detection_enabled
 
     width, height = reader.frame_size
     proc_width = int(width * process_scale)
@@ -1380,7 +1405,7 @@ def detection_thread_worker(
     nuisance_mask = None
     persistent_mask_path = None
     if output_path:
-        persistent_mask_path = Path(output_path) / "masks" / f"{camera_name}_mask.png"
+        persistent_mask_path = Path(output_path) / "masks" / f"{_storage_camera_name(camera_name)}_mask.png"
         if mask_image is None and persistent_mask_path.exists():
             mask_image = str(persistent_mask_path)
     if mask_image:
@@ -1507,7 +1532,11 @@ def detection_thread_worker(
         objects = []
         if prev_gray is not None:
             # 検出期間内の場合のみ検出処理を実行
-            if is_detection_time:
+            if not current_detection_enabled:
+                objects = []
+                is_detecting_now = False
+                current_detection_status = "DISABLED"
+            elif is_detection_time:
                 # アクティブなトラックがある場合は追跡モードを有効化
                 tracking_mode = len(detector.active_tracks) > 0
                 objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
@@ -1585,9 +1614,17 @@ def detection_thread_worker(
         cv2.putText(display, f"{overlay_name} | {elapsed:.0f}s | Detections: {detection_count}",
                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
+        stream_jpeg = None
+        ok, encoded_stream = cv2.imencode('.jpg', display, [cv2.IMWRITE_JPEG_QUALITY, STREAM_JPEG_QUALITY])
+        if ok:
+            stream_jpeg = encoded_stream.tobytes()
+
         with current_frame_lock:
             current_frame = display
             current_frame_seq += 1
+            if stream_jpeg is not None:
+                current_stream_jpeg = stream_jpeg
+                current_stream_jpeg_seq = current_frame_seq
 
         prev_gray = gray.copy()
         frame_count += 1
@@ -1656,10 +1693,10 @@ def process_rtsp_stream(
 ):
     global current_frame, detection_count, start_time_global, camera_name, camera_display_name, current_settings
     global current_runtime_fps, current_runtime_overrides_paths
-    global current_stop_flag
+    global current_stop_flag, current_detection_enabled
 
     params = params or DetectionParams()
-    camera_name = cam_name
+    camera_name = _storage_camera_name(cam_name)
     # 環境変数からWeb表示用の名前を取得（オプション）
     import os
     camera_display_name = os.environ.get("CAMERA_NAME_DISPLAY", "")
@@ -1698,6 +1735,7 @@ def process_rtsp_stream(
     )
     clip_margin_before = float(runtime_overrides.get("clip_margin_before", clip_margin_before))
     clip_margin_after = float(runtime_overrides.get("clip_margin_after", clip_margin_after))
+    current_detection_enabled = _to_bool(runtime_overrides.get("detection_enabled", True), default=True)
 
     params.exclude_bottom_ratio = float(runtime_overrides.get("exclude_bottom_ratio", params.exclude_bottom_ratio))
     params.exclude_edge_ratio = float(runtime_overrides.get("exclude_edge_ratio", params.exclude_edge_ratio))
@@ -1736,14 +1774,14 @@ def process_rtsp_stream(
         params.min_brightness = 180
     elif sensitivity == "faint":
         params.diff_threshold = 16
-        params.min_brightness = 135
+        params.min_brightness = 150
         params.min_length = 10
         params.min_duration = 0.06
         params.min_speed = 10.0
         params.min_linearity = 0.55
         params.min_track_points = 3
-        params.min_area = 3
-        params.max_distance = 110
+        params.min_area = 5
+        params.max_distance = 90
     elif sensitivity == "fireball":
         params.diff_threshold = 15
         params.min_brightness = 150
@@ -1789,6 +1827,7 @@ def process_rtsp_stream(
         "nuisance_overlap_threshold": nuisance_overlap_threshold,
         "clip_margin_before": clip_margin_before,
         "clip_margin_after": clip_margin_after,
+        "detection_enabled": current_detection_enabled,
         "diff_threshold": params.diff_threshold,
         "min_brightness": params.min_brightness,
         "min_brightness_tracking": params.min_brightness_tracking,
