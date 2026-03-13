@@ -1,6 +1,6 @@
 import numpy as np
 
-from meteor_detector_realtime import estimate_fps_from_frames, sanitize_fps
+from meteor_detector_realtime import estimate_fps_from_frames, probe_rtsp_endpoint, sanitize_fps
 
 
 def test_sanitize_fps_returns_default_for_invalid_values():
@@ -24,3 +24,29 @@ def test_estimate_fps_from_frames_15fps():
     frames = [(0.00, frame), (0.0667, frame), (0.1334, frame), (0.2001, frame)]
     fps = estimate_fps_from_frames(frames, fallback_fps=30.0)
     assert abs(fps - 15.0) < 0.5
+
+
+def test_probe_rtsp_endpoint_reports_tcp_ok(monkeypatch):
+    class _DummySocket:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr("meteor_detector_realtime.socket.create_connection", lambda addr, timeout=0: _DummySocket())
+    result = probe_rtsp_endpoint("rtsp://user:pass@10.0.1.11/live")
+    assert "probe=tcp_ok" in result
+    assert "host=10.0.1.11" in result
+    assert "port=554" in result
+
+
+def test_probe_rtsp_endpoint_reports_tcp_error(monkeypatch):
+    def _raise(addr, timeout=0):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr("meteor_detector_realtime.socket.create_connection", _raise)
+    result = probe_rtsp_endpoint("rtsp://user:pass@10.0.1.11:8554/live")
+    assert "probe=tcp_error" in result
+    assert "port=8554" in result
+    assert "TimeoutError" in result

@@ -202,6 +202,7 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
         parsed = parse_streamers_line(line)
         info = parse_rtsp_url(parsed["url"])
         if info:
+            info["name"] = f"camera{i}_{info['host'].replace('.', '_')}"
             # 表示名を保持
             if parsed["display_name"]:
                 info["display_name"] = parsed["display_name"]

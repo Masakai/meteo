@@ -13,9 +13,11 @@ from collections import deque
 from threading import Thread, Lock, Event
 from queue import Queue, Empty
 import json
+import socket
 import subprocess
 import sys
 import time
+from urllib.parse import urlparse
 
 import cv2
 import numpy as np
@@ -180,6 +182,60 @@ def estimate_fps_from_frames(
     return sanitize_fps(1.0 / median_dt, default=sanitize_fps(fallback_fps, default=30.0))
 
 
+def probe_rtsp_endpoint(url: str, timeout: float = 3.0) -> str:
+    """RTSP先の host:port 到達性を簡易診断して文字列で返す。"""
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        port = int(parsed.port or 554)
+    except Exception as e:
+        return f"probe=invalid_url error={e}"
+
+    if not host:
+        return "probe=invalid_url error=missing_host"
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return f"probe=tcp_ok host={host} port={port}"
+    except Exception as e:
+        return f"probe=tcp_error host={host} port={port} error={type(e).__name__}: {e}"
+
+
+def probe_rtsp_with_ffprobe(url: str, timeout: float = 8.0) -> str:
+    """ffprobe で RTSP セッション開始可否を簡易診断する。"""
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-rtsp_transport",
+        "tcp",
+        "-show_streams",
+        url,
+    ]
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        return "ffprobe=missing"
+    except subprocess.TimeoutExpired:
+        return f"ffprobe=timeout timeout={timeout}s"
+    except Exception as e:
+        return f"ffprobe=error error={type(e).__name__}: {e}"
+
+    if result.returncode == 0:
+        return "ffprobe=ok"
+
+    detail = (result.stderr or result.stdout or "").strip().replace("\n", " | ")
+    if not detail:
+        detail = f"returncode={result.returncode}"
+    return f"ffprobe=error detail={detail}"
+
+
 @dataclass
 class MeteorEvent:
     """検出された流星イベント"""
@@ -289,13 +345,20 @@ class RTSPReader:
         return self
 
     def _read_loop(self):
+        attempt = 0
         while not self.stopped.is_set():
+            attempt += 1
             cap = cv2.VideoCapture(self.url)
 
             if not cap.isOpened():
-                print(f"接続失敗: {self.url}")
+                probe = probe_rtsp_endpoint(self.url)
+                print(f"接続失敗: {self.url} ({probe}, attempt={attempt})", flush=True)
                 if self.log_detail:
-                    print(f"{self.reconnect_delay}秒後に再接続...")
+                    if attempt <= 3 or (attempt % 12) == 0:
+                        ffprobe_detail = probe_rtsp_with_ffprobe(self.url)
+                        print(f"RTSP詳細診断: {ffprobe_detail}", flush=True)
+                    print("OpenCVがRTSPセッションを開始できませんでした。認証情報、URLパス、RTSPポート、カメラ側同時接続数を確認してください。", flush=True)
+                    print(f"{self.reconnect_delay}秒後に再接続...", flush=True)
                 time.sleep(self.reconnect_delay)
                 continue
 
@@ -306,7 +369,8 @@ class RTSPReader:
                 if self.start_time is None:
                     self.start_time = time.time()
 
-            print(f"接続成功: {self.width}x{self.height} @ {self.fps:.1f}fps")
+            print(f"接続成功: {self.width}x{self.height} @ {self.fps:.1f}fps", flush=True)
+            attempt = 0
             self.connected.set()
 
             consecutive_failures = 0
@@ -317,7 +381,7 @@ class RTSPReader:
                     consecutive_failures += 1
                     if consecutive_failures > 30:
                         if self.log_detail:
-                            print("ストリーム切断を検出")
+                            print("ストリーム切断を検出", flush=True)
                         break
                     time.sleep(0.01)
                     continue
@@ -338,7 +402,7 @@ class RTSPReader:
 
             if not self.stopped.is_set():
                 if self.log_detail:
-                    print(f"{self.reconnect_delay}秒後に再接続...")
+                    print(f"{self.reconnect_delay}秒後に再接続...", flush=True)
                 time.sleep(self.reconnect_delay)
 
     def read(self) -> Tuple[bool, float, Optional[np.ndarray]]:

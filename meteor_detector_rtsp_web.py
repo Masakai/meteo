@@ -36,6 +36,7 @@ from meteor_detector_realtime import (
     RTSPReader,
     RealtimeMeteorDetector,
     RingBuffer,
+    probe_rtsp_endpoint,
     save_meteor_event,
     sanitize_fps,
 )
@@ -1853,10 +1854,10 @@ def process_rtsp_stream(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    print(f"RTSPストリーム: {url}")
-    print(f"出力先: {output_path}")
+    print(f"RTSPストリーム: {url}", flush=True)
+    print(f"出力先: {output_path}", flush=True)
     if web_port > 0:
-        print(f"Webプレビュー: http://0.0.0.0:{web_port}/")
+        print(f"Webプレビュー: http://0.0.0.0:{web_port}/", flush=True)
 
     # Webサーバー起動
     httpd = None
@@ -1865,12 +1866,14 @@ def process_rtsp_stream(
         web_thread = Thread(target=httpd.serve_forever, daemon=True)
         web_thread.start()
 
-    reader = RTSPReader(url)
-    print("接続中...")
+    rtsp_log_detail = _to_bool(os.environ.get("RTSP_LOG_DETAIL", "true"), default=True)
+    reader = RTSPReader(url, log_detail=rtsp_log_detail)
+    print(f"RTSP事前診断: {probe_rtsp_endpoint(url)}", flush=True)
+    print("接続中...", flush=True)
     reader.start()
 
     if not reader.connected.is_set():
-        print("接続失敗")
+        print("接続失敗（10秒以内に接続確立できず）", flush=True)
         return
 
     width, height = reader.frame_size
@@ -1878,9 +1881,9 @@ def process_rtsp_stream(
 
     current_settings["source_fps"] = fps
 
-    print(f"解像度: {width}x{height}")
-    print("検出開始 (Ctrl+C で終了)")
-    print("-" * 50)
+    print(f"解像度: {width}x{height}", flush=True)
+    print("検出開始 (Ctrl+C で終了)", flush=True)
+    print("-" * 50, flush=True)
 
     detection_count = 0
     start_time_global = time.time()
@@ -1902,9 +1905,9 @@ def process_rtsp_stream(
     timezone = os.environ.get('TIMEZONE', 'Asia/Tokyo')
 
     if enable_time_window:
-        print(f"検出時間制限: 有効（緯度: {latitude}, 経度: {longitude}）")
+        print(f"検出時間制限: 有効（緯度: {latitude}, 経度: {longitude}）", flush=True)
     else:
-        print(f"検出時間制限: 無効（常時検出）")
+        print(f"検出時間制限: 無効（常時検出）", flush=True)
 
     # 検出処理を別スレッドで実行
     detection_thread = Thread(
@@ -1947,7 +1950,7 @@ def process_rtsp_stream(
         httpd.shutdown()
     current_stop_flag = None
 
-    print(f"\n終了 - 検出数: {detection_count}個")
+    print(f"\n終了 - 検出数: {detection_count}個", flush=True)
 
 
 def main():
