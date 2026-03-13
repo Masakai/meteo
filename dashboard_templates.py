@@ -10,10 +10,17 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     is_camera_page = page_mode == "cameras"
     is_detections_page = not is_camera_page
     logotype_path = Path(__file__).parent / "documents" / "assets" / "meteo-logotype.svg"
+    meteor_calendar_path = Path(__file__).parent / "imo_meteor_calender.json"
     logotype_src = ""
+    meteor_calendar_json = "[]"
     if logotype_path.exists():
         logotype_bytes = logotype_path.read_bytes()
         logotype_src = "data:image/svg+xml;base64," + base64.b64encode(logotype_bytes).decode("ascii")
+    if meteor_calendar_path.exists():
+        meteor_calendar_json = json.dumps(
+            json.loads(meteor_calendar_path.read_text(encoding="utf-8")),
+            ensure_ascii=False,
+        )
     brand_logo_html = f'<img src="{logotype_src}" alt="METEO">' if logotype_src else ""
     client_cameras = []
     for cam in cameras:
@@ -597,6 +604,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #e8fff7;
             font-weight: bold;
         }}
+        .calendar-day.meteor-active {{
+            border-color: #f2b84a;
+            box-shadow: inset 0 0 0 1px rgba(242, 184, 74, 0.18);
+        }}
+        .calendar-day.meteor-peak {{
+            border-color: #ff6b9f;
+            box-shadow: inset 0 0 0 1px rgba(255, 107, 159, 0.22);
+        }}
         .calendar-day.selected {{
             outline: 2px solid #00d4ff;
             outline-offset: 1px;
@@ -604,7 +619,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         .calendar-day:hover {{
             transform: translateY(-1px);
         }}
-        .calendar-day.has-data::after {{
+        .calendar-day.has-tooltip::after {{
             content: attr(data-count-label);
             position: absolute;
             left: 50%;
@@ -616,13 +631,21 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             border-radius: 6px;
             padding: 4px 8px;
             font-size: 0.75em;
-            white-space: nowrap;
+            white-space: pre-line;
+            line-height: 1.45;
+            text-align: center;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.15s ease;
             z-index: 5;
         }}
-        .calendar-day.has-data:hover::after {{
+        .calendar-day.meteor-active.has-tooltip::after {{
+            border-color: #f2b84a;
+        }}
+        .calendar-day.meteor-peak.has-tooltip::after {{
+            border-color: #ff6b9f;
+        }}
+        .calendar-day.has-tooltip:hover::after {{
             opacity: 1;
         }}
         .selected-date-title {{
@@ -2109,6 +2132,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         let lastDetectionsMtime = 0;
         let detectionRecords = [];
         let detectionCountsByDate = {{}};
+        const meteorCalendarEntries = {meteor_calendar_json};
         let detectionAvailableYears = [];
         let detectionCalendarRange = 'current';
         let selectedDetectionDate = '';
@@ -2142,6 +2166,73 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
 
         function monthLabel(year, monthIndex) {{
             return `${{year}}年${{monthIndex + 1}}月`;
+        }}
+
+        function parseMonthDay(monthDayStr) {{
+            const [month, day] = String(monthDayStr || '').split('-').map(Number);
+            if (!Number.isFinite(month) || !Number.isFinite(day)) {{
+                return null;
+            }}
+            return {{ month, day }};
+        }}
+
+        function buildDateFromMonthDay(year, monthDay) {{
+            return new Date(year, monthDay.month - 1, monthDay.day);
+        }}
+
+        function getMeteorShowersForDate(dateStr) {{
+            const [year, month, day] = dateStr.split('-').map(Number);
+            if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {{
+                return {{ active: [], peak: [] }};
+            }}
+            const target = new Date(year, month - 1, day);
+            const active = [];
+            const peak = [];
+            meteorCalendarEntries.forEach((entry) => {{
+                const [startRaw, endRaw] = String(entry.active_period || '').split(' to ');
+                const startMonthDay = parseMonthDay(startRaw);
+                const endMonthDay = parseMonthDay(endRaw);
+                const peakMonthDay = parseMonthDay(entry.typical_peak);
+                if (!startMonthDay || !endMonthDay || !peakMonthDay) {{
+                    return;
+                }}
+                const wrapsYear =
+                    endMonthDay.month < startMonthDay.month ||
+                    (endMonthDay.month === startMonthDay.month && endMonthDay.day < startMonthDay.day);
+                [year - 1, year].forEach((anchorYear) => {{
+                    const startDate = buildDateFromMonthDay(anchorYear, startMonthDay);
+                    const endYear = wrapsYear ? anchorYear + 1 : anchorYear;
+                    const endDate = buildDateFromMonthDay(endYear, endMonthDay);
+                    const peakYear =
+                        wrapsYear &&
+                        (peakMonthDay.month < startMonthDay.month ||
+                            (peakMonthDay.month === startMonthDay.month && peakMonthDay.day < startMonthDay.day))
+                            ? anchorYear + 1
+                            : anchorYear;
+                    const peakDate = buildDateFromMonthDay(peakYear, peakMonthDay);
+                    if (target >= startDate && target <= endDate) {{
+                        active.push(entry.name_ja || entry.name_en || entry.id || '');
+                        if (target.getTime() === peakDate.getTime()) {{
+                            peak.push(entry.name_ja || entry.name_en || entry.id || '');
+                        }}
+                    }}
+                }});
+            }});
+            return {{
+                active: Array.from(new Set(active)).filter(Boolean),
+                peak: Array.from(new Set(peak)).filter(Boolean),
+            }};
+        }}
+
+        function buildCalendarTooltip(count, meteorInfo) {{
+            const lines = [];
+            if (count > 0) {{
+                lines.push(`${{count}}件`);
+            }}
+            if (meteorInfo.active.length > 0) {{
+                lines.push(meteorInfo.active.join(' / '));
+            }}
+            return lines.join('\\n');
         }}
 
         function buildDetectionCounts(records) {{
@@ -2247,11 +2338,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 for (let day = 1; day <= lastDate; day++) {{
                     const dateStr = `${{year}}-${{String(month + 1).padStart(2, '0')}}-${{String(day).padStart(2, '0')}}`;
                     const count = detectionCountsByDate[dateStr] || 0;
+                    const meteorInfo = getMeteorShowersForDate(dateStr);
+                    const tooltipLabel = buildCalendarTooltip(count, meteorInfo);
                     const classes = ['calendar-day'];
                     if (count > 0) classes.push('has-data');
+                    if (tooltipLabel) classes.push('has-tooltip');
+                    if (meteorInfo.active.length > 0) classes.push('meteor-active');
+                    if (meteorInfo.peak.length > 0) classes.push('meteor-peak');
                     if (dateStr === selectedDetectionDate) classes.push('selected');
                     dayCells.push(
-                        `<button type="button" class="${{classes.join(' ')}}" data-date="${{dateStr}}" data-count-label="${{count}}件" title="${{count > 0 ? `${{dateLabel(dateStr)}}: ${{count}}件` : dateLabel(dateStr)}}">${{day}}</button>`
+                        `<button type="button" class="${{classes.join(' ')}}" data-date="${{dateStr}}" data-count-label="${{tooltipLabel}}" title="${{[dateLabel(dateStr), tooltipLabel].filter(Boolean).join(' / ')}}">${{day}}</button>`
                     );
                 }}
                 return `

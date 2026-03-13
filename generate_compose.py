@@ -179,6 +179,7 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
       - "{base_port}:8080"
     volumes:
       - ./detections:/output
+      - ./imo_meteor_calender.json:/app/imo_meteor_calender.json:ro
     networks:
       - meteor-net
     depends_on:
