@@ -1,6 +1,7 @@
 """HTTP route handlers for the dashboard."""
 
 from datetime import datetime
+import hashlib
 import logging
 from time import time
 import json
@@ -154,6 +155,199 @@ def _detection_label_key(camera_name, detection_time):
     return f"{camera_name}|{detection_time}"
 
 
+def _make_detection_id(camera_name, record):
+    source = {
+        "camera": camera_name,
+        "timestamp": record.get("timestamp", ""),
+        "start_time": record.get("start_time", ""),
+        "end_time": record.get("end_time", ""),
+        "start_point": record.get("start_point", ""),
+        "end_point": record.get("end_point", ""),
+    }
+    digest = hashlib.sha1(json.dumps(source, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return f"det_{digest[:20]}"
+
+
+def _normalize_detection_id(camera_name, record):
+    value = str(record.get("id", "")).strip()
+    return value or _make_detection_id(camera_name, record)
+
+
+def _safe_datetime_from_record(record):
+    timestamp_str = str(record.get("timestamp", "")).strip()
+    if not timestamp_str:
+        return None
+    try:
+        return datetime.fromisoformat(timestamp_str)
+    except Exception:
+        return None
+
+
+def _legacy_base_name_from_record(record):
+    dt = _safe_datetime_from_record(record)
+    if dt is None:
+        return ""
+    return f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
+
+
+def _normalize_relative_asset_path(camera_name, path_value):
+    path_str = str(path_value or "").strip()
+    if not path_str:
+        return ""
+    if "/" in path_str:
+        return path_str
+    return f"{camera_name}/{path_str}"
+
+
+def _resolve_asset_path(cam_dir, camera_name, record, field_name, legacy_suffix):
+    explicit_rel = _normalize_relative_asset_path(camera_name, record.get(field_name, ""))
+    if explicit_rel:
+        explicit_path = Path(DETECTIONS_DIR) / explicit_rel
+        if explicit_path.exists():
+            return explicit_rel
+
+    base_name = str(record.get("base_name", "")).strip() or _legacy_base_name_from_record(record)
+    if not base_name:
+        return ""
+
+    rel = f"{camera_name}/{base_name}{legacy_suffix}"
+    abs_path = cam_dir / f"{base_name}{legacy_suffix}"
+    return rel if abs_path.exists() else ""
+
+
+def _resolve_detection_assets(cam_dir, camera_name, record):
+    clip_rel = ""
+    for field_name, suffix in (("clip_path", ".mp4"), ("clip_path", ".mov")):
+        candidate = _resolve_asset_path(cam_dir, camera_name, record, field_name, suffix)
+        if candidate:
+            clip_rel = candidate
+            break
+
+    image_rel = _resolve_asset_path(cam_dir, camera_name, record, "image_path", "_composite.jpg")
+    original_rel = _resolve_asset_path(
+        cam_dir,
+        camera_name,
+        record,
+        "composite_original_path",
+        "_composite_original.jpg",
+    )
+    return clip_rel, image_rel, original_rel
+
+
+def _normalize_extra_asset_paths(camera_name, values):
+    normalized = []
+    for value in values or []:
+        rel = _normalize_relative_asset_path(camera_name, value)
+        if rel:
+            normalized.append(rel)
+    return normalized
+
+
+def _normalize_detection_record(camera_name, cam_dir, record):
+    normalized = dict(record)
+    detection_id = _normalize_detection_id(camera_name, normalized)
+    dt = _safe_datetime_from_record(normalized)
+    display_time = (
+        dt.isoformat(sep=" ")[:19]
+        if dt
+        else str(normalized.get("timestamp", "")).replace("T", " ")[:19]
+    )
+    clip_rel, image_rel, original_rel = _resolve_detection_assets(cam_dir, camera_name, normalized)
+    normalized["id"] = detection_id
+    normalized["time"] = display_time
+    normalized["camera"] = camera_name
+    normalized["camera_display"] = _camera_display_name(camera_name)
+    normalized["clip_path"] = clip_rel
+    normalized["image_path"] = image_rel
+    normalized["composite_original_path"] = original_rel
+    normalized["alternate_clip_paths"] = _normalize_extra_asset_paths(
+        camera_name, normalized.get("alternate_clip_paths", [])
+    )
+    normalized["legacy_label_key"] = _detection_label_key(camera_name, display_time) if display_time else ""
+    return normalized
+
+
+def _iter_camera_detection_records(camera_name):
+    cam_dir = Path(DETECTIONS_DIR) / camera_name
+    jsonl_file = cam_dir / "detections.jsonl"
+    records = []
+    if not jsonl_file.exists():
+        return records, cam_dir, jsonl_file
+
+    with open(jsonl_file, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                raw = json.loads(line)
+                records.append((line, raw, _normalize_detection_record(camera_name, cam_dir, raw)))
+            except Exception:
+                logger.exception(
+                    "Failed to parse detection entry for camera=%s line=%r",
+                    camera_name,
+                    line[:200],
+                )
+
+    return records, cam_dir, jsonl_file
+
+
+def _find_detection_record(camera_name, detection_id):
+    records, cam_dir, jsonl_file = _iter_camera_detection_records(camera_name)
+    for index, (line, raw, normalized) in enumerate(records):
+        if normalized["id"] == detection_id:
+            return {
+                "records": records,
+                "cam_dir": cam_dir,
+                "jsonl_file": jsonl_file,
+                "index": index,
+                "line": line,
+                "raw": raw,
+                "normalized": normalized,
+            }
+    raise FileNotFoundError(f"detection id not found: {camera_name} {detection_id}")
+
+
+def _records_referencing_relpath(records, relpath, *, exclude_id=None):
+    target = str(relpath or "").strip()
+    if not target:
+        return 0
+
+    count = 0
+    for _, _, normalized in records:
+        if exclude_id and normalized["id"] == exclude_id:
+            continue
+        for key in ("clip_path", "image_path", "composite_original_path"):
+            if normalized.get(key) == target:
+                count += 1
+                break
+        else:
+            if target in normalized.get("alternate_clip_paths", []):
+                count += 1
+    return count
+
+
+def _delete_detection_assets_if_unreferenced(records, normalized):
+    deleted_files = []
+    for key in ("clip_path", "image_path", "composite_original_path"):
+        relpath = normalized.get(key, "")
+        if not relpath:
+            continue
+        if _records_referencing_relpath(records, relpath, exclude_id=normalized["id"]) > 0:
+            continue
+        abs_path = Path(DETECTIONS_DIR) / relpath
+        if abs_path.exists() and abs_path.is_file():
+            abs_path.unlink()
+            deleted_files.append(abs_path.name)
+    for relpath in normalized.get("alternate_clip_paths", []):
+        if _records_referencing_relpath(records, relpath, exclude_id=normalized["id"]) > 0:
+            continue
+        abs_path = Path(DETECTIONS_DIR) / relpath
+        if abs_path.exists() and abs_path.is_file():
+            abs_path.unlink()
+            deleted_files.append(abs_path.name)
+    return deleted_files
+
+
 def _normalize_detection_label(label):
     value = str(label or "").strip()
     if value == "post_detected":
@@ -211,57 +405,25 @@ def _build_detections_payload():
                         for line in f:
                             try:
                                 d = json.loads(line)
-                                timestamp_str = d.get("timestamp", "")
-                                if timestamp_str:
-                                    dt = datetime.fromisoformat(timestamp_str)
-                                    base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-                                    clip_ext = None
-                                    if (cam_dir / f"{base_filename}.mp4").exists():
-                                        clip_ext = ".mp4"
-                                    elif (cam_dir / f"{base_filename}.mov").exists():
-                                        clip_ext = ".mov"
-
-                                    mp4_path = (
-                                        f"{cam_dir.name}/{base_filename}{clip_ext}"
-                                        if clip_ext
-                                        else ""
-                                    )
-                                    composite_exists = (cam_dir / f"{base_filename}_composite.jpg").exists()
-                                    composite_original_exists = (
-                                        cam_dir / f"{base_filename}_composite_original.jpg"
-                                    ).exists()
-                                    composite_path = (
-                                        f"{cam_dir.name}/{base_filename}_composite.jpg"
-                                        if composite_exists
-                                        else ""
-                                    )
-                                    composite_orig_path = (
-                                        f"{cam_dir.name}/{base_filename}_composite_original.jpg"
-                                        if composite_original_exists
-                                        else ""
-                                    )
-                                    image_path = composite_path or composite_orig_path
-                                    if not composite_exists:
-                                        missing_composite += 1
-                                    if not composite_original_exists:
-                                        missing_original += 1
-                                    if not clip_ext:
-                                        missing_video += 1
-                                else:
-                                    mp4_path = ""
-                                    composite_path = ""
-                                    composite_orig_path = ""
-                                    image_path = ""
+                                normalized = _normalize_detection_record(cam_dir.name, cam_dir, d)
+                                mp4_path = normalized["clip_path"]
+                                composite_path = normalized["image_path"]
+                                composite_orig_path = normalized["composite_original_path"]
+                                image_path = composite_path or composite_orig_path
+                                if not composite_path:
                                     missing_composite += 1
+                                if not composite_orig_path:
                                     missing_original += 1
+                                if not mp4_path:
                                     missing_video += 1
 
                                 total += 1
                                 processed_lines += 1
-                                display_time = timestamp_str[:19].replace("T", " ")
-                                label_key = _detection_label_key(cam_dir.name, display_time)
+                                display_time = normalized["time"]
+                                label_key = normalized["legacy_label_key"]
                                 detections.append(
                                     {
+                                        "id": normalized["id"],
                                         "time": display_time,
                                         "camera": cam_dir.name,
                                         "camera_display": _camera_display_name(cam_dir.name),
@@ -269,7 +431,9 @@ def _build_detections_payload():
                                         "image": image_path,
                                         "mp4": mp4_path,
                                         "composite_original": composite_orig_path,
-                                        "label": _normalize_detection_label(labels.get(label_key, "")),
+                                        "label": _normalize_detection_label(
+                                            labels.get(normalized["id"], labels.get(label_key, ""))
+                                        ),
                                     }
                                 )
                             except Exception:
@@ -823,31 +987,16 @@ def handle_delete_detection(handler):
         parts = handler.path[11:].split("/", 1)
         if len(parts) == 2:
             camera_name = unquote(parts[0])
-            timestamp_str = unquote(parts[1])
+            detection_id = unquote(parts[1])
+            match = _find_detection_record(camera_name, detection_id)
+            records = match["records"]
+            cam_dir = match["cam_dir"]
+            jsonl_file = match["jsonl_file"]
+            normalized = match["normalized"]
 
-            dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-            base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-
-            cam_dir = Path(DETECTIONS_DIR) / camera_name
-
-            files_to_delete = [
-                cam_dir / f"{base_filename}.mov",
-                cam_dir / f"{base_filename}.mp4",
-                cam_dir / f"{base_filename}_composite.jpg",
-                cam_dir / f"{base_filename}_composite_original.jpg",
-            ]
-
-            deleted_files = []
-            for file_path in files_to_delete:
-                if file_path.exists():
-                    file_path.unlink()
-                    deleted_files.append(file_path.name)
-
-            jsonl_file = cam_dir / "detections.jsonl"
+            deleted_files = _delete_detection_assets_if_unreferenced(records, normalized)
             if jsonl_file.exists():
-                target_timestamp = dt.isoformat()
                 temp_file = cam_dir / "detections.jsonl.tmp"
-                removed_count = 0
 
                 with open(jsonl_file, "r", encoding="utf-8") as f_in, open(
                     temp_file, "w", encoding="utf-8"
@@ -855,20 +1004,19 @@ def handle_delete_detection(handler):
                     for line in f_in:
                         try:
                             d = json.loads(line)
-                            if not d.get("timestamp", "").startswith(target_timestamp):
+                            if _normalize_detection_id(camera_name, d) != detection_id:
                                 f_out.write(line)
-                            else:
-                                removed_count += 1
                         except Exception:
                             f_out.write(line)
 
                 temp_file.replace(jsonl_file)
 
             labels = _load_detection_labels()
-            label_key = _detection_label_key(camera_name, timestamp_str)
-            if label_key in labels:
-                del labels[label_key]
-                _save_detection_labels(labels)
+            labels.pop(detection_id, None)
+            legacy_label_key = normalized.get("legacy_label_key", "")
+            if legacy_label_key:
+                labels.pop(legacy_label_key, None)
+            _save_detection_labels(labels)
             _refresh_detection_cache(force=True)
 
             handler.send_response(200)
@@ -877,6 +1025,7 @@ def handle_delete_detection(handler):
 
             response = {
                 "success": True,
+                "id": detection_id,
                 "deleted_files": deleted_files,
                 "message": f"{len(deleted_files)}個のファイルを削除しました",
             }
@@ -909,21 +1058,25 @@ def handle_set_detection_label(handler):
         payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
 
         camera = str(payload.get("camera", "")).strip()
-        detection_time = str(payload.get("time", "")).strip()
+        detection_id = str(payload.get("id", "")).strip()
         label = str(payload.get("label", "")).strip()
 
         allowed_labels = {"detected", "post_detected"}
         if label not in allowed_labels:
             raise ValueError("invalid label")
-        if not camera or not detection_time:
-            raise ValueError("camera and time are required")
+        if not camera or not detection_id:
+            raise ValueError("camera and id are required")
 
         labels = _load_detection_labels()
-        key = _detection_label_key(camera, detection_time)
+        match = _find_detection_record(camera, detection_id)
+        key = detection_id
         if label:
             labels[key] = label
         else:
             labels.pop(key, None)
+        legacy_label_key = match["normalized"].get("legacy_label_key", "")
+        if legacy_label_key:
+            labels.pop(legacy_label_key, None)
         _save_detection_labels(labels)
         _refresh_detection_cache(force=True)
 
@@ -931,7 +1084,7 @@ def handle_set_detection_label(handler):
         handler.send_header("Content-type", "application/json")
         handler.end_headers()
         handler.wfile.write(
-            json.dumps({"success": True, "camera": camera, "time": detection_time, "label": label}).encode("utf-8")
+            json.dumps({"success": True, "camera": camera, "id": detection_id, "label": label}).encode("utf-8")
         )
         return True
     except Exception as e:
@@ -1261,6 +1414,17 @@ def handle_bulk_delete_non_meteor(handler):
 
         jsonl_file = cam_dir / "detections.jsonl"
         if jsonl_file.exists():
+            records, _, _ = _iter_camera_detection_records(camera_name)
+            records_by_id = {normalized["id"]: (line, raw, normalized) for line, raw, normalized in records}
+            ids_to_delete = []
+            for _, _, normalized in records:
+                label = _normalize_detection_label(
+                    labels.get(normalized["id"], labels.get(normalized.get("legacy_label_key", ""), ""))
+                )
+                if label == "post_detected":
+                    ids_to_delete.append(normalized["id"])
+            remaining_records = [entry for entry in records if entry[2]["id"] not in ids_to_delete]
+
             temp_file = cam_dir / "detections.jsonl.tmp"
             with open(jsonl_file, "r", encoding="utf-8") as f_in, open(
                 temp_file, "w", encoding="utf-8"
@@ -1268,33 +1432,16 @@ def handle_bulk_delete_non_meteor(handler):
                 for line in f_in:
                     try:
                         d = json.loads(line)
-                        timestamp_str = d.get("timestamp", "")
-                        if timestamp_str:
-                            dt = datetime.fromisoformat(timestamp_str)
-                            display_time = timestamp_str[:19].replace("T", " ")
-                            label_key = _detection_label_key(camera_name, display_time)
-                            label = _normalize_detection_label(labels.get(label_key, ""))
-
-                            if label == "post_detected":
-                                base_filename = f"meteor_{dt.strftime('%Y%m%d_%H%M%S')}"
-                                files_to_delete = [
-                                    cam_dir / f"{base_filename}.mov",
-                                    cam_dir / f"{base_filename}.mp4",
-                                    cam_dir / f"{base_filename}_composite.jpg",
-                                    cam_dir / f"{base_filename}_composite_original.jpg",
-                                ]
-
-                                for file_path in files_to_delete:
-                                    if file_path.exists():
-                                        file_path.unlink()
-
-                                if label_key in labels:
-                                    del labels[label_key]
-
-                                deleted_count += 1
-                                deleted_detections.append(display_time)
-                            else:
-                                f_out.write(line)
+                        detection_id = _normalize_detection_id(camera_name, d)
+                        if detection_id in ids_to_delete:
+                            normalized = records_by_id[detection_id][2]
+                            _delete_detection_assets_if_unreferenced(remaining_records, normalized)
+                            labels.pop(detection_id, None)
+                            legacy_label_key = normalized.get("legacy_label_key", "")
+                            if legacy_label_key:
+                                labels.pop(legacy_label_key, None)
+                            deleted_count += 1
+                            deleted_detections.append(normalized["time"])
                         else:
                             f_out.write(line)
                     except Exception:

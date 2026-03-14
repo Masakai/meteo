@@ -1906,14 +1906,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }});
 
         // 検出削除関数
-        function deleteDetection(camera, time, event) {{
+        function deleteDetection(camera, id, time, event) {{
             event.stopPropagation(); // 画像表示イベントを防止
 
             if (!confirm(`この検出を削除しますか?\n${{time}} - ${{camera}}`)) {{
                 return;
             }}
 
-            fetch(`/detection/${{camera}}/${{time}}`, {{
+            fetch(`/detection/${{encodeURIComponent(camera)}}/${{encodeURIComponent(id)}}`, {{
                 method: 'DELETE'
             }})
             .then(r => r.json())
@@ -2005,7 +2005,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
         }}
 
-        function updateDetectionLabel(camera, time, label, radioEl) {{
+        function updateDetectionLabel(camera, id, label, radioEl) {{
             const groupEl = radioEl.closest('.label-radios');
             if (!groupEl) return;
             const normalized = label === 'post_detected' ? 'post_detected' : 'detected';
@@ -2016,7 +2016,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 headers: {{
                     'Content-Type': 'application/json'
                 }},
-                body: JSON.stringify({{ camera, time, label: normalized }})
+                body: JSON.stringify({{ camera, id, label: normalized }})
             }})
             .then(r => r.json())
             .then(data => {{
@@ -2240,7 +2240,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{cameraLabel}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">`
                     : '';
                 const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
-                const radioName = `label-${{cameraKey}}-${{d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const radioName = `label-${{cameraKey}}-${{d.id || d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
                 const videoAction = d.mp4
                     ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">VIDEO</span>`
                     : '';
@@ -2265,16 +2265,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 <div class="label-radios" data-label="${{normalizedLabel}}">
                                     <label class="label-radio">
                                         <input type="radio" name="${{radioName}}" value="detected" ${{normalizedLabel === 'detected' ? 'checked' : ''}}
-                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'detected', this)">
+                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.id}}', 'detected', this)">
                                         <span>流星</span>
                                     </label>
                                     <label class="label-radio">
                                         <input type="radio" name="${{radioName}}" value="post_detected" ${{normalizedLabel === 'post_detected' ? 'checked' : ''}}
-                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.time}}', 'post_detected', this)">
+                                               onchange="updateDetectionLabel('${{cameraKey}}', '${{d.id}}', 'post_detected', this)">
                                         <span>それ以外</span>
                                     </label>
                                 </div>
-                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.time}}', event)">削除</button>
+                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
                             </div>
                         </div>
                     </div>
@@ -2343,7 +2343,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     detectionPollDelay = detectionPollBaseDelay;
                     totalEl.textContent = data.total;
                     const detectionsKey = (data.recent || []).map(d =>
-                        `${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
+                        `${{d.id || ''}}|${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
                     ).join('||');
                     if (detectionsKey === lastDetectionsKey) {{
                         return;

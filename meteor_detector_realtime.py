@@ -7,6 +7,7 @@ Licensed under the MIT License
 
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict
 from collections import deque
@@ -784,6 +785,32 @@ class EventMerger:
         )
 
 
+def make_detection_id(camera_name: str, record: dict) -> str:
+    source = {
+        "camera": camera_name,
+        "timestamp": record.get("timestamp", ""),
+        "start_time": record.get("start_time", ""),
+        "end_time": record.get("end_time", ""),
+        "start_point": record.get("start_point", ""),
+        "end_point": record.get("end_point", ""),
+    }
+    digest = hashlib.sha1(json.dumps(source, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return f"det_{digest[:20]}"
+
+
+def make_detection_base_name(output_dir: Path, timestamp: datetime, detection_id: str) -> str:
+    stem = f"meteor_{timestamp.strftime('%Y%m%d_%H%M%S')}_{detection_id[4:12]}"
+    candidate = stem
+    suffix = 1
+    while any(
+        (output_dir / f"{candidate}{name_suffix}").exists()
+        for name_suffix in (".mp4", ".mov", "_composite.jpg", "_composite_original.jpg")
+    ):
+        suffix += 1
+        candidate = f"{stem}_{suffix:02d}"
+    return candidate
+
+
 def save_meteor_event(
     event: MeteorEvent,
     ring_buffer: RingBuffer,
@@ -805,8 +832,10 @@ def save_meteor_event(
     if not frames:
         return None
 
-    ts = event.timestamp.strftime("%Y%m%d_%H%M%S")
-    base_name = f"meteor_{ts}"
+    record = event.to_dict()
+    camera_name = output_dir.name
+    detection_id = make_detection_id(camera_name, record)
+    base_name = make_detection_base_name(output_dir, event.timestamp, detection_id)
 
     height, width = frames[0][1].shape[:2]
 
@@ -847,9 +876,20 @@ def save_meteor_event(
         cv2.imwrite(str(output_dir / f"{base_name}_composite.jpg"), marked)
         cv2.imwrite(str(output_dir / f"{base_name}_composite_original.jpg"), composite)
 
+    record["id"] = detection_id
+    record["base_name"] = base_name
+    if clip_path is not None:
+        record["clip_path"] = clip_path.name
+    composite_path = output_dir / f"{base_name}_composite.jpg"
+    composite_original_path = output_dir / f"{base_name}_composite_original.jpg"
+    if composite_path.exists():
+        record["image_path"] = composite_path.name
+    if composite_original_path.exists():
+        record["composite_original_path"] = composite_original_path.name
+
     log_path = output_dir / "detections.jsonl"
     with open(log_path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     if extract_clips and clip_path is not None:
         print(f"  保存: {clip_path.name}")

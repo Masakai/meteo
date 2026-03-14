@@ -108,8 +108,14 @@ def test_handle_camera_snapshot_invalid_index(monkeypatch):
 
 def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_dir = tmp_path / "camera1"
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    (cam_dir / "detections.jsonl").write_text(
+        json.dumps({"id": "det_001", "timestamp": "2026-02-07T22:00:00", "confidence": 0.9}) + "\n",
+        encoding="utf-8",
+    )
     body = json.dumps(
-        {"camera": "camera1", "time": "2026-02-07 22:00:00", "label": "post_detected"}
+        {"camera": "camera1", "id": "det_001", "label": "post_detected"}
     ).encode("utf-8")
     handler = _DummyHandler("/detection_label", body=body, headers={"Content-Type": "application/json"})
 
@@ -118,7 +124,7 @@ def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["success"] is True
     saved = json.loads((tmp_path / "detection_labels.json").read_text(encoding="utf-8"))
-    assert saved["camera1|2026-02-07 22:00:00"] == "post_detected"
+    assert saved["det_001"] == "post_detected"
 
 
 def test_handle_detections_includes_label(monkeypatch, tmp_path):
@@ -138,6 +144,7 @@ def test_handle_detections_includes_label(monkeypatch, tmp_path):
     assert dr.handle_detections(handler) is None
     assert handler.status == 200
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["recent"][0]["id"].startswith("det_")
     assert payload["recent"][0]["label"] == "post_detected"
 
 
@@ -294,6 +301,48 @@ def test_handle_bulk_delete_non_meteor_success(monkeypatch, tmp_path):
     assert len(remained) == 1
     item = json.loads(remained[0])
     assert item["timestamp"] == "2026-02-07T22:00:01"
+
+
+def test_handle_delete_detection_keeps_shared_files_for_other_record(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    cam_dir = tmp_path / "camera1"
+    cam_dir.mkdir(parents=True, exist_ok=True)
+    shared_mp4 = cam_dir / "meteor_20260207_220000.mp4"
+    shared_img = cam_dir / "meteor_20260207_220000_composite.jpg"
+    shared_orig = cam_dir / "meteor_20260207_220000_composite_original.jpg"
+    for path in (shared_mp4, shared_img, shared_orig):
+        path.write_bytes(b"x")
+
+    records = [
+        {
+            "id": "det_a",
+            "timestamp": "2026-02-07T22:00:00.100000",
+            "clip_path": shared_mp4.name,
+            "image_path": shared_img.name,
+            "composite_original_path": shared_orig.name,
+        },
+        {
+            "id": "det_b",
+            "timestamp": "2026-02-07T22:00:00.200000",
+            "clip_path": shared_mp4.name,
+            "image_path": shared_img.name,
+            "composite_original_path": shared_orig.name,
+        },
+    ]
+    (cam_dir / "detections.jsonl").write_text(
+        "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records),
+        encoding="utf-8",
+    )
+
+    handler = _DummyHandler("/detection/camera1/det_a")
+    assert dr.handle_delete_detection(handler) is True
+    assert handler.status == 200
+
+    remaining = (cam_dir / "detections.jsonl").read_text(encoding="utf-8")
+    assert '"id": "det_b"' in remaining
+    assert shared_mp4.exists()
+    assert shared_img.exists()
+    assert shared_orig.exists()
 
 
 def test_handle_bulk_delete_non_meteor_path_parse(monkeypatch, tmp_path):

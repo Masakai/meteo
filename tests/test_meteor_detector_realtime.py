@@ -1,6 +1,13 @@
 import numpy as np
+from datetime import datetime
 
-from meteor_detector_realtime import estimate_fps_from_frames, probe_rtsp_endpoint, sanitize_fps
+from meteor_detector_realtime import (
+    estimate_fps_from_frames,
+    make_detection_base_name,
+    make_detection_id,
+    probe_rtsp_endpoint,
+    sanitize_fps,
+)
 
 
 def test_sanitize_fps_returns_default_for_invalid_values():
@@ -50,3 +57,26 @@ def test_probe_rtsp_endpoint_reports_tcp_error(monkeypatch):
     assert "probe=tcp_error" in result
     assert "port=8554" in result
     assert "TimeoutError" in result
+
+
+def test_make_detection_id_is_stable():
+    record = {
+        "timestamp": "2026-02-07T22:00:00.123456",
+        "start_time": 1.0,
+        "end_time": 1.4,
+        "start_point": [10, 20],
+        "end_point": [40, 50],
+    }
+    detection_id = make_detection_id("camera1", record)
+    assert detection_id.startswith("det_")
+    assert detection_id == make_detection_id("camera1", record)
+
+
+def test_make_detection_base_name_avoids_existing_collision(tmp_path):
+    detection_id = "det_1234567890abcdef1234"
+    first = make_detection_base_name(tmp_path, datetime(2026, 2, 7, 22, 0, 0), detection_id)
+    assert first == "meteor_20260207_220000_12345678"
+
+    (tmp_path / f"{first}.mp4").write_bytes(b"x")
+    second = make_detection_base_name(tmp_path, datetime(2026, 2, 7, 22, 0, 0), detection_id)
+    assert second == "meteor_20260207_220000_12345678_02"
