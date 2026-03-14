@@ -11,8 +11,9 @@ from threading import Event, Lock, Thread
 import threading
 from urllib.parse import urlparse, parse_qs, unquote
 from urllib.request import Request, urlopen
-from urllib.error import URLError, HTTPError
+from urllib.error import URLError
 
+import dashboard_camera_handlers as camera_handlers
 from dashboard_config import CAMERAS, DETECTIONS_DIR, VERSION, get_detection_window
 from dashboard_templates import render_dashboard_html, render_settings_html
 
@@ -102,24 +103,11 @@ def get_dashboard_cpu_snapshot(refresh=True):
 
 
 def _parse_camera_index(path):
-    parsed_path = urlparse(path).path
-    camera_index = int(parsed_path.rstrip("/").split("/")[-1])
-    if camera_index < 0 or camera_index >= len(CAMERAS):
-        raise ValueError(f"camera index out of range: {camera_index}")
-    return camera_index
+    return camera_handlers.parse_camera_index(path, len(CAMERAS))
 
 
 def _camera_url_for_proxy(raw_url, camera_index=None):
-    parsed = urlparse(raw_url)
-    hostname = parsed.hostname or ""
-    if hostname in ("localhost", "127.0.0.1", "::1"):
-        if _IN_DOCKER and camera_index is not None:
-            return f"{parsed.scheme}://camera{camera_index + 1}:8080"
-        netloc = "host.docker.internal"
-        if parsed.port:
-            netloc = f"{netloc}:{parsed.port}"
-        return parsed._replace(netloc=netloc).geturl()
-    return raw_url
+    return camera_handlers.camera_url_for_proxy(raw_url, _IN_DOCKER, camera_index)
 
 
 def _labels_path():
@@ -1094,260 +1082,89 @@ def handle_set_detection_label(handler):
 
 
 def handle_camera_snapshot(handler):
-    if not handler.path.startswith("/camera_snapshot/"):
-        return False
-
-    parsed = urlparse(handler.path)
-    try:
-        camera_index = _parse_camera_index(parsed.path)
-        cam = CAMERAS[camera_index]
-        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/snapshot"
-        req = Request(target_url)
-        with urlopen(req, timeout=5) as response:
-            payload = response.read()
-
-        query = parse_qs(parsed.query)
-        should_download = query.get("download", ["0"])[0] in ("1", "true", "yes")
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_name = "".join(c if (c.isalnum() and c.isascii()) else "_" for c in cam["name"]).strip("_") or f"camera{camera_index+1}"
-        filename = f"snapshot_{safe_name}_{timestamp}.jpg"
-
-        handler.send_response(200)
-        handler.send_header("Content-type", "image/jpeg")
-        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        if should_download:
-            handler.send_header("Content-Disposition", f'attachment; filename="{filename}"')
-        handler.end_headers()
-        handler.wfile.write(payload)
-        return True
-    except (ValueError, URLError, TimeoutError):
-        handler.send_response(503)
-        handler.end_headers()
-        return True
-    except Exception:
-        handler.send_response(500)
-        handler.end_headers()
-        return True
-
-
-def _proxy_camera_post(handler, camera_path, ok_status=200):
-    try:
-        camera_index = _parse_camera_index(handler.path)
-        cam = CAMERAS[camera_index]
-        target_url = _camera_url_for_proxy(cam["url"], camera_index) + camera_path
-        req = Request(target_url, method="POST")
-        with urlopen(req, timeout=5) as response:
-            payload = response.read()
-
-        handler.send_response(ok_status)
-        handler.send_header("Content-type", "application/json")
-        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        handler.end_headers()
-        handler.wfile.write(payload)
-        return True
-    except (ValueError, URLError, TimeoutError) as e:
-        handler.send_response(503)
-        handler.send_header("Content-type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
-        return True
+    return camera_handlers.handle_camera_snapshot(
+        handler,
+        CAMERAS,
+        _IN_DOCKER,
+        _parse_camera_index,
+        Request,
+        urlopen,
+    )
 
 
 def handle_camera_mask(handler):
-    if not handler.path.startswith("/camera_mask/"):
-        return False
-    return _proxy_camera_post(handler, "/update_mask", ok_status=200)
+    return camera_handlers.handle_camera_mask(
+        handler,
+        CAMERAS,
+        _IN_DOCKER,
+        _parse_camera_index,
+        Request,
+        urlopen,
+    )
 
 
 def handle_camera_mask_confirm(handler):
-    if not handler.path.startswith("/camera_mask_confirm/"):
-        return False
-    return _proxy_camera_post(handler, "/confirm_mask_update", ok_status=200)
+    return camera_handlers.handle_camera_mask_confirm(
+        handler,
+        CAMERAS,
+        _IN_DOCKER,
+        _parse_camera_index,
+        Request,
+        urlopen,
+    )
 
 
 def handle_camera_mask_discard(handler):
-    if not handler.path.startswith("/camera_mask_discard/"):
-        return False
-    return _proxy_camera_post(handler, "/discard_mask_update", ok_status=200)
+    return camera_handlers.handle_camera_mask_discard(
+        handler,
+        CAMERAS,
+        _IN_DOCKER,
+        _parse_camera_index,
+        Request,
+        urlopen,
+    )
 
 
 def handle_camera_restart(handler):
-    if not handler.path.startswith("/camera_restart/"):
-        return False
-
-    try:
-        camera_index = _parse_camera_index(handler.path)
-        cam = CAMERAS[camera_index]
-        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/restart"
-        req = Request(target_url, method="POST")
-        with urlopen(req, timeout=5) as response:
-            payload = response.read()
-
-        handler.send_response(202)
-        handler.send_header("Content-type", "application/json")
-        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        handler.end_headers()
-        handler.wfile.write(payload)
-        return True
-    except (ValueError, URLError, TimeoutError) as e:
-        handler.send_response(503)
-        handler.send_header("Content-type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
-        return True
-    except Exception as e:
-        handler.send_response(500)
-        handler.send_header("Content-type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
-        return True
+    return camera_handlers.handle_camera_restart(
+        handler,
+        CAMERAS,
+        _IN_DOCKER,
+        _parse_camera_index,
+        Request,
+        urlopen,
+    )
 
 
 def handle_camera_mask_image(handler):
-    if not handler.path.startswith("/camera_mask_image/"):
-        return False
-
-    parsed = urlparse(handler.path)
-    try:
-        camera_index = _parse_camera_index(parsed.path)
-        cam = CAMERAS[camera_index]
-        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/mask"
-        if parsed.query:
-            target_url += "?" + parsed.query
-        req = Request(target_url)
-        with urlopen(req, timeout=5) as response:
-            payload = response.read()
-
-        handler.send_response(200)
-        handler.send_header("Content-type", "image/png")
-        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        handler.end_headers()
-        handler.wfile.write(payload)
-        return True
-    except HTTPError as e:
-        handler.send_response(404 if e.code == 404 else 503)
-        handler.end_headers()
-        return True
-    except (ValueError, URLError, TimeoutError):
-        handler.send_response(503)
-        handler.end_headers()
-        return True
-    except Exception:
-        handler.send_response(500)
-        handler.end_headers()
-        return True
+    return camera_handlers.handle_camera_mask_image(
+        handler,
+        CAMERAS,
+        _IN_DOCKER,
+        _parse_camera_index,
+        Request,
+        urlopen,
+    )
 
 
 def handle_camera_settings_current(handler):
-    if handler.path != "/camera_settings/current":
-        return False
-
-    results = []
-    first_settings = {}
-
-    for camera_index, cam in enumerate(CAMERAS):
-        target_url = _camera_stats_target(camera_index)
-        try:
-            req = Request(target_url, headers={"Accept": "application/json"})
-            with urlopen(req, timeout=5) as response:
-                payload = response.read()
-            data = json.loads(payload.decode("utf-8")) if payload else {}
-            settings = data.get("settings", {}) if isinstance(data, dict) else {}
-            if not first_settings and isinstance(settings, dict) and settings:
-                first_settings = settings
-            results.append({
-                "camera": cam["name"],
-                "success": True,
-                "settings": settings,
-            })
-        except Exception as e:
-            results.append({
-                "camera": cam["name"],
-                "success": False,
-                "error": str(e),
-            })
-
-    ok_count = sum(1 for item in results if item.get("success"))
-    handler.send_response(200)
-    handler.send_header("Content-type", "application/json")
-    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-    handler.end_headers()
-    handler.wfile.write(
-        json.dumps(
-            {
-                "success": ok_count > 0,
-                "settings": first_settings,
-                "results": results,
-                "ok_count": ok_count,
-                "total": len(CAMERAS),
-            }
-        ).encode("utf-8")
+    return camera_handlers.handle_camera_settings_current(
+        handler,
+        CAMERAS,
+        _camera_stats_target,
+        Request,
+        urlopen,
     )
-    return True
 
 
 def handle_camera_settings_apply_all(handler):
-    if handler.path != "/camera_settings/apply_all":
-        return False
-
-    try:
-        length = int(handler.headers.get("Content-Length", "0"))
-        raw_body = handler.rfile.read(length)
-        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
-        if not isinstance(payload, dict):
-            raise ValueError("payload must be object")
-    except Exception as e:
-        handler.send_response(400)
-        handler.send_header("Content-type", "application/json")
-        handler.end_headers()
-        handler.wfile.write(json.dumps({"success": False, "error": f"invalid payload: {e}"}).encode("utf-8"))
-        return True
-
-    results = []
-    applied_count = 0
-    request_body = json.dumps(payload).encode("utf-8")
-    for camera_index, cam in enumerate(CAMERAS):
-        target_url = _camera_apply_settings_target(camera_index)
-        try:
-            req = Request(
-                target_url,
-                data=request_body,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urlopen(req, timeout=8) as response:
-                resp_payload = response.read()
-            data = json.loads(resp_payload.decode("utf-8")) if resp_payload else {}
-            success = bool(data.get("success", False))
-            if success:
-                applied_count += 1
-            results.append({
-                "camera": cam["name"],
-                "success": success,
-                "response": data,
-            })
-        except Exception as e:
-            results.append({
-                "camera": cam["name"],
-                "success": False,
-                "error": str(e),
-            })
-
-    handler.send_response(200)
-    handler.send_header("Content-type", "application/json")
-    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-    handler.end_headers()
-    handler.wfile.write(
-        json.dumps(
-            {
-                "success": applied_count > 0,
-                "applied_count": applied_count,
-                "total": len(CAMERAS),
-                "results": results,
-            }
-        ).encode("utf-8")
+    return camera_handlers.handle_camera_settings_apply_all(
+        handler,
+        CAMERAS,
+        _camera_apply_settings_target,
+        Request,
+        urlopen,
     )
-    return True
 
 
 def handle_bulk_delete_non_meteor(handler):

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Changed
 - ダッシュボードの未使用な `GET /camera_stream/{index}` 中継ルートを削除し、ブラウザから各カメラの `/stream` へ直接接続する構成に整理。
+- 設定画面 HTML 生成 (`render_settings_html`) を `dashboard_templates_settings.py` へ分割し、ダッシュボード画面テンプレートとの責務を分離。
+- マスク生成ロジック（除外マスク / ノイズ帯マスク）を `meteor_mask_utils.py` へ分割し、`meteor_detector_rtsp_web.py` と `generate_compose.py` で共通利用する構成に整理。
+- カメラ操作系ハンドラ（snapshot/mask/restart/settings反映）を `dashboard_camera_handlers.py` へ分割し、`dashboard_routes.py` はルーティング調停と監視系処理に集中する構成へ整理。
 
 ## [1.24.1] - 2026-03-14
 ### Added

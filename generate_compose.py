@@ -20,7 +20,7 @@ except ImportError:
     cv2 = None
 
 try:
-    from meteor_detector_rtsp_web import build_exclusion_mask
+    from meteor_mask_utils import build_exclusion_mask
 except Exception:
     build_exclusion_mask = None
 
