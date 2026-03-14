@@ -28,6 +28,7 @@ RUN apt-get update --allow-releaseinfo-change && \
 COPY meteor_detector_rtsp_web.py .
 COPY meteor_detector_realtime.py .
 COPY meteor_detector_common.py .
+COPY meteor_mask_utils.py .
 COPY astro_utils.py .
 
 # マスク画像（デフォルトは空ファイル）

@@ -406,13 +406,33 @@ def render_settings_html(cameras, version):
             return payload;
         }}
 
+        function extractApiError(data, fallbackMessage) {{
+            if (!data || typeof data !== 'object') {{
+                return fallbackMessage;
+            }}
+            if (typeof data.error === 'string' && data.error.trim() !== '') {{
+                return data.error;
+            }}
+            if (Array.isArray(data.results)) {{
+                const failed = data.results.filter((item) => item && item.success === false);
+                if (failed.length > 0) {{
+                    const first = failed[0];
+                    if (first && typeof first.error === 'string' && first.error.trim() !== '') {{
+                        return `${{failed.length}}台で失敗: ${{first.error}}`;
+                    }}
+                    return `${{failed.length}}台で失敗`;
+                }}
+            }}
+            return fallbackMessage;
+        }}
+
         async function loadCurrent() {{
             setStatus('現在値を取得中...');
             try {{
                 const res = await fetch('/camera_settings/current', {{ cache: 'no-store' }});
                 const data = await res.json();
                 if (!res.ok || data.success === false) {{
-                    throw new Error(data.error || ('HTTP ' + res.status));
+                    throw new Error(extractApiError(data, '現在値の取得に失敗しました'));
                 }}
                 fillForm(data.settings || {{}});
                 setStatus('現在値を取得しました');
@@ -437,8 +457,9 @@ def render_settings_html(cameras, version):
                 }});
                 const data = await res.json();
                 if (!res.ok || data.success === false) {{
-                    throw new Error(data.error || ('HTTP ' + res.status));
+                    throw new Error(extractApiError(data, '設定適用に失敗しました'));
                 }}
+                alert(`反映完了: ${{data.applied_count}} / ${{data.total}} 台`);
                 setStatus(
                     '適用完了\\n' +
                     '成功: ' + data.applied_count + '/' + data.total + '\\n' +
