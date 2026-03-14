@@ -416,10 +416,10 @@ if path_overlap > params.nuisance_path_overlap_threshold:
 | `low` | 40 | 220 | 明るい流星のみ |
 | `medium` (デフォルト) | 30 | 200 | バランス型 |
 | `high` | 20 | 180 | 暗い流星も検出 |
-| `faint` | 16 | 135 | 短く暗い流星の取りこぼし低減 |
+| `faint` | 16 | 150 | 短く暗い流星の取りこぼし低減 |
 | `fireball` | 15 | 150 | 火球専用（長時間OK） |
 
-追跡中は `min_brightness_tracking` を使用します。RTSP Webでは `faint` のみ `min_brightness` の80%に自動設定され、それ以外は `min_brightness` と同値です。
+追跡中は `min_brightness_tracking` を使用します。RTSP Webでは `faint` のみ `min_brightness` の80%に自動設定されるため、現行値では `120` になります。それ以外は `min_brightness` と同値です。
 
 #### 信頼度計算
 

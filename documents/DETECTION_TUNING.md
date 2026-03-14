@@ -38,6 +38,8 @@ Licensed under the MIT License
 --sensitivity faint
 ```
 
+`faint` は現行実装で `diff_threshold=16`、`min_brightness=150`、`min_area=5`、`max_distance=90` を起点に調整されます。RTSP Web では追跡中のみ `min_brightness_tracking=120` が自動適用されます。
+
 **火球向け**
 ```bash
 --sensitivity fireball

@@ -75,7 +75,7 @@ docker-compose.ymlで設定される環境変数:
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
 | `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限 |
 | `CAMERA1_NAME` | - | カメラ1の内部名（ディレクトリ名・識別子） |
-| `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名 |
+| `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名（UI専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
 | `CAMERA1_URL` | - | カメラ1のURL |
 | `DETECTIONS_DIR` | `/output` | 検出結果ディレクトリ |
 | `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |
@@ -165,6 +165,7 @@ environment:
 
 起動時依存の設定は `output/runtime_settings/<camera>.json` に保存されます。
 これにより、コンテナ再起動後も同じ設定が維持されます。
+`<camera>` には `CAMERA_NAME` の内部名が使われ、`CAMERA_NAME_DISPLAY` の表示名には切り替わりません。
 
 #### 設定変更の推奨手順
 
@@ -529,7 +530,7 @@ environment:
 | `low` | 40 | 220 | 明るい流星のみ | 低 |
 | `medium` | 30 | 200 | バランス型（推奨） | 中 |
 | `high` | 20 | 180 | 暗い流星も検出 | やや高 |
-| `faint` | 16 | 135 | 短く暗い流星の取りこぼし低減 | 高 |
+| `faint` | 16 | 150 | 短く暗い流星の取りこぼし低減 | 高 |
 | `fireball` | 15 | 150 | 火球専用 | 高 |
 
 ### プリセットの適用
@@ -1010,8 +1011,10 @@ environment:
 
 **params調整**:
 ```python
-params.min_brightness = 135
+params.min_brightness = 150
 params.diff_threshold = 16
+params.min_area = 5
+params.max_distance = 90
 ```
 
 ---

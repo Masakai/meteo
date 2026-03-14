@@ -125,6 +125,7 @@ python generate_compose.py
 
 起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、
 コンテナ再起動後も維持されます。
+この `<camera>` は内部識別子です。`CAMERA_NAME_DISPLAY` を設定していても、保存ファイル名やディレクトリ名には表示名ではなく内部名が使われます。
 
 ### 停止
 

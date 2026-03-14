@@ -114,7 +114,7 @@ python meteor_detector.py input.mp4 --sensitivity fireball
 - `low` - 誤検出を減らす（明るい流星のみ）
 - `medium` - バランス（デフォルト）
 - `high` - 暗い流星も検出
-- `faint` - 取りこぼし低減（短く暗い流星向け、誤検出は増えやすい）
+- `faint` - 取りこぼし低減（短く暗い流星向け、`diff_threshold=16` / `min_brightness=150` / `min_area=5` / `max_distance=90`、誤検出は増えやすい）
 - `fireball` - 火球検出（長時間・長距離・明滅対応）
 
 #### 高速化オプション
@@ -192,6 +192,8 @@ python meteor_detector_rtsp_web.py rtsp://... --no-clips
 
 起動時に効く設定は `output/runtime_settings/<camera>.json` に保存され、
 コンテナ再起動後も維持されます。
+この `<camera>` には内部名が使われ、`CAMERA_NAME_DISPLAY` で表示名を付けても
+ディレクトリ名・マスク保存名・ランタイム設定ファイル名は内部名のままです。
 
 ### 3. Web版と同じ検出ロジックでファイル再検証
 
@@ -233,6 +235,17 @@ rtsp://user:pass@10.0.1.25/live
 rtsp://user:pass@10.0.1.3/live
 rtsp://user:pass@10.0.1.11/live
 ```
+
+表示名を付けたい場合は `|` 区切りの3項目目に指定できます。
+
+```
+rtsp://user:pass@10.0.1.25/live | camera1.jpg | 東側
+rtsp://user:pass@10.0.1.3/live  | camera2.jpg | 南側
+rtsp://user:pass@10.0.1.11/live | | 西側
+```
+
+- 表示名はダッシュボードや単体カメラUIの表示専用です
+- 保存先ディレクトリ、`output/runtime_settings/<camera>.json`、マスク画像名は内部名を使います
 
 **昼間画像による自動マスク（任意）**
 

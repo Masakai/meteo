@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- `faint` 感度プリセットの現行実装値 (`diff_threshold=16`, `min_brightness=150`, `min_area=5`, `max_distance=90`) と、RTSP Webでの追跡輝度自動調整（`min_brightness_tracking=120`）に合わせて、README と技術ドキュメントの記述を更新。
+- `CAMERA_NAME_DISPLAY` は UI 表示専用であり、保存先ディレクトリ・マスク保存名・ランタイム設定ファイル名には内部名を使い続ける点を、README と運用/設定ドキュメントへ追記。
 
 ## [1.23.1] - 2026-03-09
 ### Changed
