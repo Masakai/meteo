@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-03-14
+### Added
+- ダッシュボードに `GET /health` を追加し、コンテナやリバースプロキシ配下からの疎通確認をしやすく改善。
+
+### Changed
+- `dashboard.py` を Flask のアプリファクトリ構成へ整理し、`app = create_app()` を公開して WSGI 配備やコンテナ運用で扱いやすい構成へ変更。
+- 監視スレッドの起動を初回リクエスト時にも行うよう見直し、`python dashboard.py` 以外の起動経路でもカメラ監視・検出監視が有効になるよう改善。
+- ダッシュボード関連レスポンスの no-cache ヘッダー付与を共通化。
+
+### Fixed
+- Flask アプリとして import して起動した場合に、バックグラウンド監視が開始されないケースを修正。
+
 ## [1.24.0] - 2026-03-14
 ### Added
 - 検出データの運用整備として、ID ベース移行・孤立ファイル救済・検出ディレクトリ統合を行う各種スクリプトを追加。

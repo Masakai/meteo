@@ -27,6 +27,12 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v1.24.1 - ダッシュボードの Flask アプリ運用整備
+- **新規エンドポイント**: `GET /health`
+  - ダッシュボードのヘルスチェックを返却
+  - レスポンス例: `{ "status": "ok", "version": "1.24.1", "camera_count": 3 }`
+- **変更**: `dashboard.py` を Flask のアプリファクトリ構成へ整理し、WSGI 配備やコンテナ運用時でも監視スレッドが初回リクエストで起動するよう改善
+
 ### v1.24.0 - 検出 ID 管理と運用制御の拡張
 - **機能追加**: `/camera_settings/current` および `/camera_settings/apply_all` で `detection_enabled` を扱えるようにし、全カメラの検出停止・再開を一括制御可能化
 - **変更**: 検出レコードの `id` を、`timestamp` に加えて `start_time` / `end_time` / `start_point` / `end_point` を含む現行ルールへ統一
@@ -90,6 +96,7 @@ Licensed under the MIT License
 
 | エンドポイント | メソッド | 説明 |
 |--------------|---------|------|
+| `/health` | GET | ダッシュボードヘルスチェック |
 | `/` | GET | ダッシュボードHTML |
 | `/settings` | GET | 全カメラ設定ページ |
 | `/detection_window` | GET | 検出時間帯取得 |
@@ -105,6 +112,30 @@ Licensed under the MIT License
 | `/bulk_delete_non_meteor/{camera_name}` | POST | カメラの非流星検出を一括削除 |
 | `/detection_label` | POST | 検出にラベルを設定 |
 | `/changelog` | GET | CHANGELOG表示 |
+
+---
+
+### GET /health
+
+**説明**: ダッシュボードのプロセス状態と構成情報を返す
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "status": "ok",
+  "version": "1.24.1",
+  "camera_count": 3
+}
+```
+
+**使用例**:
+```bash
+curl http://localhost:8080/health
+```
 
 ---
 
