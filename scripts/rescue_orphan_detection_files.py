@@ -17,12 +17,14 @@ METEOR_FILE_RE = re.compile(
 )
 
 
-def make_rescued_detection_id(camera_name: str, base_name: str, timestamp: str) -> str:
+def make_detection_id(camera_name: str, record: dict) -> str:
     source = {
         "camera": camera_name,
-        "base_name": base_name,
-        "timestamp": timestamp,
-        "rescued": True,
+        "timestamp": record.get("timestamp", ""),
+        "start_time": record.get("start_time", ""),
+        "end_time": record.get("end_time", ""),
+        "start_point": record.get("start_point", ""),
+        "end_point": record.get("end_point", ""),
     }
     digest = hashlib.sha1(json.dumps(source, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     return f"det_{digest[:20]}"
@@ -133,10 +135,10 @@ def rescue_camera(camera_dir: Path, apply: bool) -> dict:
         rescued = {
             "timestamp": timestamp,
             "confidence": 0.0,
-            "id": make_rescued_detection_id(camera_dir.name, base_name, timestamp),
             "base_name": base_name,
             "rescued_from_orphan": True,
         }
+        rescued["id"] = make_detection_id(camera_dir.name, rescued)
         clip_name = files.get(".mp4") or files.get(".mov")
         if clip_name:
             rescued["clip_path"] = clip_name
