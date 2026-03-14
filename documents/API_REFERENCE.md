@@ -27,6 +27,11 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v1.24.0 - 検出 ID 管理と運用制御の拡張
+- **機能追加**: `/camera_settings/current` および `/camera_settings/apply_all` で `detection_enabled` を扱えるようにし、全カメラの検出停止・再開を一括制御可能化
+- **変更**: 検出レコードの `id` を、`timestamp` に加えて `start_time` / `end_time` / `start_point` / `end_point` を含む現行ルールへ統一
+- **運用改善**: 検出データの移行・孤立ファイル救済・ディレクトリ統合を補助するメンテナンススクリプトを追加
+
 ### v1.23.1 - 検出時間帯判定と状態表示の修正
 - **修正**: 検出時間帯の計算を「当日日没から翌日の日出まで」に是正
 - **機能追加**: `GET /stats` レスポンスに検出状態詳細フィールドを追加

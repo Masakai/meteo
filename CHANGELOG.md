@@ -6,9 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.24.0] - 2026-03-14
+### Added
+- 検出データの運用整備として、ID ベース移行・孤立ファイル救済・検出ディレクトリ統合を行う各種スクリプトを追加。
+- カメラ側 `/stats` とランタイム設定に `detection_enabled` を反映し、ダッシュボードから全カメラの検出停止・再開を制御できるよう改善。
+- RTSP 接続障害の切り分けをしやすくする診断ログと到達性確認ロジックを追加。
+
 ### Changed
+- 検出 ID の生成規則を、`timestamp` に加えて `start_time` / `end_time` / `start_point` / `end_point` を含む現行形式へ統一し、保存ファイル名もその ID 断片を含む形式へ更新。
 - `faint` 感度プリセットの現行実装値 (`diff_threshold=16`, `min_brightness=150`, `min_area=5`, `max_distance=90`) と、RTSP Webでの追跡輝度自動調整（`min_brightness_tracking=120`）に合わせて、README と技術ドキュメントの記述を更新。
 - `CAMERA_NAME_DISPLAY` は UI 表示専用であり、保存先ディレクトリ・マスク保存名・ランタイム設定ファイル名には内部名を使い続ける点を、README と運用/設定ドキュメントへ追記。
+
+### Fixed
+- 孤立検出ファイルの救済で新規追加されるレコードの `id` が独自規則になっていた問題を修正し、本流の検出 ID 管理と一致する形式へ是正。
 
 ## [1.23.1] - 2026-03-09
 ### Changed
