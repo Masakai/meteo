@@ -42,8 +42,6 @@ _camera_monitor_lock = Lock()
 _camera_monitor_stop = Event()
 _camera_monitor_thread = None
 _camera_monitor_state = {}
-_CAMERA_STREAM_TIMEOUT = 300
-_CAMERA_STREAM_CHUNK_SIZE = 1024 * 64
 _dashboard_cpu_lock = Lock()
 _dashboard_cpu = {
     "cpu_percent": 0.0,
@@ -1092,46 +1090,6 @@ def handle_set_detection_label(handler):
         handler.send_header("Content-type", "application/json")
         handler.end_headers()
         handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
-        return True
-
-
-def handle_camera_stream(handler):
-    if not handler.path.startswith("/camera_stream/"):
-        return False
-
-    try:
-        camera_index = _parse_camera_index(handler.path)
-        cam = CAMERAS[camera_index]
-        target_url = _camera_url_for_proxy(cam["url"], camera_index) + "/stream"
-        req = Request(target_url)
-        # MJPEG は長時間接続のため、読み取りタイムアウトは長めに設定する
-        with urlopen(req, timeout=_CAMERA_STREAM_TIMEOUT) as response:
-            content_type = response.headers.get("Content-Type", "multipart/x-mixed-replace")
-            handler.send_response(200)
-            handler.send_header("Content-type", content_type)
-            handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-            handler.end_headers()
-
-            while True:
-                chunk = response.read(_CAMERA_STREAM_CHUNK_SIZE)
-                if not chunk:
-                    break
-                try:
-                    handler.wfile.write(chunk)
-                    handler.wfile.flush()
-                except (BrokenPipeError, ConnectionResetError):
-                    # クライアント切断時は正常系として終了する
-                    return True
-        return True
-    except (ValueError, URLError, TimeoutError) as e:
-        handler.send_response(503)
-        handler.end_headers()
-        return True
-    except (BrokenPipeError, ConnectionResetError):
-        return True
-    except Exception:
-        handler.send_response(500)
-        handler.end_headers()
         return True
 
 

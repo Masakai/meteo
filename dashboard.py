@@ -12,11 +12,9 @@ from __future__ import annotations
 import atexit
 import logging
 import os
-import time
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
-from urllib.request import Request, urlopen
 
 from flask import Flask, Response, jsonify, request
 
@@ -28,10 +26,6 @@ logging.basicConfig(
     level=os.environ.get("DASHBOARD_LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
-
-STREAM_PROXY_TIMEOUT_SEC = 20
-STREAM_PROXY_RECONNECT_DELAY_SEC = 0.3
-
 
 class HandlerAdapter:
     """BaseHTTPRequestHandler 互換の最小アダプタ。"""
@@ -192,90 +186,6 @@ def create_app() -> Flask:
         if query:
             path = f"{path}?{query}"
         return _dispatch(routes.handle_camera_snapshot, path=path)
-
-    @app.get("/camera_stream/<int:camera_index>")
-    def camera_stream(camera_index: int) -> Response:
-        try:
-            cam = CAMERAS[camera_index]
-        except IndexError:
-            return Response(status=503)
-
-        target_url = routes._camera_url_for_proxy(cam["url"], camera_index) + "/stream"
-        req = Request(target_url)
-
-        try:
-            upstream = urlopen(req, timeout=STREAM_PROXY_TIMEOUT_SEC)
-            first_chunk = upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
-            if not first_chunk:
-                upstream.close()
-                return Response(status=503)
-        except (TimeoutError, ValueError):
-            return Response(status=503)
-        except Exception:
-            return Response(status=500)
-
-        content_type = "multipart/x-mixed-replace; boundary=frame"
-
-        def generate():
-            current_upstream = upstream
-            current_first_chunk = first_chunk
-            try:
-                while True:
-                    first_chunk_sent = False
-                    try:
-                        if current_first_chunk:
-                            first_chunk_sent = True
-                            yield current_first_chunk
-                            current_first_chunk = b""
-
-                        while True:
-                            chunk = current_upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
-                            if not chunk:
-                                raise TimeoutError("stream ended")
-                            first_chunk_sent = True
-                            yield chunk
-                    except GeneratorExit:
-                        break
-                    except Exception:
-                        if first_chunk_sent:
-                            time.sleep(STREAM_PROXY_RECONNECT_DELAY_SEC)
-
-                        try:
-                            if current_upstream is not None:
-                                current_upstream.close()
-                        except Exception:
-                            pass
-                        current_upstream = None
-                        current_first_chunk = b""
-
-                        while True:
-                            try:
-                                current_upstream = urlopen(req, timeout=STREAM_PROXY_TIMEOUT_SEC)
-                                current_first_chunk = current_upstream.read(routes._CAMERA_STREAM_CHUNK_SIZE)
-                                if not current_first_chunk:
-                                    raise TimeoutError("empty first chunk")
-                                break
-                            except GeneratorExit:
-                                raise
-                            except Exception:
-                                try:
-                                    if current_upstream is not None:
-                                        current_upstream.close()
-                                except Exception:
-                                    pass
-                                current_upstream = None
-                                current_first_chunk = b""
-                                time.sleep(STREAM_PROXY_RECONNECT_DELAY_SEC)
-            finally:
-                if current_upstream is not None:
-                    try:
-                        current_upstream.close()
-                    except Exception:
-                        pass
-
-        response = Response(generate(), content_type=content_type)
-        response.headers["X-Accel-Buffering"] = "no"
-        return _apply_no_cache_headers(response)
 
     @app.get("/image/<path:subpath>")
     def image(subpath: str) -> Response:

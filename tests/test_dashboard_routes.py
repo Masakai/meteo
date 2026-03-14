@@ -58,7 +58,7 @@ def test_camera_url_for_proxy_non_localhost(monkeypatch):
 
 def test_parse_camera_index_with_query(monkeypatch):
     monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
-    assert dr._parse_camera_index("/camera_stream/0?t=12345") == 0
+    assert dr._parse_camera_index("/camera_snapshot/0?download=1&t=12345") == 0
 
 
 def test_handle_camera_restart_success(monkeypatch):

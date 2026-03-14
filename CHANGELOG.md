@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- ダッシュボードの未使用な `GET /camera_stream/{index}` 中継ルートを削除し、ブラウザから各カメラの `/stream` へ直接接続する構成に整理。
 
 ## [1.24.1] - 2026-03-14
 ### Added
