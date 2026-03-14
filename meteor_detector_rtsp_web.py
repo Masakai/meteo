@@ -37,6 +37,7 @@ from meteor_detector_realtime import (
     RealtimeMeteorDetector,
     RingBuffer,
     probe_rtsp_endpoint,
+    probe_rtsp_with_ffprobe,
     save_meteor_event,
     sanitize_fps,
 )
@@ -1869,6 +1870,8 @@ def process_rtsp_stream(
     rtsp_log_detail = _to_bool(os.environ.get("RTSP_LOG_DETAIL", "true"), default=True)
     reader = RTSPReader(url, log_detail=rtsp_log_detail)
     print(f"RTSP事前診断: {probe_rtsp_endpoint(url)}", flush=True)
+    if rtsp_log_detail:
+        print(f"RTSP ffprobe診断: {probe_rtsp_with_ffprobe(url)}", flush=True)
     print("接続中...", flush=True)
     reader.start()
 
