@@ -4,6 +4,8 @@ api:
 webrtc:
   candidates:
     - 192.168.0.10:8555
+  # STUN由来の srflx candidate が追加で返ることがありますが、
+  # host candidate が同時に返っていれば通常は問題ありません。
 
 streams:
   camera1:

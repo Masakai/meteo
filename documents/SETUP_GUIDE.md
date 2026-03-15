@@ -136,7 +136,12 @@ rtsp://user:pass@10.0.1.3/live
 
 ```bash
 python3 generate_compose.py
+
+# WebRTCライブ表示を使う場合
+python3 generate_compose.py --streaming-mode webrtc
 ```
+
+`--streaming-mode webrtc` を使うと `go2rtc` コンテナ用の設定も同時に生成されます。`go2rtc` の `webrtc.candidates` は既定でローカル IP を自動検出し、必要なら `--go2rtc-candidate-host <host-ip>` で上書きできます。
 
 ### 7-3. meteor-docker.sh で起動
 

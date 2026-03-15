@@ -108,10 +108,13 @@ Licensed under the MIT License
 |--------------|---------|------|
 | `/health` | GET | ダッシュボードヘルスチェック |
 | `/` | GET | ダッシュボードHTML |
+| `/cameras` | GET | カメラライブ画面HTML |
 | `/settings` | GET | 全カメラ設定ページ |
 | `/detection_window` | GET | 検出時間帯取得 |
 | `/detections` | GET | 検出一覧取得 |
 | `/detections_mtime` | GET | 検出ログ更新時刻取得 |
+| `/camera_embed/{index}` | GET | WebRTC 埋め込みページ |
+| `/go2rtc_asset/{name}` | GET | go2rtc フロント資産プロキシ |
 | `/camera_settings/current` | GET | カメラ設定の現在値取得 |
 | `/camera_settings/apply_all` | POST | 設定を全カメラへ一括適用 |
 | `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） |
@@ -164,6 +167,20 @@ curl http://localhost:8080/
 
 ---
 
+### GET /cameras
+
+**説明**: カメラライブ表示用のHTMLページを返す
+
+**レスポンス**:
+- Content-Type: `text/html; charset=utf-8`
+- Status: 200 OK
+
+**補足**:
+- `CAMERA*_STREAM_KIND=mjpeg` の場合は各カメラの `/stream` を直接参照
+- `CAMERA*_STREAM_KIND=webrtc` の場合は `/camera_embed/{index}` を iframe で埋め込み
+
+---
+
 ### GET /settings
 
 **説明**: 全カメラ設定UIページを返す
@@ -176,6 +193,35 @@ curl http://localhost:8080/
 ```bash
 curl http://localhost:8080/settings
 ```
+
+---
+
+### GET /camera_embed/{index}
+
+**説明**: WebRTC ライブ表示用の埋め込みHTMLを返す
+
+**レスポンス**:
+- Content-Type: `text/html; charset=utf-8`
+- Status: 200 OK
+
+**補足**:
+- `CAMERA*_STREAM_KIND=webrtc` のカメラのみ有効
+- 埋め込みページ内で `/go2rtc_asset/video-stream.js` を読み込み、`go2rtc` の `/api/ws?src=...` へ接続
+- 表示モードは `webrtc,mse,hls,mjpeg` の優先順で自動選択
+
+---
+
+### GET /go2rtc_asset/{name}
+
+**説明**: `go2rtc` の `video-stream.js` / `video-rtc.js` をダッシュボード経由で配信
+
+**レスポンス**:
+- Content-Type: `application/javascript; charset=utf-8`
+- Status: 200 OK
+
+**補足**:
+- WebRTC 埋め込みページからのみ利用
+- Docker 内では `go2rtc` コンテナを名前解決し、ホスト側公開アドレスと分離して取得
 
 ---
 
@@ -855,6 +901,11 @@ open http://localhost:8081/
 ### GET /stream
 
 **説明**: MJPEGストリーム（Motion JPEG）を返す
+
+**補足**:
+- 各カメラコンテナ (`meteor_detector_rtsp_web.py`) が提供するライブ表示用エンドポイント
+- ダッシュボードが `mjpeg` 構成のときはブラウザがこのURLを直接参照
+- ダッシュボードが `webrtc` 構成のときは、ライブ表示の主経路は `go2rtc` 経由になり、この `/stream` は主表示には使われません
 
 **レスポンス**:
 - Content-Type: `multipart/x-mixed-replace; boundary=frame`

@@ -94,7 +94,6 @@ python generate_compose.py \
   --scale 0.5 \
   --buffer 15 \
   --streaming-mode webrtc \
-  --go2rtc-candidate-host 10.0.1.59 \
   --latitude 35.6762 \
   --longitude 139.6503 \
   --enable-time-window true \
@@ -118,7 +117,9 @@ services:
       - CAMERA1_STREAM_URL=http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false
 ```
 
-`webrtc` を Docker 内の `go2rtc` で使う場合は、`go2rtc.yaml` の `webrtc.candidates` にブラウザから到達可能なホスト側 IP/ポートを設定してください。`generate_compose.py --go2rtc-candidate-host <host-ip>` を使うと自動生成されます。
+`webrtc` を Docker 内の `go2rtc` で使う場合は、`go2rtc.yaml` の `webrtc.candidates` にブラウザから到達可能なホスト側 IP/ポートを設定してください。`generate_compose.py` は既定でローカル IP を自動検出して設定し、必要な場合だけ `--go2rtc-candidate-host <host-ip>` で上書きできます。
+
+`go2rtc` は `webrtc.candidates` で指定した `host` candidate に加えて、STUN 由来の `srflx` candidate を返すことがあります。`srflx` がログやブラウザ開発者ツールに見えても異常ではありません。重要なのは、同時に指定した `host` candidate も返っており、最終的な表示モードが `RTC` になっていることです。
 
 #### 方法3: .envファイルを使用
 

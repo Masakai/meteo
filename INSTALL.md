@@ -92,6 +92,7 @@ pip install -r requirements.txt
 
 ```bash
 cp docker-compose.yml.sample docker-compose.yml
+cp go2rtc.yaml.sample go2rtc.yaml
 ```
 
 エディタで `docker-compose.yml` を開き、以下の項目を編集します：
@@ -102,6 +103,14 @@ cp docker-compose.yml.sample docker-compose.yml
 - `RTSP_URL`: 各カメラのRTSP URL
 - `CAMERA_NAME`: 各カメラの識別名
 - `CAMERA_NAME_DISPLAY`: 各カメラの表示名
+
+WebRTC ライブ表示を使う場合は以下も確認します：
+
+- `dashboard` の `CAMERA*_STREAM_KIND=webrtc`
+- `dashboard` の `CAMERA*_STREAM_URL`
+- `go2rtc.yaml` の `webrtc.candidates`
+
+`webrtc.candidates` にはブラウザから到達可能なホスト側 IP を設定します。`srflx` candidate が追加で返っても、`host` candidate が返っていて表示モードが `RTC` なら正常です。
 
 **カメラを増減する場合:**
 - カメラを追加する場合は、既存のカメラセクションをコピーして設定を変更
@@ -140,6 +149,8 @@ docker compose up -d
 - **カメラ1**: http://localhost:8081
 - **カメラ2**: http://localhost:8082
 - **カメラ3**: http://localhost:8083
+
+WebRTC ライブ表示を有効にする場合は、事前に `generate_compose.py --streaming-mode webrtc` で `docker-compose.yml` と `go2rtc.yaml` を生成してください。`go2rtc` の候補アドレスは既定でローカル IP を自動検出します。
 
 ---
 

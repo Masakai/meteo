@@ -28,7 +28,7 @@
 <div class="link-grid">
   <div class="link-card">
     <strong><a href="SETUP_GUIDE/">セットアップマニュアル</a></strong>
-    初回構築と動作確認の手順。
+    初回構築と動作確認の手順。WebRTC ライブ表示と go2rtc 構成も含む。
   </div>
   <div class="link-card">
     <strong><a href="CONFIGURATION_GUIDE/">設定ガイド</a></strong>
@@ -66,7 +66,7 @@
   </div>
   <div class="link-card">
     <strong><a href="DOCKER_ARCHITECTURE/">Docker 構成</a></strong>
-    コンテナ構成とサービス連携。
+    コンテナ構成とサービス連携。WebRTC 時の go2rtc と candidate 設定を含む。
   </div>
   <div class="link-card">
     <strong><a href="DETECTOR_COMPONENTS/">検出コンポーネント</a></strong>

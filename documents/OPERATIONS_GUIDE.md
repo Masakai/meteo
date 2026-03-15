@@ -74,10 +74,13 @@ vim streamers  # RTSP URLを設定
 
 # 昼間画像を指定する場合（任意）
 # rtsp://user:pass@10.0.1.25/live | camera1.jpg
-# マスク生成には OpenCV が必要
+# OpenCV がない環境ではマスク生成のみスキップ
 
 # 2. docker-compose.ymlを生成
 python generate_compose.py
+
+# WebRTCライブ表示を使う場合
+python generate_compose.py --streaming-mode webrtc
 
 # 3. Dockerイメージをビルド
 ./meteor-docker.sh build
@@ -108,6 +111,12 @@ python generate_compose.py
 
 - `スナップショット保存`: 各カメラの現在フレームをJPEGでダウンロード
 - `再起動`: 対象カメラのみ再起動要求（反映まで数秒かかる場合あり）
+
+### WebRTC ライブ表示運用
+
+- `--streaming-mode webrtc` で生成した構成では、`go2rtc` コンテナが追加されます。
+- `go2rtc.yaml` の `webrtc.candidates` は既定でローカル IP を自動検出して設定されます。
+- ブラウザ開発者ツールに `srflx` candidate が見えても、`host` candidate が同時に返っていて画面表示が `RTC` なら正常です。
 
 ### ダッシュボードからの全カメラ一括設定（/settings）
 

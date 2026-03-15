@@ -271,6 +271,9 @@ rtsp://user:pass@10.0.1.11/live
 # streamersファイルからdocker-compose.ymlを生成（基本）
 python3 generate_compose.py
 
+# WebRTCライブ表示込みで生成（go2rtc も生成）
+python3 generate_compose.py --streaming-mode webrtc
+
 # 全オプション指定の例
 python3 generate_compose.py \
   --sensitivity fireball \          # 火球検出モード
@@ -278,6 +281,7 @@ python3 generate_compose.py \
   --buffer 15 \                     # バッファ秒数
   --exclude-bottom 0.0625 \         # 下部除外範囲
   --extract-clips true \            # クリップ動画保存
+  --streaming-mode webrtc \         # ダッシュボードのライブ表示をWebRTC化
   --latitude 35.3606 \              # 観測地点の緯度（デフォルト: 富士山頂）
   --longitude 138.7274 \            # 観測地点の経度（デフォルト: 富士山頂）
   --enable-time-window true \       # 天文薄暮期間のみ検出
@@ -286,7 +290,9 @@ python3 generate_compose.py \
 ```
 
 **補足**: `streamers` に `| 昼間画像パス` を付けた場合、`generate_compose.py` 実行時に
-マスクを自動生成して `--mask-output-dir` に保存します。OpenCV が必要です。
+マスクを自動生成して `--mask-output-dir` に保存します。OpenCV がない環境では警告を表示してマスク生成のみスキップし、Compose 生成自体は継続します。
+
+`--streaming-mode webrtc` を使うと、`dashboard + camera1..N` に加えて `go2rtc` サービスと `go2rtc.yaml` も生成されます。`go2rtc` の `webrtc.candidates` は既定でローカル IP を自動検出して設定し、必要な場合だけ `--go2rtc-candidate-host <host-ip>` で上書きできます。
 
 #### 天文薄暮期間の検出制限
 

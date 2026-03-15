@@ -11,7 +11,7 @@ Licensed under the MIT License
 
 ## システム概要
 
-流星検出システムは、Docker Composeで管理される4つのコンテナで構成されます。WebRTCライブ表示を有効にする場合は、ここに `go2rtc` が追加されます。Docker 内の `go2rtc` で WebRTC を安定動作させるには、`webrtc.candidates` へホスト側の到達可能アドレスを明示する必要があります。
+流星検出システムは、Docker Composeで管理される4つのコンテナで構成されます。WebRTCライブ表示を有効にする場合は、ここに `go2rtc` が追加されます。Docker 内の `go2rtc` で WebRTC を安定動作させるには、`webrtc.candidates` へホスト側の到達可能アドレスを明示する必要があります。`generate_compose.py` は既定でこの候補アドレスを自動検出し、必要に応じて `--go2rtc-candidate-host` で上書きできます。
 
 - **1つのダッシュボードコンテナ**: 全カメラの統合管理画面
 - **3つの検出コンテナ**: 各カメラごとの流星検出エンジン
@@ -276,6 +276,8 @@ graph TB
 | コンテナ | ホストポート | コンテナポート | プロトコル | 用途 |
 |---------|------------|--------------|----------|------|
 | dashboard | 8080 | 8080 | HTTP | ダッシュボードWeb UI |
+| go2rtc | 1984 | 1984 | HTTP / WS | WebRTC / MSE シグナリング、フロント資産 |
+| go2rtc | 8555 | 8555 | TCP / UDP | WebRTC メディア転送 |
 | camera1 | 8081 | 8080 | HTTP | カメラ1プレビュー |
 | camera2 | 8082 | 8080 | HTTP | カメラ2プレビュー |
 | camera3 | 8083 | 8080 | HTTP | カメラ3プレビュー |

@@ -18,6 +18,7 @@
 #   http://localhost:8083/  (カメラ3)
 #   http://localhost:1984/webrtc.html?src=camera1  (WebRTC表示)
 #   WebRTCを他端末から見る場合は go2rtc.yaml の webrtc.candidates をホスト側IPへ合わせる
+#   srflx candidate が併記されても、host candidate が返っていて表示モードが RTC なら正常
 #
 # 検出結果は ./detections/ 以下に保存されます
 
