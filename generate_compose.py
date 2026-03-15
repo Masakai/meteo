@@ -11,7 +11,10 @@ Licensed under the MIT License
 """
 
 import argparse
+import ipaddress
 import re
+import socket
+import subprocess
 from pathlib import Path
 
 try:
@@ -25,6 +28,50 @@ except Exception:
     build_exclusion_mask = None
 
 VERSION = "1.7.0"
+
+
+def _is_usable_candidate_ip(value: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return addr.version == 4 and not addr.is_loopback and not addr.is_unspecified
+
+
+def detect_local_ip() -> str:
+    """WebRTC candidate に使うローカルIPを推定"""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            value = sock.getsockname()[0]
+            if _is_usable_candidate_ip(value):
+                return value
+    except OSError:
+        pass
+
+    try:
+        for _, _, _, _, sockaddr in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            value = sockaddr[0]
+            if _is_usable_candidate_ip(value):
+                return value
+    except OSError:
+        pass
+
+    try:
+        result = subprocess.run(
+            ["ifconfig"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        for match in re.finditer(r"\binet (\d+\.\d+\.\d+\.\d+)\b", result.stdout):
+            value = match.group(1)
+            if _is_usable_candidate_ip(value):
+                return value
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    return ""
 
 
 def parse_rtsp_url(url: str) -> dict:
@@ -274,16 +321,20 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
                 if not mask_src.is_absolute():
                     mask_src = (streamers_path.parent / mask_src).resolve()
                 mask_output = mask_output_dir / f"camera{i}_mask.png"
-                mask_image = generate_mask_file(
-                    mask_src,
-                    Path(mask_output),
-                    float(settings["scale"]),
-                    int(settings.get("mask_dilate", "5")),
-                )
                 try:
-                    mask_image = str(Path(mask_image).relative_to(Path.cwd()))
-                except ValueError:
-                    pass
+                    mask_image = generate_mask_file(
+                        mask_src,
+                        Path(mask_output),
+                        float(settings["scale"]),
+                        int(settings.get("mask_dilate", "5")),
+                    )
+                    try:
+                        mask_image = str(Path(mask_image).relative_to(Path.cwd()))
+                    except ValueError:
+                        pass
+                except RuntimeError as exc:
+                    print("警告: OpenCVがないためマスク生成をスキップしました")
+                    mask_image = ""
             services.append(generate_service(i, info, settings, web_port, mask_image))
         else:
             print(f"警告: 無効なURL (行{i}): {parsed['url']}")
@@ -395,9 +446,11 @@ streamersファイルの形式:
     parser.add_argument("--go2rtc-config", default="go2rtc.yaml",
                        help="生成する go2rtc 設定ファイル (default: go2rtc.yaml)")
     parser.add_argument("--go2rtc-candidate-host", default="",
-                       help="go2rtc がブラウザへ返す到達可能アドレスのホスト/IP (例: 10.0.1.59)")
+                       help="go2rtc がブラウザへ返す到達可能アドレスのホスト/IP (default: 自動検出)")
 
     args = parser.parse_args()
+    if args.streaming_mode == "webrtc" and not args.go2rtc_candidate_host:
+        args.go2rtc_candidate_host = detect_local_ip()
 
     settings = {
         'sensitivity': args.sensitivity,
@@ -446,8 +499,10 @@ streamersファイルの形式:
     print(f"生成完了: {args.output}")
     if args.streaming_mode == "webrtc":
         print(f"go2rtc設定生成: {args.go2rtc_config}")
-        if not args.go2rtc_candidate_host:
-            print("警告: --go2rtc-candidate-host 未指定のため、Docker/NAT 環境では WebRTC が MSE にフォールバックする可能性があります。")
+        if args.go2rtc_candidate_host:
+            print(f"go2rtc candidate host: {args.go2rtc_candidate_host}")
+        else:
+            print("警告: go2rtc candidate host を自動検出できませんでした。Docker/NAT 環境では WebRTC が MSE にフォールバックする可能性があります。")
 
     # 情報表示
     urls = lines
