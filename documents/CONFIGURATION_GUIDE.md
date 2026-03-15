@@ -78,7 +78,7 @@ docker-compose.ymlで設定される環境変数:
 | `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名（UI専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
 | `CAMERA1_URL` | - | カメラ1のURL |
 | `CAMERA1_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
-| `CAMERA1_STREAM_URL` | `CAMERA1_URL` | ライブ表示用URL (`webrtc` 時は `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse...` など) |
+| `CAMERA1_STREAM_URL` | `CAMERA1_URL` | ライブ表示用URL (`webrtc` 時は `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse...` など。埋め込み時はダッシュボード表示中のホスト名を優先して接続) |
 | `DETECTIONS_DIR` | `/output` | 検出結果ディレクトリ |
 | `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |
 | `CAMERA_TIMEOUT` | `5` | カメラ応答タイムアウト（秒） |
@@ -94,6 +94,7 @@ python generate_compose.py \
   --scale 0.5 \
   --buffer 15 \
   --streaming-mode webrtc \
+  --go2rtc-candidate-host 10.0.1.59 \
   --latitude 35.6762 \
   --longitude 139.6503 \
   --enable-time-window true \
@@ -116,6 +117,8 @@ services:
       - CAMERA1_STREAM_KIND=webrtc
       - CAMERA1_STREAM_URL=http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false
 ```
+
+`webrtc` を Docker 内の `go2rtc` で使う場合は、`go2rtc.yaml` の `webrtc.candidates` にブラウザから到達可能なホスト側 IP/ポートを設定してください。`generate_compose.py --go2rtc-candidate-host <host-ip>` を使うと自動生成されます。
 
 #### 方法3: .envファイルを使用
 

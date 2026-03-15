@@ -1,6 +1,10 @@
 api:
   origin: "*"
 
+webrtc:
+  candidates:
+    - 192.168.0.10:8555
+
 streams:
   camera1:
     - rtsp://username:password@192.168.0.11/live

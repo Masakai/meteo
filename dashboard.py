@@ -101,12 +101,12 @@ def _camera_embed_info(camera_index: int) -> dict | None:
         proxy_port = parsed.port or 1984
         proxy_http_base = f"{parsed.scheme}://{proxy_host}:{proxy_port}"
     ws_scheme = "wss" if parsed.scheme == "https" else "ws"
-    ws_url = f"{ws_scheme}://{parsed.netloc}/api/ws?src={quote(src, safe='')}"
     return {
         "camera": cam,
         "http_base": http_base,
         "proxy_http_base": proxy_http_base,
-        "ws_url": ws_url,
+        "ws_scheme": ws_scheme,
+        "ws_port": parsed.port or (443 if parsed.scheme == "https" else 80),
         "src": src,
     }
 
@@ -265,11 +265,20 @@ def create_app() -> Flask:
     <script type="module">
         import '/go2rtc_asset/video-stream.js';
         const player = document.getElementById('player');
+        const sourceName = {info["src"]!r};
+        const go2rtcPort = {info["ws_port"]!r};
+        const wsScheme = {info["ws_scheme"]!r};
+        const hostname = window.location.hostname.includes(':')
+            ? `[${{window.location.hostname}}]`
+            : window.location.hostname;
+        const wsOrigin = `${{wsScheme}}://${{hostname}}:${{go2rtcPort}}`;
+        const wsUrl = new URL('/api/ws', wsOrigin);
+        wsUrl.searchParams.set('src', sourceName);
         player.mode = 'webrtc,mse,hls,mjpeg';
-        player.media = 'video,audio';
+        player.media = 'video';
         player.background = true;
         player.visibilityCheck = false;
-        player.src = {info["ws_url"]!r};
+        player.src = wsUrl.toString();
     </script>
 </body>
 </html>"""

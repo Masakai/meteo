@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-03-15
+### Added
+- ダッシュボードのライブ表示方式として `WebRTC` を正式サポートし、`go2rtc` 経由のブラウザ向け低遅延配信を利用可能に。
+- `generate_compose.py` に `--streaming-mode webrtc` と `--go2rtc-candidate-host` を追加し、`go2rtc.yaml` の生成と `webrtc.candidates` の明示設定を自動化。
+
+### Changed
+- ダッシュボードの WebRTC 埋め込みを専用ページ化し、`go2rtc` アセットのプロキシ配信とホスト名ベースの WebSocket 接続へ変更。
+- Docker 配下で WebRTC が `MSE` にフォールバックしやすかった構成を見直し、`go2rtc` がブラウザから到達可能な candidate を返せる運用手順とサンプル設定へ更新。
+
+### Fixed
+- `go2rtc` が Docker/NAT 配下で不達な candidate を返し、ブラウザ表示が `MSE` にフォールバックする問題を修正。
+- ダッシュボードの WebRTC オーバーレイ表示と `visibility` 復帰処理がライブ映像を覆ってしまう問題を修正。
+
 ## [3.0.0] - 2026-03-15
 ### Removed
 - 標準の MP4 直出力に対して実効性のなかった旧互換オプション `fb_normalize` / `fb_delete_mov` を削除。

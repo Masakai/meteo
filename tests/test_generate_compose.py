@@ -23,6 +23,7 @@ def test_generate_compose_includes_webrtc_dashboard_and_go2rtc(tmp_path):
             "go2rtc_api_port": 1984,
             "go2rtc_webrtc_port": 8555,
             "go2rtc_config_path": "./go2rtc.yaml",
+            "go2rtc_candidate_host": "10.0.1.59",
         },
         base_port=8080,
     )
@@ -38,8 +39,12 @@ def test_generate_go2rtc_config_uses_camera_sources():
         [
             {"url": "rtsp://user:pass@192.168.0.11/live"},
             {"url": "rtsp://user:pass@192.168.0.12/live"},
-        ]
+        ],
+        {"go2rtc_candidate_host": "10.0.1.59", "go2rtc_webrtc_port": 8555},
     )
+    assert 'origin: "*"' in config
+    assert "webrtc:" in config
+    assert "    - 10.0.1.59:8555" in config
     assert "camera1:" in config
     assert "camera2:" in config
     assert "rtsp://user:pass@192.168.0.11/live" in config

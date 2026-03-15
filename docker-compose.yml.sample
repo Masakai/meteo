@@ -16,7 +16,8 @@
 #   http://localhost:8081/  (カメラ1)
 #   http://localhost:8082/  (カメラ2)
 #   http://localhost:8083/  (カメラ3)
-#   http://localhost:1984/webrtc.html?src=camera1  (WebRTC試験表示)
+#   http://localhost:1984/webrtc.html?src=camera1  (WebRTC表示)
+#   WebRTCを他端末から見る場合は go2rtc.yaml の webrtc.candidates をホスト側IPへ合わせる
 #
 # 検出結果は ./detections/ 以下に保存されます
 
@@ -62,7 +63,7 @@ services:
       - camera2
       - camera3
 
-  # WebRTC中継（試験実装）
+  # WebRTC中継
   go2rtc:
     image: alexxit/go2rtc:latest
     container_name: meteor-go2rtc

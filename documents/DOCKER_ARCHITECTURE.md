@@ -11,7 +11,7 @@ Licensed under the MIT License
 
 ## システム概要
 
-流星検出システムは、Docker Composeで管理される4つのコンテナで構成されます。WebRTC試験構成ではここに `go2rtc` が追加されます。
+流星検出システムは、Docker Composeで管理される4つのコンテナで構成されます。WebRTCライブ表示を有効にする場合は、ここに `go2rtc` が追加されます。Docker 内の `go2rtc` で WebRTC を安定動作させるには、`webrtc.candidates` へホスト側の到達可能アドレスを明示する必要があります。
 
 - **1つのダッシュボードコンテナ**: 全カメラの統合管理画面
 - **3つの検出コンテナ**: 各カメラごとの流星検出エンジン

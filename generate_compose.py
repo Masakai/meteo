@@ -204,7 +204,7 @@ def generate_go2rtc_service(settings: dict) -> str:
     webrtc_port = int(settings.get("go2rtc_webrtc_port", 8555))
     config_path = settings.get("go2rtc_config_path", "./go2rtc.yaml")
     return f"""
-  # WebRTC中継（試験実装）
+  # WebRTC中継
   go2rtc:
     image: alexxit/go2rtc:latest
     container_name: meteor-go2rtc
@@ -220,15 +220,26 @@ def generate_go2rtc_service(settings: dict) -> str:
 """
 
 
-def generate_go2rtc_config(cameras: list) -> str:
+def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
     """go2rtc設定ファイルを生成"""
 
+    settings = settings or {}
     lines = [
         "api:",
         '  origin: "*"',
-        "",
-        "streams:",
     ]
+    candidate_host = str(settings.get("go2rtc_candidate_host", "")).strip()
+    candidate_port = int(settings.get("go2rtc_webrtc_port", 8555))
+    if candidate_host:
+        lines.extend(
+            [
+                "",
+                "webrtc:",
+                "  candidates:",
+                f"    - {candidate_host}:{candidate_port}",
+            ]
+        )
+    lines.extend(["", "streams:"])
     for i, cam in enumerate(cameras, 1):
         lines.append(f"  camera{i}:")
         lines.append(f"    - {cam['url']}")
@@ -383,6 +394,8 @@ streamersファイルの形式:
                        help="go2rtc の WebRTC シグナリング / メディア用ポート (default: 8555)")
     parser.add_argument("--go2rtc-config", default="go2rtc.yaml",
                        help="生成する go2rtc 設定ファイル (default: go2rtc.yaml)")
+    parser.add_argument("--go2rtc-candidate-host", default="",
+                       help="go2rtc がブラウザへ返す到達可能アドレスのホスト/IP (例: 10.0.1.59)")
 
     args = parser.parse_args()
 
@@ -402,6 +415,7 @@ streamersファイルの形式:
         'go2rtc_api_port': args.go2rtc_api_port,
         'go2rtc_webrtc_port': args.go2rtc_webrtc_port,
         'go2rtc_config_path': f"./{Path(args.go2rtc_config).name}",
+        'go2rtc_candidate_host': args.go2rtc_candidate_host,
     }
 
     # 生成
@@ -420,7 +434,7 @@ streamersファイルの形式:
         cameras.append(info)
 
     if args.streaming_mode == "webrtc":
-        go2rtc_config = generate_go2rtc_config(cameras)
+        go2rtc_config = generate_go2rtc_config(cameras, settings)
         go2rtc_output = Path(args.go2rtc_config)
         with open(go2rtc_output, 'w', encoding='utf-8') as f:
             f.write(go2rtc_config)
@@ -432,6 +446,8 @@ streamersファイルの形式:
     print(f"生成完了: {args.output}")
     if args.streaming_mode == "webrtc":
         print(f"go2rtc設定生成: {args.go2rtc_config}")
+        if not args.go2rtc_candidate_host:
+            print("警告: --go2rtc-candidate-host 未指定のため、Docker/NAT 環境では WebRTC が MSE にフォールバックする可能性があります。")
 
     # 情報表示
     urls = lines
