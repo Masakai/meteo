@@ -168,6 +168,13 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #888;
             font-size: 0.9em;
         }}
+        .hero-clock {{
+            margin-top: 10px;
+            color: #b9f3ff;
+            font-size: 1.15em;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.04em;
+        }}
         .page-kicker {{
             color: #7ec8ff;
             font-size: 0.82em;
@@ -960,6 +967,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         <div class="page-kicker">Dashboard View</div>
         <h1>{page_heading}</h1>
         <div class="subtitle">リアルタイム流星検出システム</div>
+        <div class="hero-clock" id="hero-clock">----/--/-- --:--:--</div>
         <div class="header-actions">
             {header_actions}
         </div>
@@ -1017,6 +1025,15 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         const serverStartTime = {int(server_start_time * 1000)};
         const streamPlaceholderSrc = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
         const streamSelectionStorageKey = 'dashboard_stream_enabled_v1';
+        const heroClockFormatter = new Intl.DateTimeFormat('ja-JP', {{
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        }});
 
         // 稼働時間を更新
         setInterval(() => {{
@@ -1026,6 +1043,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             document.getElementById('uptime').textContent =
                 hours > 0 ? hours + ':' + String(mins).padStart(2,'0') + 'h' : mins + 'm';
         }}, 1000);
+
+        function updateHeroClock() {{
+            const el = document.getElementById('hero-clock');
+            if (!el) {{
+                return;
+            }}
+            el.textContent = heroClockFormatter.format(new Date());
+        }}
+        updateHeroClock();
+        setInterval(updateHeroClock, 1000);
 
         function updateDashboardCpu() {{
             fetch('/dashboard_stats', {{ cache: 'no-store' }})
@@ -2480,4 +2507,3 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     </script>
 </body>
 </html>'''
-
