@@ -22,6 +22,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     if is_camera_page:
         for i, cam in enumerate(cameras):
             display_name = cam.get('display_name', cam['name'])
+            stream_kind = cam.get('stream_kind', 'mjpeg')
+            stream_view = f'''
+                        <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="{cam['name']}"
+                             data-stream-kind="{stream_kind}">
+                        <iframe class="camera-stream-frame" id="stream-frame{i}" title="{display_name} WebRTC"
+                                data-stream-kind="{stream_kind}" allow="autoplay; fullscreen; camera; microphone"
+                                referrerpolicy="no-referrer" loading="lazy"></iframe>
+            '''
             camera_cards += f'''
                 <div class="camera-card">
                     <div class="camera-header">
@@ -44,9 +52,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="camera-video">
-                        <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="{cam['name']}"
-                             onerror="handleStreamError({i})"
-                             onload="handleStreamLoad({i})">
+{stream_view}
                         <img class="mask-overlay" id="mask{i}" data-src="/camera_mask_image/{i}" alt="mask"
                              onerror="this.style.display='none'; this.dataset.visible='';">
                         <div class="camera-error" id="error{i}">
@@ -428,10 +434,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             opacity: 0.5;
             cursor: not-allowed;
         }}
-        .camera-video img {{
+        .camera-video img,
+        .camera-video iframe {{
             width: 100%;
             height: 100%;
             object-fit: contain;
+            border: 0;
+        }}
+        .camera-stream-frame {{
+            display: none;
+            background: #000;
         }}
         .mask-overlay {{
             position: absolute;
@@ -1288,6 +1300,79 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             return src.startsWith(streamPlaceholderSrc);
         }}
 
+        function getCameraStreamKind(i) {{
+            const cam = cameras[i] || {{}};
+            return String(cam.stream_kind || 'mjpeg').toLowerCase();
+        }}
+
+        function isWebRTCStream(i) {{
+            return getCameraStreamKind(i) === 'webrtc';
+        }}
+
+        function getStreamImageElement(i) {{
+            return document.getElementById('stream' + i);
+        }}
+
+        function getStreamFrameElement(i) {{
+            return document.getElementById('stream-frame' + i);
+        }}
+
+        function setStreamOverlayVisible(i, visible, message = '') {{
+            const errorEl = document.getElementById('error' + i);
+            if (!errorEl) {{
+                return;
+            }}
+            if (message) {{
+                setStreamErrorMessage(i, message);
+            }}
+            if (isWebRTCStream(i) && visible) {{
+                errorEl.style.display = 'none';
+                return;
+            }}
+            errorEl.style.display = visible ? 'flex' : 'none';
+        }}
+
+        function normalizeBrowserFacingUrl(rawUrl, streamKind) {{
+            if (!rawUrl) {{
+                return '';
+            }}
+            const host = window.location.hostname;
+            const pageProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+            try {{
+                const parsed = new URL(rawUrl, window.location.href);
+                if (host && ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) {{
+                    parsed.hostname = host;
+                }}
+                if (streamKind === 'mjpeg') {{
+                    parsed.protocol = pageProtocol;
+                }}
+                return parsed.toString();
+            }} catch (_) {{
+                return rawUrl;
+            }}
+        }}
+
+        function resolveCameraStreamUrl(i) {{
+            const cam = cameras[i];
+            if (!cam) {{
+                return '';
+            }}
+            const streamKind = getCameraStreamKind(i);
+            if (streamKind === 'webrtc') {{
+                return new URL('/camera_embed/' + i, window.location.href).toString();
+            }}
+            const rawStreamUrl = String(cam.stream_url || cam.url || '');
+            if (!rawStreamUrl) {{
+                return '';
+            }}
+            try {{
+                const targetUrl = new URL('/stream', rawStreamUrl).toString();
+                return normalizeBrowserFacingUrl(targetUrl, streamKind);
+            }} catch (_) {{
+                return '';
+            }}
+        }}
+
         function fetchJsonWithTimeout(url, timeoutMs, options = {{}}) {{
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1303,6 +1388,20 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
         }}
 
+        function bindStreamEventHandlers(i) {{
+            const img = getStreamImageElement(i);
+            const frame = getStreamFrameElement(i);
+            if (img && !img.dataset.handlersBound) {{
+                img.addEventListener('error', () => handleStreamError(i));
+                img.addEventListener('load', () => handleStreamLoad(i));
+                img.dataset.handlersBound = '1';
+            }}
+            if (frame && !frame.dataset.handlersBound) {{
+                frame.addEventListener('load', () => handleStreamLoad(i));
+                frame.dataset.handlersBound = '1';
+            }}
+        }}
+
         function setStreamEnabled(i, enabled, persist = true) {{
             if (!cameraPageEnabled) {{
                 return;
@@ -1311,13 +1410,15 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             applyStreamToggleUI(i);
             clearStreamRetryTimer(i);
 
-            const img = document.getElementById('stream' + i);
+            const img = getStreamImageElement(i);
+            const frame = getStreamFrameElement(i);
             const errorEl = document.getElementById('error' + i);
             const statusEl = document.getElementById('status' + i);
-            if (!img || !errorEl || !statusEl) {{
+            if (!img || !frame || !errorEl || !statusEl) {{
                 if (persist) saveStreamSelection();
                 return;
             }}
+            bindStreamEventHandlers(i);
 
             if (isStreamEnabled(i)) {{
                 setStreamErrorMessage(i, '接続中...');
@@ -1325,7 +1426,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 connectStream(i);
             }} else {{
                 img.removeAttribute('src');
+                frame.removeAttribute('src');
                 img.style.display = 'none';
+                frame.style.display = 'none';
                 errorEl.style.display = 'flex';
                 setStreamErrorMessage(i, '常時表示オフ');
                 statusEl.className = 'camera-status paused';
@@ -1353,31 +1456,26 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 return;
             }}
             clearStreamRetryTimer(i);
-            const img = document.getElementById('stream' + i);
-            const errorEl = document.getElementById('error' + i);
-            if (!img) return;
-            const cam = cameras[i];
-            if (!cam || !cam.url) return;
-            let targetUrl;
-            try {{
-                targetUrl = new URL('/stream', cam.url).toString();
-            }} catch (_) {{
+            const img = getStreamImageElement(i);
+            const frame = getStreamFrameElement(i);
+            if (!img || !frame) return;
+            const targetUrl = resolveCameraStreamUrl(i);
+            if (!targetUrl) {{
+                setStreamOverlayVisible(i, true, '表示URL未設定');
                 return;
             }}
-            const host = window.location.hostname;
-            const scheme = window.location.protocol === 'https:' ? 'https:' : 'http:';
-            if (host) {{
-                try {{
-                    const parsed = new URL(targetUrl);
-                    parsed.protocol = scheme;
-                    parsed.hostname = host;
-                    targetUrl = parsed.toString();
-                }} catch (_) {{}}
+            if (isWebRTCStream(i)) {{
+                img.removeAttribute('src');
+                img.style.display = 'none';
+                frame.style.display = 'block';
+                setStreamOverlayVisible(i, false);
+                frame.src = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+                return;
             }}
-            if (errorEl) {{
-                errorEl.style.display = 'flex';
-            }}
+            frame.removeAttribute('src');
+            frame.style.display = 'none';
             img.style.display = 'none';
+            setStreamOverlayVisible(i, true, '接続中...');
             img.src = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
         }}
 
@@ -1399,16 +1497,17 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             if (!isStreamEnabled(i)) {{
                 return;
             }}
-            const img = document.getElementById('stream' + i);
-            const errorEl = document.getElementById('error' + i);
+            const img = getStreamImageElement(i);
+            const frame = getStreamFrameElement(i);
             if (img) {{
                 img.removeAttribute('src');
                 img.style.display = 'none';
             }}
-            if (errorEl) {{
-                errorEl.style.display = 'flex';
+            if (frame) {{
+                frame.removeAttribute('src');
+                frame.style.display = 'none';
             }}
-            setStreamErrorMessage(i, '映像取得に失敗（再接続中）');
+            setStreamOverlayVisible(i, true, '映像取得に失敗（再接続中）');
             scheduleStreamRetry(i);
         }}
 
@@ -1419,31 +1518,37 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             if (!isStreamEnabled(i)) {{
                 return;
             }}
-            const img = document.getElementById('stream' + i);
-            if (isPlaceholderStreamSrc(img)) {{
+            const img = getStreamImageElement(i);
+            const frame = getStreamFrameElement(i);
+            if (!isWebRTCStream(i) && isPlaceholderStreamSrc(img)) {{
                 // プレースホルダ読込は正常接続ではないため無視する
                 return;
             }}
-            const errorEl = document.getElementById('error' + i);
             if (img) {{
+                img.style.display = isWebRTCStream(i) ? 'none' : '';
+            }}
+            if (frame) {{
+                frame.style.display = isWebRTCStream(i) ? 'block' : 'none';
+            }}
+            if (img && !isWebRTCStream(i)) {{
                 img.style.display = '';
             }}
-            if (errorEl) {{
-                errorEl.style.display = 'none';
-            }}
+            setStreamOverlayVisible(i, false);
             clearStreamRetryTimer(i);
         }}
 
         function forceResetStreamElement(i) {{
-            const img = document.getElementById('stream' + i);
-            const errorEl = document.getElementById('error' + i);
+            const img = getStreamImageElement(i);
+            const frame = getStreamFrameElement(i);
             if (img) {{
                 img.removeAttribute('src');
                 img.style.display = 'none';
             }}
-            if (errorEl) {{
-                errorEl.style.display = 'flex';
+            if (frame) {{
+                frame.removeAttribute('src');
+                frame.style.display = 'none';
             }}
+            setStreamOverlayVisible(i, true, '接続待機...');
         }}
 
         function startCameraStreams() {{
@@ -1479,6 +1584,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             cameras.forEach((_, i) => {{
                 clearStreamRetryTimer(i);
                 const img = document.getElementById('stream' + i);
+                const frame = document.getElementById('stream-frame' + i);
                 const errorEl = document.getElementById('error' + i);
                 const statusEl = document.getElementById('status' + i);
                 const serverStatusEl = document.getElementById('server-status' + i);
@@ -1486,16 +1592,17 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     img.removeAttribute('src');
                     img.style.display = 'none';
                 }}
-                if (errorEl) {{
-                    errorEl.style.display = 'flex';
+                if (frame) {{
+                    frame.removeAttribute('src');
+                    frame.style.display = 'none';
                 }}
+                setStreamOverlayVisible(i, !isWebRTCStream(i), 'バックグラウンド一時停止');
                 if (statusEl) {{
                     statusEl.className = 'camera-status paused';
                 }}
                 if (serverStatusEl) {{
                     serverStatusEl.className = 'server-status unknown';
                 }}
-                setStreamErrorMessage(i, 'バックグラウンド一時停止');
             }});
         }}
 
@@ -1511,15 +1618,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     }}
                     clearStreamRetryTimer(i);
                     const img = document.getElementById('stream' + i);
-                    const errorEl = document.getElementById('error' + i);
+                    const frame = document.getElementById('stream-frame' + i);
                     const statusEl = document.getElementById('status' + i);
                     const serverStatusEl = document.getElementById('server-status' + i);
                     if (img) {{
                         img.removeAttribute('src');
                         img.style.display = 'none';
                     }}
-                    if (errorEl) {{
-                        errorEl.style.display = 'flex';
+                    if (frame) {{
+                        frame.removeAttribute('src');
+                        frame.style.display = 'none';
                     }}
                     if (statusEl) {{
                         statusEl.className = 'camera-status';
@@ -1527,7 +1635,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     if (serverStatusEl) {{
                         serverStatusEl.className = 'server-status unknown';
                     }}
-                    setStreamErrorMessage(i, '接続待機...');
+                    setStreamOverlayVisible(i, !isWebRTCStream(i), '接続待機...');
                 }});
                 startCameraStreams();
                 cameras.forEach((_, i) => {{
@@ -1560,7 +1668,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         return;
                     }}
                     clearStreamRetryTimer(i);
-                    setStreamErrorMessage(i, `再同期待機... (${{reason}})`);
+                    setStreamOverlayVisible(i, !isWebRTCStream(i), `再同期待機... (${{reason}})`);
                 }});
                 startCameraStreams();
                 cameras.forEach((_, i) => {{

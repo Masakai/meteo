@@ -19,14 +19,26 @@ for i in range(1, 10):
     url = os.environ.get(f"CAMERA{i}_URL")
     if name and url:
         display_name = os.environ.get(f"CAMERA{i}_NAME_DISPLAY", name)
-        CAMERAS.append({"name": name, "url": url, "display_name": display_name})
+        stream_url = os.environ.get(f"CAMERA{i}_STREAM_URL", "").strip() or url
+        stream_kind = os.environ.get(f"CAMERA{i}_STREAM_KIND", "mjpeg").strip().lower() or "mjpeg"
+        if stream_kind not in ("mjpeg", "webrtc"):
+            stream_kind = "mjpeg"
+        CAMERAS.append(
+            {
+                "name": name,
+                "url": url,
+                "display_name": display_name,
+                "stream_url": stream_url,
+                "stream_kind": stream_kind,
+            }
+        )
 
 # デフォルト設定
 if not CAMERAS:
     CAMERAS = [
-        {"name": "camera1_10.0.1.25", "url": "http://camera1:8080"},
-        {"name": "camera2_10.0.1.3", "url": "http://camera2:8080"},
-        {"name": "camera3_10.0.1.11", "url": "http://camera3:8080"},
+        {"name": "camera1_10.0.1.25", "url": "http://camera1:8080", "stream_url": "http://camera1:8080", "stream_kind": "mjpeg"},
+        {"name": "camera2_10.0.1.3", "url": "http://camera2:8080", "stream_url": "http://camera2:8080", "stream_kind": "mjpeg"},
+        {"name": "camera3_10.0.1.11", "url": "http://camera3:8080", "stream_url": "http://camera3:8080", "stream_kind": "mjpeg"},
     ]
 
 PORT = int(os.environ.get("PORT", 8080))

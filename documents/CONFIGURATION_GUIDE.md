@@ -77,6 +77,8 @@ docker-compose.ymlで設定される環境変数:
 | `CAMERA1_NAME` | - | カメラ1の内部名（ディレクトリ名・識別子） |
 | `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名（UI専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
 | `CAMERA1_URL` | - | カメラ1のURL |
+| `CAMERA1_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA1_STREAM_URL` | `CAMERA1_URL` | ライブ表示用URL (`webrtc` 時は `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse...` など) |
 | `DETECTIONS_DIR` | `/output` | 検出結果ディレクトリ |
 | `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |
 | `CAMERA_TIMEOUT` | `5` | カメラ応答タイムアウト（秒） |
@@ -91,6 +93,7 @@ python generate_compose.py \
   --sensitivity high \
   --scale 0.5 \
   --buffer 15 \
+  --streaming-mode webrtc \
   --latitude 35.6762 \
   --longitude 139.6503 \
   --enable-time-window true \
@@ -107,6 +110,11 @@ services:
       - SENSITIVITY=high
       - SCALE=0.5
       - EXTRACT_CLIPS=false
+
+  dashboard:
+    environment:
+      - CAMERA1_STREAM_KIND=webrtc
+      - CAMERA1_STREAM_URL=http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false
 ```
 
 #### 方法3: .envファイルを使用

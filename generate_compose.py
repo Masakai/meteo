@@ -144,6 +144,9 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
 def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     """ダッシュボードサービスを生成"""
 
+    streaming_mode = settings.get("streaming_mode", "mjpeg").strip().lower()
+    go2rtc_api_port = int(settings.get("go2rtc_api_port", 1984))
+
     # カメラ環境変数
     camera_envs = []
     depends = []
@@ -152,7 +155,17 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
         if cam.get('display_name'):
             camera_envs.append(f"      - CAMERA{i}_NAME_DISPLAY={cam['display_name']}")
         camera_envs.append(f"      - CAMERA{i}_URL=http://localhost:{base_port + i}")
+        if streaming_mode == "webrtc":
+            camera_envs.append(f"      - CAMERA{i}_STREAM_KIND=webrtc")
+            camera_envs.append(
+                f"      - CAMERA{i}_STREAM_URL=http://localhost:{go2rtc_api_port}/stream.html?src=camera{i}&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false"
+            )
+        else:
+            camera_envs.append(f"      - CAMERA{i}_STREAM_KIND=mjpeg")
+            camera_envs.append(f"      - CAMERA{i}_STREAM_URL=http://localhost:{base_port + i}")
         depends.append(f"camera{i}")
+    if streaming_mode == "webrtc":
+        depends.append("go2rtc")
 
     camera_env_str = "\n".join(camera_envs)
     depends_str = "\n      - ".join(depends)
@@ -182,6 +195,44 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     depends_on:
       - {depends_str}
 """
+
+
+def generate_go2rtc_service(settings: dict) -> str:
+    """WebRTC中継用の go2rtc サービスを生成"""
+
+    api_port = int(settings.get("go2rtc_api_port", 1984))
+    webrtc_port = int(settings.get("go2rtc_webrtc_port", 8555))
+    config_path = settings.get("go2rtc_config_path", "./go2rtc.yaml")
+    return f"""
+  # WebRTC中継（試験実装）
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: meteor-go2rtc
+    restart: unless-stopped
+    ports:
+      - "{api_port}:1984"
+      - "{webrtc_port}:8555/tcp"
+      - "{webrtc_port}:8555/udp"
+    volumes:
+      - {config_path}:/config/go2rtc.yaml:ro
+    networks:
+      - meteor-net
+"""
+
+
+def generate_go2rtc_config(cameras: list) -> str:
+    """go2rtc設定ファイルを生成"""
+
+    lines = [
+        "api:",
+        '  origin: "*"',
+        "",
+        "streams:",
+    ]
+    for i, cam in enumerate(cameras, 1):
+        lines.append(f"  camera{i}:")
+        lines.append(f"    - {cam['url']}")
+    return "\n".join(lines) + "\n"
 
 
 def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080) -> str:
@@ -257,6 +308,9 @@ services:"""
     # ダッシュボード
     compose += generate_dashboard(cameras, base_port, settings)
 
+    if settings.get("streaming_mode", "mjpeg").strip().lower() == "webrtc":
+        compose += generate_go2rtc_service(settings)
+
     # カメラサービス
     compose += "".join(services)
 
@@ -320,6 +374,15 @@ streamersファイルの形式:
                        help="除外マスクの拡張ピクセル数 (default: 20)")
     parser.add_argument("--mask-save", default="",
                        help="生成マスク画像の保存先 (空で保存しない)")
+    parser.add_argument("--streaming-mode", default="mjpeg",
+                       choices=["mjpeg", "webrtc"],
+                       help="ダッシュボード表示方式 (default: mjpeg)")
+    parser.add_argument("--go2rtc-api-port", type=int, default=1984,
+                       help="go2rtc のWeb UI / WebRTCページ公開ポート (default: 1984)")
+    parser.add_argument("--go2rtc-webrtc-port", type=int, default=8555,
+                       help="go2rtc の WebRTC シグナリング / メディア用ポート (default: 8555)")
+    parser.add_argument("--go2rtc-config", default="go2rtc.yaml",
+                       help="生成する go2rtc 設定ファイル (default: go2rtc.yaml)")
 
     args = parser.parse_args()
 
@@ -335,20 +398,43 @@ streamersファイルの形式:
         'mask_output_dir': args.mask_output_dir,
         'mask_dilate': args.mask_dilate,
         'mask_save': args.mask_save,
+        'streaming_mode': args.streaming_mode,
+        'go2rtc_api_port': args.go2rtc_api_port,
+        'go2rtc_webrtc_port': args.go2rtc_webrtc_port,
+        'go2rtc_config_path': f"./{Path(args.go2rtc_config).name}",
     }
 
     # 生成
     compose = generate_compose(args.streamers, settings, args.base_port)
+
+    with open(args.streamers, 'r') as f:
+        lines = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+
+    cameras = []
+    for i, line in enumerate(lines, 1):
+        parsed = parse_streamers_line(line)
+        info = parse_rtsp_url(parsed["url"])
+        if not info:
+            continue
+        info["name"] = f"camera{i}_{info['host'].replace('.', '_')}"
+        cameras.append(info)
+
+    if args.streaming_mode == "webrtc":
+        go2rtc_config = generate_go2rtc_config(cameras)
+        go2rtc_output = Path(args.go2rtc_config)
+        with open(go2rtc_output, 'w', encoding='utf-8') as f:
+            f.write(go2rtc_config)
 
     # 出力
     with open(args.output, 'w') as f:
         f.write(compose)
 
     print(f"生成完了: {args.output}")
+    if args.streaming_mode == "webrtc":
+        print(f"go2rtc設定生成: {args.go2rtc_config}")
 
     # 情報表示
-    with open(args.streamers, 'r') as f:
-        urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+    urls = lines
 
     print(f"カメラ数: {len(urls)}")
     print()
@@ -358,6 +444,10 @@ streamersファイルの形式:
         info = parse_rtsp_url(url)
         if info:
             print(f"  http://localhost:{args.base_port + i}/  (カメラ{i}: {info['host']})")
+    if args.streaming_mode == "webrtc":
+        print(
+            f"  http://localhost:{args.go2rtc_api_port}/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg  (go2rtc ストリームテスト)"
+        )
     print()
     print("使い方:")
     print("  docker compose build   # イメージをビルド")

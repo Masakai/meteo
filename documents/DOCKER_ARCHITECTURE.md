@@ -11,10 +11,11 @@ Licensed under the MIT License
 
 ## システム概要
 
-流星検出システムは、Docker Composeで管理される4つのコンテナで構成されています。
+流星検出システムは、Docker Composeで管理される4つのコンテナで構成されます。WebRTC試験構成ではここに `go2rtc` が追加されます。
 
 - **1つのダッシュボードコンテナ**: 全カメラの統合管理画面
 - **3つの検出コンテナ**: 各カメラごとの流星検出エンジン
+- **任意のWebRTC中継コンテナ**: `go2rtc` によるブラウザ向けライブ配信
 
 ## コンテナ構成図
 
@@ -105,12 +106,18 @@ graph LR
 | `CAMERA1_NAME` | `camera1_10_0_1_25` | カメラ1の内部名（ディレクトリ名・識別子） |
 | `CAMERA1_NAME_DISPLAY` | `東側` | カメラ1のWeb表示名 |
 | `CAMERA1_URL` | `http://localhost:8081` | カメラ1のURL |
+| `CAMERA1_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA1_STREAM_URL` | `http://localhost:8081` | ライブ表示用URL |
 | `CAMERA2_NAME` | `camera2_10_0_1_3` | カメラ2の内部名（ディレクトリ名・識別子） |
 | `CAMERA2_NAME_DISPLAY` | `南側` | カメラ2のWeb表示名 |
 | `CAMERA2_URL` | `http://localhost:8082` | カメラ2のURL |
+| `CAMERA2_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA2_STREAM_URL` | `http://localhost:8082` | ライブ表示用URL |
 | `CAMERA3_NAME` | `camera3_10_0_1_11` | カメラ3の内部名（ディレクトリ名・識別子） |
 | `CAMERA3_NAME_DISPLAY` | `西側` | カメラ3のWeb表示名 |
 | `CAMERA3_URL` | `http://localhost:8083` | カメラ3のURL |
+| `CAMERA3_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA3_STREAM_URL` | `http://localhost:8083` | ライブ表示用URL |
 
 #### Dockerfile.dashboard
 
