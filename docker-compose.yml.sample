@@ -16,6 +16,7 @@
 #   http://localhost:8081/  (カメラ1)
 #   http://localhost:8082/  (カメラ2)
 #   http://localhost:8083/  (カメラ3)
+#   http://localhost:1984/webrtc.html?src=camera1  (WebRTC試験表示)
 #
 # 検出結果は ./detections/ 以下に保存されます
 
@@ -37,12 +38,18 @@ services:
       - CAMERA1_NAME=camera1
       - CAMERA1_NAME_DISPLAY=カメラ1
       - CAMERA1_URL=http://localhost:8081
+      - CAMERA1_STREAM_KIND=webrtc
+      - CAMERA1_STREAM_URL=http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false
       - CAMERA2_NAME=camera2
       - CAMERA2_NAME_DISPLAY=カメラ2
       - CAMERA2_URL=http://localhost:8082
+      - CAMERA2_STREAM_KIND=webrtc
+      - CAMERA2_STREAM_URL=http://localhost:1984/stream.html?src=camera2&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false
       - CAMERA3_NAME=camera3
       - CAMERA3_NAME_DISPLAY=カメラ3
       - CAMERA3_URL=http://localhost:8083
+      - CAMERA3_STREAM_KIND=webrtc
+      - CAMERA3_STREAM_URL=http://localhost:1984/stream.html?src=camera3&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false
     ports:
       - "8080:8080"
     volumes:
@@ -50,9 +57,24 @@ services:
     networks:
       - meteor-net
     depends_on:
+      - go2rtc
       - camera1
       - camera2
       - camera3
+
+  # WebRTC中継（試験実装）
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: meteor-go2rtc
+    restart: unless-stopped
+    ports:
+      - "1984:1984"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    volumes:
+      - ./go2rtc.yaml:/config/go2rtc.yaml:ro
+    networks:
+      - meteor-net
 
   # カメラ1 (192.168.0.11)
   camera1:

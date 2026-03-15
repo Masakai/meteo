@@ -14,7 +14,8 @@ import logging
 import os
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlparse
+from urllib.request import Request, urlopen
 
 from flask import Flask, Response, jsonify, request
 
@@ -76,6 +77,38 @@ def _apply_no_cache_headers(response: Response) -> Response:
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+def _camera_embed_info(camera_index: int) -> dict | None:
+    if camera_index < 0 or camera_index >= len(CAMERAS):
+        return None
+    cam = CAMERAS[camera_index]
+    stream_kind = str(cam.get("stream_kind", "mjpeg")).lower()
+    if stream_kind != "webrtc":
+        return None
+    stream_url = str(cam.get("stream_url") or "").strip()
+    if not stream_url:
+        return None
+    parsed = urlparse(stream_url)
+    src = parse_qs(parsed.query).get("src", [""])[0].strip()
+    if not src:
+        return None
+    http_base = f"{parsed.scheme}://{parsed.netloc}"
+    proxy_http_base = http_base
+    hostname = parsed.hostname or ""
+    if hostname in {"localhost", "127.0.0.1", "::1"} and os.path.exists("/.dockerenv"):
+        proxy_host = "go2rtc"
+        proxy_port = parsed.port or 1984
+        proxy_http_base = f"{parsed.scheme}://{proxy_host}:{proxy_port}"
+    ws_scheme = "wss" if parsed.scheme == "https" else "ws"
+    ws_url = f"{ws_scheme}://{parsed.netloc}/api/ws?src={quote(src, safe='')}"
+    return {
+        "camera": cam,
+        "http_base": http_base,
+        "proxy_http_base": proxy_http_base,
+        "ws_url": ws_url,
+        "src": src,
+    }
 
 
 def create_app() -> Flask:
@@ -186,6 +219,74 @@ def create_app() -> Flask:
         if query:
             path = f"{path}?{query}"
         return _dispatch(routes.handle_camera_snapshot, path=path)
+
+    @app.get("/camera_embed/<int:camera_index>")
+    def camera_embed(camera_index: int) -> Response:
+        info = _camera_embed_info(camera_index)
+        if info is None:
+            return Response("camera embed not available", status=404, content_type="text/plain; charset=utf-8")
+        display_name = info["camera"].get("display_name", info["camera"]["name"])
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{display_name}</title>
+    <style>
+        html, body {{
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }}
+        video-stream {{
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #000;
+        }}
+        video-stream video {{
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }}
+        video-stream .info {{
+            padding: 10px 14px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.85);
+        }}
+    </style>
+</head>
+<body>
+    <video-stream id="player"></video-stream>
+    <script type="module">
+        import '/go2rtc_asset/video-stream.js';
+        const player = document.getElementById('player');
+        player.mode = 'webrtc,mse,hls,mjpeg';
+        player.media = 'video,audio';
+        player.background = true;
+        player.visibilityCheck = false;
+        player.src = {info["ws_url"]!r};
+    </script>
+</body>
+</html>"""
+        return _apply_no_cache_headers(Response(html, content_type="text/html; charset=utf-8"))
+
+    @app.get("/go2rtc_asset/<path:asset_name>")
+    def go2rtc_asset(asset_name: str) -> Response:
+        if asset_name not in {"video-stream.js", "video-rtc.js"}:
+            return Response("not found", status=404, content_type="text/plain; charset=utf-8")
+        info = next((_camera_embed_info(i) for i in range(len(CAMERAS))), None)
+        if info is None:
+            return Response("go2rtc asset unavailable", status=503, content_type="text/plain; charset=utf-8")
+        target_url = f"{info['proxy_http_base']}/{asset_name}"
+        req = Request(target_url, headers={"Accept": "application/javascript, text/javascript, */*"})
+        with urlopen(req, timeout=5) as upstream:
+            payload = upstream.read()
+        return _apply_no_cache_headers(Response(payload, content_type="application/javascript; charset=utf-8"))
 
     @app.get("/image/<path:subpath>")
     def image(subpath: str) -> Response:

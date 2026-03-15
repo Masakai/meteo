@@ -1,0 +1,10 @@
+api:
+  origin: "*"
+
+streams:
+  camera1:
+    - rtsp://username:password@192.168.0.11/live
+  camera2:
+    - rtsp://username:password@192.168.0.12/live
+  camera3:
+    - rtsp://username:password@192.168.0.13/live

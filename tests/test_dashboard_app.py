@@ -61,3 +61,73 @@ def test_monitors_start_once_when_served_via_wsgi(monkeypatch):
     assert first.status_code == 200
     assert second.status_code == 200
     assert calls == {"detection": 1, "camera": 1}
+
+
+def test_create_app_camera_embed_page(monkeypatch):
+    monkeypatch.setattr(dashboard, "_started", True)
+    monkeypatch.setattr(
+        dashboard,
+        "CAMERAS",
+        [
+            {
+                "name": "cam1",
+                "url": "http://localhost:8081",
+                "display_name": "東側",
+                "stream_kind": "webrtc",
+                "stream_url": "http://localhost:1984/stream.html?src=camera1&mode=webrtc",
+            }
+        ],
+    )
+
+    app = dashboard.create_app()
+    client = app.test_client()
+
+    response = client.get("/camera_embed/0")
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "video-stream" in body
+    assert "/go2rtc_asset/video-stream.js" in body
+    assert "ws://localhost:1984/api/ws?src=camera1" in body
+
+
+def test_create_app_go2rtc_asset_proxy(monkeypatch):
+    monkeypatch.setattr(dashboard, "_started", True)
+    monkeypatch.setattr(
+        dashboard,
+        "CAMERAS",
+        [
+            {
+                "name": "cam1",
+                "url": "http://localhost:8081",
+                "display_name": "東側",
+                "stream_kind": "webrtc",
+                "stream_url": "http://localhost:1984/stream.html?src=camera1&mode=webrtc",
+            }
+        ],
+    )
+
+    class _DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b"console.log('ok');"
+
+    def _fake_urlopen(req, timeout=0):
+        assert req.full_url == "http://localhost:1984/video-stream.js"
+        assert timeout == 5
+        return _DummyResponse()
+
+    monkeypatch.setattr(dashboard, "urlopen", _fake_urlopen)
+
+    app = dashboard.create_app()
+    client = app.test_client()
+
+    response = client.get("/go2rtc_asset/video-stream.js")
+
+    assert response.status_code == 200
+    assert response.get_data(as_text=True) == "console.log('ok');"
