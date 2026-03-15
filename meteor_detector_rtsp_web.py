@@ -24,7 +24,6 @@ import time
 import signal
 import sys
 import os
-import subprocess
 import socket
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
@@ -47,7 +46,7 @@ from meteor_mask_utils import (
     build_nuisance_mask_from_night,
 )
 
-VERSION = "1.16.0"
+VERSION = "3.0.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -107,7 +106,6 @@ current_settings = {
     "extract_clips": True,
     "exclude_bottom": 0.0625,
     "exclude_edge_ratio": 0.0,
-    "fb_normalize": False,
     "source_fps": 30.0,
     "nuisance_mask_image": "",
     "nuisance_from_night": "",
@@ -162,130 +160,6 @@ def _save_runtime_overrides(path: Path, payload: dict) -> None:
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
     tmp_path.replace(path)
-
-
-def fb_normalize_clip(
-    clip_path: Path,
-    *,
-    overwrite: bool = True,
-    delete_source: bool = False,
-) -> Optional[Path]:
-    if clip_path is None:
-        return None
-    out_path = clip_path.with_suffix(".mp4")
-    if out_path.exists() and not overwrite:
-        return None
-
-    if clip_path.suffix.lower() == ".mp4":
-        return clip_path
-    if clip_path.suffix.lower() != ".mov":
-        print(f"[WARN] 正規化対象がMOVではありません: {clip_path}")
-        return None
-
-    fps = 30.0
-    try:
-        probe = subprocess.run(
-            [
-                "ffprobe",
-                "-v",
-                "error",
-                "-select_streams",
-                "v:0",
-                "-show_entries",
-                "stream=avg_frame_rate",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(clip_path),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if probe.returncode == 0:
-            rate = probe.stdout.strip()
-            if "/" in rate:
-                num, den = rate.split("/", 1)
-                den_f = float(den)
-                if den_f != 0:
-                    fps = float(num) / den_f
-            elif rate:
-                fps = float(rate)
-        else:
-            if probe.stderr:
-                print(f"[WARN] ffprobe失敗: {probe.stderr.strip()}")
-    except FileNotFoundError:
-        print("[WARN] ffprobeコマンドが見つかりません。ffmpegパッケージをインストールしてください。")
-        return None
-    except Exception:
-        pass
-    target_fps = 30.0
-    target_timescale = 15360
-    gop = int(target_fps * 2)
-
-    cmd = [
-        "ffmpeg",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-y" if overwrite else "-n",
-        "-i",
-        str(clip_path),
-        "-c:v",
-        "libx264",
-        "-preset",
-        "medium",
-        "-crf",
-        "18",
-        "-profile:v",
-        "baseline",
-        "-level",
-        "4.0",
-        "-pix_fmt",
-        "yuv420p",
-        "-bf",
-        "0",
-        "-refs",
-        "1",
-        "-coder",
-        "0",
-        "-x264-params",
-        "cabac=0:ref=1:bframes=0:weightp=0:8x8dct=0:force-cfr=1",
-        "-r",
-        f"{target_fps:.0f}",
-        "-fps_mode",
-        "cfr",
-        "-g",
-        str(gop),
-        "-keyint_min",
-        str(gop),
-        "-sc_threshold",
-        "0",
-        "-video_track_timescale",
-        str(target_timescale),
-        "-tag:v",
-        "avc1",
-        "-an",
-        "-brand",
-        "isom",
-        "-movflags",
-        "+faststart",
-        str(out_path),
-    ]
-    try:
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    except FileNotFoundError:
-        print("[WARN] ffmpegコマンドが見つかりません。fb_normalizeを有効化するにはffmpegが必要です。")
-        return None
-    if result.returncode != 0:
-        if result.stderr:
-            sys.stderr.write(result.stderr)
-        return None
-    if delete_source:
-        try:
-            clip_path.unlink()
-        except Exception:
-            print(f"[WARN] 元MOV削除に失敗: {clip_path}")
-    return out_path
 
 
 class MJPEGHandler(BaseHTTPRequestHandler):
@@ -908,7 +782,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 ("scale", 0.05, 1.0),
                 ("buffer", 1.0, 120.0),
             ]
-            startup_bool_fields = ("extract_clips", "fb_normalize", "fb_delete_mov")
+            startup_bool_fields = ("extract_clips",)
             startup_text_fields = ("sensitivity",)
             startup_path_fields = ("mask_image", "mask_from_day", "nuisance_mask_image", "nuisance_from_night")
 
@@ -1160,8 +1034,6 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "scale",
                 "buffer",
                 "extract_clips",
-                "fb_normalize",
-                "fb_delete_mov",
                 "mask_dilate",
                 "nuisance_dilate",
                 "clip_margin_before",
@@ -1227,8 +1099,6 @@ def detection_thread_worker(
     latitude=35.3606,
     longitude=138.7274,
     timezone="Asia/Tokyo",
-    fb_normalize=False,
-    fb_delete_mov=False,
 ):
     """検出処理を行うワーカースレッド"""
     global current_frame, current_frame_seq, current_stream_jpeg, current_stream_jpeg_seq
@@ -1420,8 +1290,6 @@ def detection_thread_worker(
                     clip_margin_after=current_clip_margin_after,
                     composite_after=current_clip_margin_after,
                 )
-                if fb_normalize and clip_path is not None:
-                    fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
         expired_events = merger.flush_expired(timestamp)
         for expired_event in expired_events:
@@ -1438,8 +1306,6 @@ def detection_thread_worker(
                 clip_margin_after=current_clip_margin_after,
                 composite_after=current_clip_margin_after,
             )
-            if fb_normalize and clip_path is not None:
-                fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
         # プレビュー用フレーム生成
         display = frame.copy()
@@ -1496,8 +1362,6 @@ def detection_thread_worker(
                 clip_margin_after=current_clip_margin_after,
                 composite_after=current_clip_margin_after,
             )
-            if fb_normalize and clip_path is not None:
-                fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
     for event in merger.flush_all():
         detection_count += 1
@@ -1511,8 +1375,6 @@ def detection_thread_worker(
             clip_margin_after=current_clip_margin_after,
             composite_after=current_clip_margin_after,
         )
-        if fb_normalize and clip_path is not None:
-            fb_normalize_clip(clip_path, delete_source=fb_delete_mov)
 
 
 def process_rtsp_stream(
@@ -1535,8 +1397,6 @@ def process_rtsp_stream(
     nuisance_overlap_threshold: float = 0.60,
     clip_margin_before: float = 1.0,
     clip_margin_after: float = 1.0,
-    fb_normalize: bool = False,
-    fb_delete_mov: bool = False,
 ):
     global current_frame, detection_count, start_time_global, camera_name, camera_display_name, current_settings
     global current_runtime_fps, current_runtime_overrides_paths
@@ -1569,8 +1429,6 @@ def process_rtsp_stream(
     process_scale = float(runtime_overrides.get("scale", process_scale))
     buffer_seconds = float(runtime_overrides.get("buffer", buffer_seconds))
     extract_clips = _to_bool(runtime_overrides.get("extract_clips", extract_clips), default=extract_clips)
-    fb_normalize = _to_bool(runtime_overrides.get("fb_normalize", fb_normalize), default=fb_normalize)
-    fb_delete_mov = _to_bool(runtime_overrides.get("fb_delete_mov", fb_delete_mov), default=fb_delete_mov)
     mask_image = runtime_overrides.get("mask_image", mask_image) or None
     mask_from_day = runtime_overrides.get("mask_from_day", mask_from_day) or None
     mask_dilate = int(runtime_overrides.get("mask_dilate", mask_dilate))
@@ -1662,8 +1520,6 @@ def process_rtsp_stream(
         "exclude_bottom": params.exclude_bottom_ratio,
         "exclude_bottom_ratio": params.exclude_bottom_ratio,
         "exclude_edge_ratio": params.exclude_edge_ratio,
-        "fb_normalize": fb_normalize,
-        "fb_delete_mov": fb_delete_mov,
         "source_fps": 30.0,
         "mask_image": mask_image or "",
         "mask_from_day": mask_from_day or "",
@@ -1775,8 +1631,6 @@ def process_rtsp_stream(
             'latitude': latitude,
             'longitude': longitude,
             'timezone': timezone,
-            'fb_normalize': fb_normalize,
-            'fb_delete_mov': fb_delete_mov,
         },
         daemon=False,
     )
@@ -1831,10 +1685,6 @@ def main():
     )
     parser.add_argument("--clip-margin-before", type=float, default=1.0, help="検出前の記録秒数")
     parser.add_argument("--clip-margin-after", type=float, default=1.0, help="検出後の記録秒数")
-    parser.add_argument("--fb-normalize", action="store_true",
-                        help="Facebook向けにH.264 MP4へ正規化")
-    parser.add_argument("--fb-delete-mov", action="store_true",
-                        help="正規化後に元MOVを削除")
 
     args = parser.parse_args()
 
@@ -1876,8 +1726,6 @@ def main():
         nuisance_overlap_threshold=args.nuisance_overlap_threshold,
         clip_margin_before=args.clip_margin_before,
         clip_margin_after=args.clip_margin_after,
-        fb_normalize=args.fb_normalize,
-        fb_delete_mov=args.fb_delete_mov,
     )
 
 

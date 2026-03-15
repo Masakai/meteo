@@ -629,8 +629,6 @@ sequenceDiagram
     "scale": 0.5,
     "buffer": 12.0,
     "extract_clips": true,
-    "fb_normalize": false,
-    "fb_delete_mov": false,
     "exclude_bottom": 0.0625,
     "nuisance_overlap_threshold": 0.6,
     "nuisance_path_overlap_threshold": 0.7,

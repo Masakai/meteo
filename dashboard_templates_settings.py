@@ -161,7 +161,6 @@ def render_settings_html(cameras, version):
                         <tr><td>scale</td><td>処理解像度スケール</td><td>上げると小さい流星に有利だが重くなる</td></tr>
                         <tr><td>buffer</td><td>リングバッファ秒数</td><td>長くすると検出前後の切り出し余裕が増える</td></tr>
                         <tr><td>extract_clips</td><td>検出時に動画クリップを保存</td><td>オフで容量節約（静止画中心運用向け）</td></tr>
-                        <tr><td>fb_normalize / fb_delete_mov</td><td>MP4正規化とMOV削除</td><td>互換性重視時に有効化</td></tr>
                         <tr><td>clip_margin_before/after</td><td>検出前後に含める秒数</td><td>増やすと状況把握しやすい</td></tr>
                     </tbody>
                 </table>
@@ -180,8 +179,6 @@ def render_settings_html(cameras, version):
                 <div><label>処理解像度スケール（scale）</label><input id="scale" type="number" step="0.01"></div>
                 <div><label>録画バッファ秒数（buffer）</label><input id="buffer" type="number" step="0.1"></div>
                 <div><label>検出クリップ保存（extract_clips）</label><input id="extract_clips" type="checkbox"></div>
-                <div><label>Facebook向けMP4正規化（fb_normalize）</label><input id="fb_normalize" type="checkbox"></div>
-                <div><label>正規化後に元MOV削除（fb_delete_mov）</label><input id="fb_delete_mov" type="checkbox"></div>
                 <div><label>検出前の記録秒数（clip_margin_before）</label><input id="clip_margin_before" type="number" step="0.1"></div>
                 <div><label>検出後の記録秒数（clip_margin_after）</label><input id="clip_margin_after" type="number" step="0.1"></div>
             </div>
@@ -293,7 +290,7 @@ def render_settings_html(cameras, version):
     </div>
     <script>
         const fields = [
-            'sensitivity', 'scale', 'buffer', 'extract_clips', 'fb_normalize', 'fb_delete_mov',
+            'sensitivity', 'scale', 'buffer', 'extract_clips',
             'clip_margin_before', 'clip_margin_after',
             'diff_threshold', 'min_brightness', 'min_brightness_tracking',
             'min_length', 'max_length', 'min_duration', 'max_duration', 'min_speed',
@@ -310,8 +307,6 @@ def render_settings_html(cameras, version):
             scale: 0.5,
             buffer: 15.0,
             extract_clips: true,
-            fb_normalize: false,
-            fb_delete_mov: false,
             clip_margin_before: 1.0,
             clip_margin_after: 1.0,
             diff_threshold: 30,

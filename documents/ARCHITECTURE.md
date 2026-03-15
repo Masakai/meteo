@@ -261,8 +261,6 @@ sequenceDiagram
     "scale": 0.5,
     "buffer": 15.0,
     "extract_clips": true,
-    "fb_normalize": false,
-    "fb_delete_mov": false,
     "source_fps": 20.0,
     "exclude_bottom": 0.0625,
     "mask_image": "/app/mask_image.png",

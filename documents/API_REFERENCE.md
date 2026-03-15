@@ -27,10 +27,15 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.0.0 - 旧互換 MP4 正規化設定の削除
+- **削除**: `GET /stats` の `settings` から `fb_normalize` / `fb_delete_mov` を削除
+- **削除**: カメラ設定 API の起動時依存設定から `fb_normalize` / `fb_delete_mov` を削除
+- **変更**: ダッシュボードのヘルスチェック例の `version` 表示を `3.0.0` に更新
+
 ### v1.24.1 - ダッシュボードの Flask アプリ運用整備
 - **新規エンドポイント**: `GET /health`
   - ダッシュボードのヘルスチェックを返却
-  - レスポンス例: `{ "status": "ok", "version": "1.24.1", "camera_count": 3 }`
+  - レスポンス例: `{ "status": "ok", "version": "3.0.0", "camera_count": 3 }`
 - **変更**: `dashboard.py` を Flask のアプリファクトリ構成へ整理し、WSGI 配備やコンテナ運用時でも監視スレッドが初回リクエストで起動するよう改善
 
 ### v1.24.0 - 検出 ID 管理と運用制御の拡張
@@ -127,7 +132,7 @@ Licensed under the MIT License
 ```json
 {
   "status": "ok",
-  "version": "1.24.1",
+  "version": "3.0.0",
   "camera_count": 3
 }
 ```
@@ -905,8 +910,6 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
     "scale": 0.5,
     "buffer": 15.0,
     "extract_clips": true,
-    "fb_normalize": false,
-    "fb_delete_mov": false,
     "source_fps": 20.0,
     "exclude_bottom": 0.0625,
     "exclude_bottom_ratio": 0.0625,
@@ -942,8 +945,6 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `settings.scale` | float | 処理スケール |
 | `settings.buffer` | float | バッファ秒数 |
 | `settings.extract_clips` | boolean | 動画保存の有効/無効 |
-| `settings.fb_normalize` | boolean | 旧互換設定。現在の標準MP4出力では通常不要 |
-| `settings.fb_delete_mov` | boolean | 旧MOV互換経路向け設定。通常は未使用 |
 | `settings.source_fps` | float | 接続時に取得した入力ストリームFPS |
 | `settings.exclude_bottom` | float | 画面下部除外率 |
 | `settings.exclude_bottom_ratio` | float | 画面下部除外率（内部キー） |
@@ -1061,8 +1062,6 @@ curl -X POST http://localhost:8081/update_mask | jq
   "scale": 0.5,
   "buffer": 15,
   "extract_clips": true,
-  "fb_normalize": false,
-  "fb_delete_mov": false,
   "diff_threshold": 20,
   "min_brightness": 180,
   "min_linearity": 0.7,

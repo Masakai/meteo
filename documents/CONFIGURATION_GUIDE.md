@@ -159,7 +159,6 @@ environment:
 
 **自動再起動で反映（再ビルド不要）:**
   - **基本設定**: `sensitivity`, `scale`, `buffer`, `extract_clips`
-  - **旧互換設定**: `fb_normalize`, `fb_delete_mov`（現在の標準MP4直出力では通常不要）
 
 #### 永続化
 
@@ -1147,7 +1146,6 @@ environment:
 
 **自動再起動項目（再ビルド不要）**:
 - sensitivity, scale, buffer, extract_clips
-- 旧互換のMP4正規化設定（fb_normalize, fb_delete_mov）
 
 **メリット**:
 - Docker再ビルド不要で設定変更可能

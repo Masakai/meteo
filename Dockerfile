@@ -59,17 +59,11 @@ ENV MASK_FROM_DAY="/app/mask_from_day.jpg"
 ENV MASK_IMAGE=""
 ENV MASK_DILATE="20"
 ENV MASK_SAVE=""
-ENV FB_NORMALIZE="false"
-ENV FB_DELETE_MOV="false"
-
 # Webプレビュー用ポート
 EXPOSE 8080
 
 # 起動コマンド
 CMD ["/bin/sh", "-c", "set -e; \
-FB_NORM_FLAG=''; FB_DEL_FLAG=''; \
-if [ \"${FB_NORMALIZE}\" = \"true\" ]; then FB_NORM_FLAG='--fb-normalize'; fi; \
-if [ \"${FB_DELETE_MOV}\" = \"true\" ]; then FB_DEL_FLAG='--fb-delete-mov'; fi; \
 exec python meteor_detector_rtsp_web.py \
   \"${RTSP_URL}\" \
   -o \"/output/${CAMERA_NAME}\" \
@@ -82,5 +76,4 @@ exec python meteor_detector_rtsp_web.py \
   --mask-dilate \"${MASK_DILATE}\" \
   --mask-save \"${MASK_SAVE}\" \
   --web-port \"${WEB_PORT}\" \
-  --camera-name \"${CAMERA_NAME}\" \
-  ${FB_NORM_FLAG} ${FB_DEL_FLAG}"]
+  --camera-name \"${CAMERA_NAME}\""]

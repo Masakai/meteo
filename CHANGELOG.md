@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-03-15
+### Removed
+- 標準の MP4 直出力に対して実効性のなかった旧互換オプション `fb_normalize` / `fb_delete_mov` を削除。
+- カメラ設定 UI、`generate_compose.py`、`install.sh`、Docker 起動オプションから `fb_normalize` / `fb_delete_mov` の設定経路を削除。
+
+### Changed
+- 関連ドキュメントとサンプル設定を、MP4 直出力を前提とした現行仕様に更新。
+
 ## [2.0.0] - 2026-03-15
 ### Changed
 - ダッシュボードの未使用な `GET /camera_stream/{index}` 中継ルートを削除し、ブラウザから各カメラの `/stream` へ直接接続する構成に整理。

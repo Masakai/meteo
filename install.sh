@@ -217,8 +217,6 @@ for i in $(seq 1 $CAMERA_COUNT); do
       - MASK_IMAGE=/app/mask_image.png
       - MASK_DILATE=20
       - MASK_SAVE=
-      - FB_NORMALIZE=true
-      - FB_DELETE_MOV=true
       - WEB_PORT=8080
     ports:
       - "$PORT:8080"

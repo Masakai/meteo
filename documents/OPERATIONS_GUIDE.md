@@ -121,7 +121,6 @@ python generate_compose.py
   - 検出しきい値、追跡/結合、誤検出抑制（`nuisance_*`）など
 - 自動再起動で反映（再ビルド不要）:
   - `sensitivity`, `scale`, `buffer`, `extract_clips`
-  - `fb_normalize`, `fb_delete_mov` は旧互換設定で、標準のMP4直出力では通常不要
 
 起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、
 コンテナ再起動後も維持されます。
