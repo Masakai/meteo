@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-03-15
+### Changed
+- `generate_compose.py` で `--streaming-mode webrtc` を使う際、`go2rtc` の candidate host を既定でローカル IP から自動検出するよう改善。
+- WebRTC / go2rtc / candidate 設定まわりの README、セットアップ、運用、API、アーキテクチャ文書を現行構成に合わせて改版。
+
+### Fixed
+- OpenCV 未導入環境で昼間画像付き `streamers` を使うと `generate_compose.py` 全体が停止し、`docker-compose.yml` や `go2rtc.yaml` が生成されない問題を修正。
+- `generate_compose.py` の警告表示を見直し、OpenCV 未導入時はマスク生成のみスキップすることが分かるメッセージへ改善。
+
 ## [3.1.0] - 2026-03-15
 ### Added
 - ダッシュボードのライブ表示方式として `WebRTC` を正式サポートし、`go2rtc` 経由のブラウザ向け低遅延配信を利用可能に。

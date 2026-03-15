@@ -27,10 +27,15 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.1.1 - WebRTC candidate 自動検出と生成安定化
+- **変更**: `generate_compose.py` が `go2rtc` の candidate host を既定でローカル IP から自動検出するよう改善
+- **修正**: OpenCV 未導入時でも `docker-compose.yml` / `go2rtc.yaml` の生成を継続し、マスク生成のみスキップするよう改善
+- **変更**: ダッシュボードおよび Docker / WebRTC 構成の関連ドキュメントを現行仕様へ改版
+
 ### v3.1.0 - WebRTC ライブ表示の正式対応
 - **追加**: Docker 構成で `go2rtc` を利用する WebRTC ライブ表示設定を正式サポート
 - **変更**: ダッシュボードのライブ表示設定に `CAMERA*_STREAM_KIND=webrtc` / `CAMERA*_STREAM_URL` を追加
-- **変更**: ダッシュボードのヘルスチェック例の `version` 表示を `3.1.0` に更新
+- **変更**: ダッシュボードのヘルスチェック例の `version` 表示を `3.1.1` に更新
 
 ### v3.0.0 - 旧互換 MP4 正規化設定の削除
 - **削除**: `GET /stats` の `settings` から `fb_normalize` / `fb_delete_mov` を削除
@@ -40,7 +45,7 @@ Licensed under the MIT License
 ### v1.24.1 - ダッシュボードの Flask アプリ運用整備
 - **新規エンドポイント**: `GET /health`
   - ダッシュボードのヘルスチェックを返却
-  - レスポンス例: `{ "status": "ok", "version": "3.1.0", "camera_count": 3 }`
+  - レスポンス例: `{ "status": "ok", "version": "3.1.1", "camera_count": 3 }`
 - **変更**: `dashboard.py` を Flask のアプリファクトリ構成へ整理し、WSGI 配備やコンテナ運用時でも監視スレッドが初回リクエストで起動するよう改善
 
 ### v1.24.0 - 検出 ID 管理と運用制御の拡張
@@ -140,7 +145,7 @@ Licensed under the MIT License
 ```json
 {
   "status": "ok",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "camera_count": 3
 }
 ```
