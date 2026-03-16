@@ -678,7 +678,7 @@ flowchart TD
     CheckCamera -->|"1-2台"| Scale050
     CheckCamera -->|"3台以上"| Scale025
 
-    style Scale050 fill:#00ff88
+    style Scale050 fill:#dff6e8
 ```
 
 ### スケール別の特徴

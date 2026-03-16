@@ -59,12 +59,12 @@ graph TB
     Detector2 -->|"検出結果保存"| Storage
     Detector3 -->|"検出結果保存"| Storage
 
-    style Dashboard fill:#1e2a4a
-    style Go2RTC fill:#244b5a
-    style Detector1 fill:#16213e
-    style Detector2 fill:#16213e
-    style Detector3 fill:#16213e
-    style Storage fill:#2a3f6f
+    style Dashboard fill:#dbe7f6
+    style Go2RTC fill:#d7eef2
+    style Detector1 fill:#e2eafc
+    style Detector2 fill:#e2eafc
+    style Detector3 fill:#e2eafc
+    style Storage fill:#dce6ff
 ```
 
 ## シーケンス図

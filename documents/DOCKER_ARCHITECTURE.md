@@ -11,11 +11,11 @@ Licensed under the MIT License
 
 ## システム概要
 
-流星検出システムは、Docker Composeで管理される4つのコンテナで構成されます。WebRTCライブ表示を有効にする場合は、ここに `go2rtc` が追加されます。Docker 内の `go2rtc` で WebRTC を安定動作させるには、`webrtc.candidates` へホスト側の到達可能アドレスを明示する必要があります。`generate_compose.py` は既定でこの候補アドレスを自動検出し、必要に応じて `--go2rtc-candidate-host` で上書きできます。
+流星検出システムは、Docker Compose で管理される複数コンテナで構成されます。現行の WebRTC ライブ表示構成では `dashboard + camera1..N + go2rtc` の組み合わせが基本です。Docker 内の `go2rtc` で WebRTC を安定動作させるには、`webrtc.candidates` へホスト側の到達可能アドレスを明示する必要があります。`generate_compose.py` は既定でこの候補アドレスを自動検出し、必要に応じて `--go2rtc-candidate-host` で上書きできます。
 
-- **1つのダッシュボードコンテナ**: 全カメラの統合管理画面
-- **3つの検出コンテナ**: 各カメラごとの流星検出エンジン
-- **任意のWebRTC中継コンテナ**: `go2rtc` によるブラウザ向けライブ配信
+- **1つのダッシュボードコンテナ**: 全カメラの統合管理画面と go2rtc 埋め込みページ配信
+- **複数の検出コンテナ**: 各カメラごとの流星検出エンジンと MJPEG / ステータス提供
+- **1つの WebRTC 中継コンテナ**: `go2rtc` による WebRTC / MSE / HLS 配信
 
 ## コンテナ構成図
 
@@ -23,9 +23,11 @@ Licensed under the MIT License
 graph TB
     subgraph "ホストマシン"
         Detections["./detections/<br/>共有ボリューム"]
+        Go2RTCConf["./go2rtc.yaml<br/>設定ファイル"]
 
         subgraph "Docker Network: meteor-net (bridge)"
             Dashboard["dashboard<br/>meteor-dashboard<br/>:8080→8080"]
+            Go2RTC["go2rtc<br/>meteor-go2rtc<br/>:1984→1984<br/>:8555→8555"]
             Camera1["camera1<br/>meteor-camera1<br/>:8081→8080"]
             Camera2["camera2<br/>meteor-camera2<br/>:8082→8080"]
             Camera3["camera3<br/>meteor-camera3<br/>:8083→8080"]
@@ -40,25 +42,32 @@ graph TB
         RTSP3["RTSP Camera<br/>10.0.1.11:554"]
     end
 
-    Browser -->|"HTTP"| Dashboard
+    Browser -->|"HTTP UI"| Dashboard
+    Browser -->|"WebRTC / MSE"| Go2RTC
     Dashboard -->|"HTTP"| Camera1
     Dashboard -->|"HTTP"| Camera2
     Dashboard -->|"HTTP"| Camera3
+    Dashboard -->|"埋め込みHTML / asset取得"| Go2RTC
 
     Camera1 -->|"RTSP"| RTSP1
     Camera2 -->|"RTSP"| RTSP2
     Camera3 -->|"RTSP"| RTSP3
+    Go2RTC -->|"RTSP"| RTSP1
+    Go2RTC -->|"RTSP"| RTSP2
+    Go2RTC -->|"RTSP"| RTSP3
 
     Dashboard -->|"読み込み"| Detections
     Camera1 -->|"書き込み"| Detections
     Camera2 -->|"書き込み"| Detections
     Camera3 -->|"書き込み"| Detections
+    Go2RTCConf -->|"読み込み"| Go2RTC
 
-    style Dashboard fill:#1e2a4a
-    style Camera1 fill:#16213e
-    style Camera2 fill:#16213e
-    style Camera3 fill:#16213e
-    style Detections fill:#2a3f6f
+    style Dashboard fill:#dbe7f6
+    style Go2RTC fill:#d7eef2
+    style Camera1 fill:#e2eafc
+    style Camera2 fill:#e2eafc
+    style Camera3 fill:#e2eafc
+    style Detections fill:#dce6ff
 ```
 
 ## コンテナ詳細
@@ -71,14 +80,18 @@ graph TB
 graph LR
     subgraph "meteor-dashboard コンテナ"
         Dashboard["dashboard.py<br/>HTTPサーバー"]
+        Embed["/camera_embed/*<br/>埋め込みHTML生成"]
+        Proxy["/go2rtc_asset/*<br/>go2rtc asset プロキシ"]
         AstroUtils["astro_utils.py<br/>天文計算"]
         Files["/output/<br/>マウント"]
     end
 
     Dashboard --> AstroUtils
     Dashboard --> Files
+    Dashboard --> Embed
+    Dashboard --> Proxy
 
-    style Dashboard fill:#1e2a4a
+    style Dashboard fill:#dbe7f6
 ```
 
 #### コンテナ情報
@@ -89,7 +102,7 @@ graph LR
 | **コンテナ名** | `meteor-dashboard` |
 | **ポートマッピング** | `8080:8080` (ホスト:コンテナ) |
 | **再起動ポリシー** | `unless-stopped` |
-| **依存関係** | camera1, camera2, camera3 |
+| **依存関係** | camera1, camera2, camera3, go2rtc（WebRTC構成時） |
 | **ボリューム** | `./detections:/output` (読み込み専用的使用) |
 | **ネットワーク** | `meteor-net` (bridge) |
 
@@ -106,26 +119,27 @@ graph LR
 | `CAMERA1_NAME` | `camera1_10_0_1_25` | カメラ1の内部名（ディレクトリ名・識別子） |
 | `CAMERA1_NAME_DISPLAY` | `東側` | カメラ1のWeb表示名 |
 | `CAMERA1_URL` | `http://localhost:8081` | カメラ1のURL |
-| `CAMERA1_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
-| `CAMERA1_STREAM_URL` | `http://localhost:8081` | ライブ表示用URL |
+| `CAMERA1_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA1_STREAM_URL` | `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false` | ライブ表示用URL |
 | `CAMERA2_NAME` | `camera2_10_0_1_3` | カメラ2の内部名（ディレクトリ名・識別子） |
 | `CAMERA2_NAME_DISPLAY` | `南側` | カメラ2のWeb表示名 |
 | `CAMERA2_URL` | `http://localhost:8082` | カメラ2のURL |
-| `CAMERA2_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
-| `CAMERA2_STREAM_URL` | `http://localhost:8082` | ライブ表示用URL |
+| `CAMERA2_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA2_STREAM_URL` | `http://localhost:1984/stream.html?src=camera2&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false` | ライブ表示用URL |
 | `CAMERA3_NAME` | `camera3_10_0_1_11` | カメラ3の内部名（ディレクトリ名・識別子） |
 | `CAMERA3_NAME_DISPLAY` | `西側` | カメラ3のWeb表示名 |
 | `CAMERA3_URL` | `http://localhost:8083` | カメラ3のURL |
-| `CAMERA3_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
-| `CAMERA3_STREAM_URL` | `http://localhost:8083` | ライブ表示用URL |
+| `CAMERA3_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA3_STREAM_URL` | `http://localhost:1984/stream.html?src=camera3&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false` | ライブ表示用URL |
 
 #### Dockerfile.dashboard
 
 ```dockerfile
 FROM python:3.11-slim
 WORKDIR /app
-COPY dashboard.py .
+COPY dashboard*.py .
 COPY astro_utils.py .
+COPY documents/assets/meteo-logotype.svg ./documents/assets/meteo-logotype.svg
 RUN pip install --no-cache-dir astral
 ENV TZ=Asia/Tokyo
 EXPOSE 8080
@@ -158,8 +172,8 @@ graph TB
         Detection --> Output
     end
 
-    style Detector fill:#16213e
-    style Output fill:#2a3f6f
+    style Detector fill:#e2eafc
+    style Output fill:#dce6ff
 ```
 
 #### コンテナ情報（camera1の例）
@@ -237,6 +251,64 @@ CMD python meteor_detector_rtsp_web.py \
 
 ---
 
+### 3. go2rtc コンテナ
+
+**役割**: ブラウザ向けの WebRTC / MSE / HLS ライブ配信
+
+```mermaid
+graph TB
+    subgraph "meteor-go2rtc コンテナ"
+        Config["/config/go2rtc.yaml"]
+        API["1984/tcp<br/>HTTP / WS API"]
+        Media["8555/tcp,udp<br/>WebRTC メディア"]
+        Streams["camera1 / camera2 / camera3<br/>RTSP source"]
+    end
+
+    Config --> API
+    API --> Streams
+    Streams --> Media
+
+    style Config fill:#ffe7cc
+    style API fill:#d7eef2
+    style Media fill:#dff3e2
+```
+
+#### コンテナ情報
+
+| 項目 | 値 |
+|-----|-----|
+| **イメージ** | `alexxit/go2rtc:latest` |
+| **コンテナ名** | `meteor-go2rtc` |
+| **ポートマッピング** | `1984:1984`, `8555:8555/tcp`, `8555:8555/udp` |
+| **再起動ポリシー** | `unless-stopped` |
+| **ボリューム** | `./go2rtc.yaml:/config/go2rtc.yaml:ro` |
+| **ネットワーク** | `meteor-net` (bridge) |
+
+#### go2rtc.yaml の役割
+
+```yaml
+api:
+  origin: "*"
+
+webrtc:
+  candidates:
+    - 10.0.1.59:8555
+
+streams:
+  camera1:
+    - rtsp://...
+  camera2:
+    - rtsp://...
+  camera3:
+    - rtsp://...
+```
+
+- `api.origin` はダッシュボードからの埋め込みアクセスを許可します。
+- `webrtc.candidates` はブラウザが接続するホスト側候補アドレスです。
+- `streams.*` は各カメラの RTSP ソース定義です。
+
+---
+
 ## ネットワーク構成
 
 ### meteor-net (bridge)
@@ -248,9 +320,10 @@ graph TB
     subgraph "Docker Network: meteor-net"
         subgraph "IPアドレス自動割り当て"
             Dashboard["dashboard<br/>172.x.x.2"]
-            Camera1["camera1<br/>172.x.x.3"]
-            Camera2["camera2<br/>172.x.x.4"]
-            Camera3["camera3<br/>172.x.x.5"]
+            Go2RTC["go2rtc<br/>172.x.x.3"]
+            Camera1["camera1<br/>172.x.x.4"]
+            Camera2["camera2<br/>172.x.x.5"]
+            Camera3["camera3<br/>172.x.x.6"]
         end
     end
 
@@ -259,16 +332,19 @@ graph TB
     Dashboard -.->|"内部通信"| Camera1
     Dashboard -.->|"内部通信"| Camera2
     Dashboard -.->|"内部通信"| Camera3
+    Dashboard -.->|"内部通信"| Go2RTC
 
     Host -->|"ポート転送"| Dashboard
+    Host -->|"ポート転送"| Go2RTC
     Host -->|"ポート転送"| Camera1
     Host -->|"ポート転送"| Camera2
     Host -->|"ポート転送"| Camera3
 
-    style Dashboard fill:#1e2a4a
-    style Camera1 fill:#16213e
-    style Camera2 fill:#16213e
-    style Camera3 fill:#16213e
+    style Dashboard fill:#dbe7f6
+    style Go2RTC fill:#d7eef2
+    style Camera1 fill:#e2eafc
+    style Camera2 fill:#e2eafc
+    style Camera3 fill:#e2eafc
 ```
 
 #### ポートマッピング
@@ -307,11 +383,11 @@ graph TB
     Host --> Camera3
     Host --> Dashboard
 
-    style Host fill:#2a3f6f
-    style Camera1 fill:#16213e
-    style Camera2 fill:#16213e
-    style Camera3 fill:#16213e
-    style Dashboard fill:#1e2a4a
+    style Host fill:#dce6ff
+    style Camera1 fill:#e2eafc
+    style Camera2 fill:#e2eafc
+    style Camera3 fill:#e2eafc
+    style Dashboard fill:#dbe7f6
 ```
 
 ### ディレクトリ構造
@@ -337,6 +413,12 @@ graph TB
 | camera2 | `/output` | rw | 検出結果の書き込み |
 | camera3 | `/output` | rw | 検出結果の書き込み |
 | dashboard | `/output` | rw | 検出結果の読み込み、削除 |
+
+### 設定ファイル: ./go2rtc.yaml
+
+| コンテナ | パス | モード | 操作 |
+|---------|------|--------|------|
+| go2rtc | `/config/go2rtc.yaml` | ro | WebRTC candidate とストリーム定義の読み込み |
 
 ---
 
@@ -367,12 +449,17 @@ sequenceDiagram
     participant Camera2
     participant Camera3
     participant Dashboard
+    participant Go2RTC
 
     User->>DockerCompose: docker compose up -d
 
     DockerCompose->>Network: meteor-netを作成
 
     par コンテナ起動（並列）
+        DockerCompose->>Go2RTC: コンテナ起動
+        Go2RTC->>Go2RTC: go2rtc.yaml 読み込み
+        Go2RTC->>Go2RTC: API待受開始 (1984/8555)
+
         DockerCompose->>Camera1: コンテナ起動
         Camera1->>Camera1: meteor_detector_rtsp_web.py起動
         Camera1->>Camera1: RTSP接続開始
@@ -386,11 +473,13 @@ sequenceDiagram
         Camera3->>Camera3: RTSP接続開始
     end
 
-    Note over Camera1,Camera3: depends_onによりカメラ起動完了を待つ
+    Note over Go2RTC,Camera3: depends_on により dashboard は各依存サービス起動後に開始
 
     DockerCompose->>Dashboard: コンテナ起動
     Dashboard->>Dashboard: dashboard.py起動
     Dashboard->>Dashboard: HTTPサーバー起動 (0.0.0.0:8080)
+    Dashboard->>Go2RTC: asset 取得先を解決
+    Dashboard->>Camera1: /stats, /stream 参照準備
 
     Dashboard-->>User: http://localhost:8080/ アクセス可能
 ```
@@ -404,14 +493,17 @@ graph TD
     Compose["docker-compose.yml"]
 
     Compose --> Dashboard
+    Compose --> Go2RTC
     Compose --> Camera1
     Compose --> Camera2
     Compose --> Camera3
 
+    Dashboard -.->|"depends_on"| Go2RTC
     Dashboard -.->|"depends_on"| Camera1
     Dashboard -.->|"depends_on"| Camera2
     Dashboard -.->|"depends_on"| Camera3
 
+    Go2RTC --> Go2RTCConfig["go2rtc.yaml"]
     Camera1 --> Dockerfile
     Camera2 --> Dockerfile
     Camera3 --> Dockerfile
@@ -419,11 +511,12 @@ graph TD
 
     Dockerfile --> Requirements["requirements-docker.txt"]
 
-    style Compose fill:#1e2a4a
-    style Dashboard fill:#16213e
-    style Camera1 fill:#2a3f6f
-    style Camera2 fill:#2a3f6f
-    style Camera3 fill:#2a3f6f
+    style Compose fill:#dbe7f6
+    style Dashboard fill:#e2eafc
+    style Go2RTC fill:#d7eef2
+    style Camera1 fill:#dce6ff
+    style Camera2 fill:#dce6ff
+    style Camera3 fill:#dce6ff
 ```
 
 ---
@@ -435,22 +528,25 @@ graph TD
 | コンテナ | ベースイメージ | アプリメモリ | 合計（推定） |
 |---------|--------------|------------|-------------|
 | dashboard | ~50MB | ~30MB | **~80MB** |
+| go2rtc | ~30MB | ~40MB | **~70MB** |
 | camera1 | ~120MB | ~200MB (リングバッファ含む) | **~320MB** |
 | camera2 | ~120MB | ~200MB | **~320MB** |
 | camera3 | ~120MB | ~200MB | **~320MB** |
-| **合計** | | | **~1040MB (約1GB)** |
+| **合計** | | | **~1110MB (約1.1GB)** |
 
 ### ディスク使用量
 
 | 項目 | サイズ（推定） |
 |-----|--------------|
 | Dockerイメージ (dashboard) | ~200MB |
+| Dockerイメージ (go2rtc) | ~60MB |
 | Dockerイメージ (camera) × 3 | ~600MB |
 | 検出結果 (1時間あたり) | ~100MB-1GB (検出数依存) |
 
 ### CPU使用率
 
 - **camera1-3**: 各コンテナ 30-50% (1コア)
+- **go2rtc**: 数% - 15% 程度（接続数と配信方式依存）
 - **dashboard**: 5-10% (1コア)
 
 ---
@@ -474,6 +570,7 @@ docker compose logs -f
 
 # 特定コンテナのログ
 docker compose logs -f camera1
+docker compose logs -f go2rtc
 
 # 状態確認
 docker compose ps
@@ -503,9 +600,11 @@ docker image prune -a
 ```bash
 # 特定コンテナの再起動
 docker compose restart camera1
+docker compose restart go2rtc
 
 # 特定コンテナに入る
 docker compose exec camera1 /bin/bash
+docker compose exec go2rtc sh
 
 # 特定コンテナを停止
 docker compose stop camera1
@@ -623,8 +722,8 @@ flowchart LR
     Streamers -->|"読み込み"| Script
     Script -->|"生成"| Compose
 
-    style Script fill:#2a3f6f
-    style Compose fill:#16213e
+    style Script fill:#dce6ff
+    style Compose fill:#e2eafc
 ```
 
 ### カメラ追加手順

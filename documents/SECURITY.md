@@ -45,11 +45,11 @@ graph TB
         Risk5["ログファイルからの情報漏洩<br/>影響: 設定情報の露出"]
     end
 
-    style Risk1 fill:#ff4444
-    style Risk2 fill:#ff4444
-    style Risk3 fill:#ff8844
-    style Risk4 fill:#ff8844
-    style Risk5 fill:#ffcc44
+    style Risk1 fill:#f8d7da
+    style Risk2 fill:#f8d7da
+    style Risk3 fill:#ffe3c4
+    style Risk4 fill:#ffe3c4
+    style Risk5 fill:#fff1bf
 ```
 
 ### 脅威モデル
@@ -342,8 +342,8 @@ graph LR
     User -->|"暗号化トンネル"| VPN
     VPN -->|"プライベートネットワーク"| Meteor
 
-    style VPN fill:#2a3f6f
-    style Meteor fill:#16213e
+    style VPN fill:#dce6ff
+    style Meteor fill:#e2eafc
 ```
 
 **推奨VPNソリューション**:
@@ -677,9 +677,9 @@ flowchart TD
     Patch --> Restart
     Restart --> Report
 
-    style Detect fill:#ff4444
-    style Stop fill:#ff8844
-    style Restart fill:#00ff88
+    style Detect fill:#f8d7da
+    style Stop fill:#ffe3c4
+    style Restart fill:#dff6e8
 ```
 
 #### ステップ1: 即座に停止

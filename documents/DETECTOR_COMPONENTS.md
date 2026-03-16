@@ -42,11 +42,11 @@ graph TB
     WebServer -->|"MJPEGストリーム"| Browser
     Browser -->|"HTTP GET /stats"| WebServer
 
-    style Reader fill:#16213e
-    style DetectionWorker fill:#16213e
-    style WebServer fill:#16213e
-    style Detector fill:#2a3f6f
-    style RingBuffer fill:#2a3f6f
+    style Reader fill:#e2eafc
+    style DetectionWorker fill:#e2eafc
+    style WebServer fill:#e2eafc
+    style Detector fill:#dce6ff
+    style RingBuffer fill:#dce6ff
 ```
 
 ## コアコンポーネント
@@ -172,8 +172,8 @@ graph LR
     Dots --> F360
     F360 -.->|"新フレーム追加で<br/>古いフレーム削除"| F1
 
-    style F1 fill:#16213e
-    style F360 fill:#2a3f6f
+    style F1 fill:#e2eafc
+    style F360 fill:#dce6ff
 ```
 
 #### メソッド
@@ -275,12 +275,12 @@ flowchart TD
     NuisanceCheck -->|"通過"| Meteor
     Meteor --> End
 
-    style Start fill:#16213e
-    style Meteor fill:#ff4444
-    style Objects fill:#2a3f6f
-    style Filter2b fill:#ff8844
-    style Filter4 fill:#ff8844
-    style NuisanceCheck fill:#ff8844
+    style Start fill:#e2eafc
+    style Meteor fill:#f8d7da
+    style Objects fill:#dce6ff
+    style Filter2b fill:#ffe3c4
+    style Filter4 fill:#ffe3c4
+    style NuisanceCheck fill:#ffe3c4
 ```
 
 #### トラッキング状態管理
@@ -544,10 +544,10 @@ flowchart TD
     CheckStop -->|"Yes"| Finalize
     Finalize --> End
 
-    style Start fill:#16213e
-    style SaveEvent fill:#2a3f6f
-    style CheckTime fill:#ff8844
-    style End fill:#16213e
+    style Start fill:#e2eafc
+    style SaveEvent fill:#dce6ff
+    style CheckTime fill:#ffe3c4
+    style End fill:#e2eafc
 ```
 
 #### グローバル変数（Webサーバー連携用）
@@ -592,9 +592,9 @@ graph LR
     Browser -->|"GET /stats"| Stats
     Stats --> JSON
 
-    style Root fill:#16213e
-    style Stream fill:#16213e
-    style Stats fill:#16213e
+    style Root fill:#e2eafc
+    style Stream fill:#e2eafc
+    style Stats fill:#e2eafc
 ```
 
 #### /stream 処理フロー
@@ -731,10 +731,10 @@ graph TD
     GetFrames --> Original
     Event --> JSONL
 
-    style Video fill:#16213e
-    style Composite fill:#2a3f6f
-    style Original fill:#2a3f6f
-    style JSONL fill:#ff8844
+    style Video fill:#e2eafc
+    style Composite fill:#dce6ff
+    style Original fill:#dce6ff
+    style JSONL fill:#ffe3c4
 ```
 
 ### コンポジット画像生成アルゴリズム
@@ -789,11 +789,11 @@ graph TB
         Thread3 -->|"取得"| FrameLock
     end
 
-    style Main fill:#1e2a4a
-    style Thread1 fill:#16213e
-    style Thread2 fill:#16213e
-    style Thread3 fill:#16213e
-    style Queue fill:#2a3f6f
+    style Main fill:#dbe7f6
+    style Thread1 fill:#e2eafc
+    style Thread2 fill:#e2eafc
+    style Thread3 fill:#e2eafc
+    style Queue fill:#dce6ff
 ```
 
 ### ロック戦略

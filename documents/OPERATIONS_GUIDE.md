@@ -59,10 +59,10 @@ flowchart TD
     Monitor --> Stop
     Stop --> End
 
-    style Generate fill:#2a3f6f
-    style Build fill:#16213e
-    style Up fill:#1e2a4a
-    style Monitor fill:#00ff88
+    style Generate fill:#dce6ff
+    style Build fill:#e2eafc
+    style Up fill:#dbe7f6
+    style Monitor fill:#dff6e8
 ```
 
 ### 初回起動
@@ -611,9 +611,9 @@ flowchart TD
     FixDisk --> Resolved
     FixMemory --> Resolved
 
-    style Start fill:#ff4444
-    style Resolved fill:#00ff88
-    style Support fill:#ff8844
+    style Start fill:#f8d7da
+    style Resolved fill:#dff6e8
+    style Support fill:#ffe3c4
 ```
 
 ### よくある問題と解決方法

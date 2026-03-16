@@ -103,7 +103,7 @@ flowchart TD
     SetYesterday --> Return
     SetToday --> Return
 
-    style CheckTime fill:#ff8844
+    style CheckTime fill:#ffe3c4
 ```
 
 **使用例**:
@@ -175,9 +175,9 @@ flowchart TD
     Compare -->|"Yes"| ReturnTrue
     Compare -->|"No"| ReturnFalse
 
-    style Compare fill:#ff8844
-    style ReturnTrue fill:#00ff88
-    style ReturnFalse fill:#ff4444
+    style Compare fill:#ffe3c4
+    style ReturnTrue fill:#dff6e8
+    style ReturnFalse fill:#f8d7da
 ```
 
 **使用例**:
@@ -224,11 +224,11 @@ graph TD
     Nautical --> Astro
     Astro --> Night
 
-    style Day fill:#ffff00
-    style Civil fill:#ffcc66
-    style Nautical fill:#ff9933
-    style Astro fill:#6666ff
-    style Night fill:#000066
+    style Day fill:#fff9c4
+    style Civil fill:#ffe7bf
+    style Nautical fill:#ffd8a8
+    style Astro fill:#e3dcff
+    style Night fill:#d6d9f8
 ```
 
 ### 流星観測に適した時間帯
