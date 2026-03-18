@@ -526,6 +526,11 @@ def _camera_apply_settings_target(camera_index):
     return _camera_url_for_proxy(cam["url"], camera_index) + "/apply_settings"
 
 
+def _camera_recording_status_target(camera_index):
+    cam = CAMERAS[camera_index]
+    return _camera_url_for_proxy(cam["url"], camera_index) + "/recording/status"
+
+
 def _camera_monitor_default_snapshot(camera_index):
     now_ts = time()
     cam_name = CAMERAS[camera_index]["name"] if camera_index < len(CAMERAS) else f"camera{camera_index+1}"
@@ -1144,6 +1149,54 @@ def handle_camera_mask_image(handler):
         _parse_camera_index,
         Request,
         urlopen,
+    )
+
+
+def handle_camera_recording_status(handler):
+    if not handler.path.startswith("/camera_recording_status/"):
+        return False
+    return camera_handlers.proxy_camera_recording_request(
+        handler,
+        target_path="/recording/status",
+        method="GET",
+        cameras=CAMERAS,
+        in_docker=_IN_DOCKER,
+        parse_index=_parse_camera_index,
+        request_cls=Request,
+        urlopen_fn=urlopen,
+        timeout=5,
+    )
+
+
+def handle_camera_recording_schedule(handler):
+    if not handler.path.startswith("/camera_recording_schedule/"):
+        return False
+    return camera_handlers.proxy_camera_recording_request(
+        handler,
+        target_path="/recording/schedule",
+        method="POST",
+        cameras=CAMERAS,
+        in_docker=_IN_DOCKER,
+        parse_index=_parse_camera_index,
+        request_cls=Request,
+        urlopen_fn=urlopen,
+        timeout=10,
+    )
+
+
+def handle_camera_recording_stop(handler):
+    if not handler.path.startswith("/camera_recording_stop/"):
+        return False
+    return camera_handlers.proxy_camera_recording_request(
+        handler,
+        target_path="/recording/stop",
+        method="POST",
+        cameras=CAMERAS,
+        in_docker=_IN_DOCKER,
+        parse_index=_parse_camera_index,
+        request_cls=Request,
+        urlopen_fn=urlopen,
+        timeout=10,
     )
 
 

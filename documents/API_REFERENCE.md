@@ -27,6 +27,11 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.2.0 - カメラ別手動録画予約の追加
+- **追加**: ダッシュボードに `GET /camera_recording_status/{index}`、`POST /camera_recording_schedule/{index}`、`POST /camera_recording_stop/{index}` を追加
+- **追加**: カメラ側 API に `GET /recording/status`、`POST /recording/schedule`、`POST /recording/stop` を追加
+- **変更**: `/camera_stats/{index}` と `/stats` のレスポンスへ `recording` オブジェクトを追加し、予約状態・録画状態・保存先を取得可能化
+
 ### v3.1.1 - WebRTC candidate 自動検出と生成安定化
 - **変更**: `generate_compose.py` が `go2rtc` の candidate host を既定でローカル IP から自動検出するよう改善
 - **修正**: OpenCV 未導入時でも `docker-compose.yml` / `go2rtc.yaml` の生成を継続し、マスク生成のみスキップするよう改善
@@ -45,7 +50,7 @@ Licensed under the MIT License
 ### v1.24.1 - ダッシュボードの Flask アプリ運用整備
 - **新規エンドポイント**: `GET /health`
   - ダッシュボードのヘルスチェックを返却
-  - レスポンス例: `{ "status": "ok", "version": "3.1.1", "camera_count": 3 }`
+  - レスポンス例: `{ "status": "ok", "version": "3.2.0", "camera_count": 3 }`
 - **変更**: `dashboard.py` を Flask のアプリファクトリ構成へ整理し、WSGI 配備やコンテナ運用時でも監視スレッドが初回リクエストで起動するよう改善
 
 ### v1.24.0 - 検出 ID 管理と運用制御の拡張
@@ -123,6 +128,9 @@ Licensed under the MIT License
 | `/camera_settings/current` | GET | カメラ設定の現在値取得 |
 | `/camera_settings/apply_all` | POST | 設定を全カメラへ一括適用 |
 | `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） |
+| `/camera_recording_status/{index}` | GET | カメラ手動録画状態取得 |
+| `/camera_recording_schedule/{index}` | POST | カメラ手動録画の予約/即時開始 |
+| `/camera_recording_stop/{index}` | POST | カメラ手動録画の停止 |
 | `/camera_restart/{index}` | POST | カメラ再起動要求 |
 | `/camera_stats/{index}` | GET | カメラ統計情報取得 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
@@ -145,7 +153,7 @@ Licensed under the MIT License
 ```json
 {
   "status": "ok",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "camera_count": 3
 }
 ```
@@ -525,6 +533,77 @@ curl -OJ "http://localhost:8080/camera_snapshot/0?download=1"
 
 ---
 
+### GET /camera_recording_status/{index}
+
+**説明**: 指定カメラの手動録画状態を取得
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "success": true,
+  "recording": {
+    "supported": true,
+    "state": "idle",
+    "camera": "camera1_10_0_1_25",
+    "job_id": "",
+    "start_at": "",
+    "scheduled_at": "",
+    "started_at": "",
+    "ended_at": "",
+    "duration_sec": 0,
+    "remaining_sec": 0,
+    "output_path": "",
+    "error": ""
+  }
+}
+```
+
+---
+
+### POST /camera_recording_schedule/{index}
+
+**説明**: 指定カメラの手動録画を予約または即時開始
+
+**リクエストボディ**:
+```json
+{
+  "start_at": "2026-03-19T21:30:00",
+  "duration_sec": 90
+}
+```
+
+**補足**:
+- `start_at` を空文字または省略すると即時開始
+- `duration_sec` は 1 以上 86400 以下
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/camera_recording_schedule/0" \
+  -H "Content-Type: application/json" \
+  -d '{"start_at":"2026-03-19T21:30:00","duration_sec":90}' | jq
+```
+
+---
+
+### POST /camera_recording_stop/{index}
+
+**説明**: 予約中または録画中の手動録画を停止
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/camera_recording_stop/0" | jq
+```
+
+---
+
 ### POST /camera_restart/{index}
 
 **説明**: 指定カメラに再起動を要求（非同期）
@@ -878,6 +957,9 @@ curl http://localhost:8080/changelog
 | `/stream` | GET | MJPEGストリーム |
 | `/snapshot` | GET | 現在フレームJPEG |
 | `/stats` | GET | 統計情報 |
+| `/recording/status` | GET | 手動録画状態取得 |
+| `/recording/schedule` | POST | 手動録画の予約/即時開始 |
+| `/recording/stop` | POST | 手動録画の停止 |
 | `/update_mask` | POST | 現在フレームからマスク再生成 |
 | `/apply_settings` | POST | 設定値をランタイム反映 |
 | `/restart` | POST | プロセス再起動要求 |
@@ -990,7 +1072,16 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
   "detection_window_enabled": true,
   "detection_window_active": true,
   "detection_window_start": "2026-03-09 17:46:53",
-  "detection_window_end": "2026-03-10 06:03:38"
+  "detection_window_end": "2026-03-10 06:03:38",
+  "recording": {
+    "supported": true,
+    "state": "scheduled",
+    "start_at": "2026-03-19T21:30:00+09:00",
+    "duration_sec": 90,
+    "remaining_sec": 42,
+    "output_path": "/output/manual_recordings/camera1_10_0_1_25/manual_camera1_10_0_1_25_20260319_213000_90s.mp4",
+    "error": ""
+  }
 }
 ```
 
@@ -1032,6 +1123,14 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `detection_window_active` | boolean | 現在が検出時間帯内か |
 | `detection_window_start` | string | 現在参照中の検出開始時刻 |
 | `detection_window_end` | string | 現在参照中の検出終了時刻 |
+| `recording` | object | 手動録画状態 |
+| `recording.supported` | boolean | 手動録画機能が利用可能か |
+| `recording.state` | string | `idle` / `scheduled` / `recording` / `completed` / `failed` / `stopped` |
+| `recording.start_at` | string | 予約開始時刻 |
+| `recording.duration_sec` | integer | 録画予定秒数 |
+| `recording.remaining_sec` | integer | 残り秒数 |
+| `recording.output_path` | string | 保存先MP4パス |
+| `recording.error` | string | 失敗・停止理由 |
 
 **使用例**:
 ```bash
@@ -1061,6 +1160,66 @@ setInterval(() => {
     });
 }, 2000);  // 2秒ごと
 ```
+
+---
+
+### GET /recording/status
+
+**説明**: カメラコンテナ内の手動録画状態を取得
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "success": true,
+  "recording": {
+    "supported": true,
+    "state": "recording",
+    "camera": "camera1_10_0_1_25",
+    "job_id": "rec_1742387400000",
+    "start_at": "2026-03-19T21:30:00+09:00",
+    "scheduled_at": "2026-03-19T21:29:10+09:00",
+    "started_at": "2026-03-19T21:30:00+09:00",
+    "ended_at": "",
+    "duration_sec": 90,
+    "remaining_sec": 37,
+    "output_path": "/output/manual_recordings/camera1_10_0_1_25/manual_camera1_10_0_1_25_20260319_213000_90s.mp4",
+    "error": ""
+  }
+}
+```
+
+---
+
+### POST /recording/schedule
+
+**説明**: RTSP入力を `ffmpeg` で MP4 へ保存する手動録画ジョブを予約または即時開始
+
+**リクエストボディ**:
+```json
+{
+  "start_at": "2026-03-19T21:30:00",
+  "duration_sec": 90
+}
+```
+
+**補足**:
+- `start_at` 省略時は即時開始
+- 既に `scheduled` または `recording` のジョブがある場合は失敗
+- 保存先は `manual_recordings/<camera>/` 配下
+
+---
+
+### POST /recording/stop
+
+**説明**: 予約中または録画中の手動録画ジョブを停止
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
 
 ---
 

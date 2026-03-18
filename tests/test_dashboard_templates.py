@@ -111,3 +111,17 @@ def test_render_dashboard_supports_webrtc_camera_embed():
     assert "function isWebRTCStream(i)" in html
     assert "function bindStreamEventHandlers(i)" in html
     assert "stream.html?src=camera1&mode=webrtc&mode=mse" in html
+
+
+def test_render_dashboard_includes_recording_controls():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+        page_mode="cameras",
+    )
+    assert "録画予約" in html
+    assert 'id="recording-panel0"' in html
+    assert "function scheduleRecording(i)" in html
+    assert "function stopRecording(i)" in html
+    assert "camera_recording_schedule" in html

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-03-19
+### Added
+- カメラライブ画面にカメラ別の「録画予約」UIを追加し、開始時刻と録画秒数を指定して手動録画できるよう改善。
+- ダッシュボードに `GET /camera_recording_status/{index}`、`POST /camera_recording_schedule/{index}`、`POST /camera_recording_stop/{index}` を追加。
+- カメラ側 API に `GET /recording/status`、`POST /recording/schedule`、`POST /recording/stop` を追加し、RTSP入力を `ffmpeg` で MP4 保存できるよう改善。
+
+### Changed
+- カメラ統計レスポンス `/camera_stats/{index}` と `/stats` に録画状態を含め、予約中・録画中・完了・停止をダッシュボードへ反映するよう変更。
+- 手動録画の保存先を各カメラ出力ディレクトリ配下 `manual_recordings/<camera>/` に統一。
+
 ## [3.1.1] - 2026-03-15
 ### Changed
 - `generate_compose.py` で `--streaming-mode webrtc` を使う際、`go2rtc` の candidate host を既定でローカル IP から自動検出するよう改善。

@@ -98,6 +98,93 @@ def _proxy_camera_post(
         return True
 
 
+def _read_handler_body(handler) -> bytes:
+    try:
+        length = int(handler.headers.get("Content-Length", "0"))
+    except Exception:
+        length = 0
+    return handler.rfile.read(length) if length > 0 else b""
+
+
+def _proxy_camera_json(
+    handler,
+    *,
+    camera_index: int,
+    target_path: str,
+    method: str,
+    cameras,
+    in_docker,
+    request_cls,
+    urlopen_fn,
+    body: bytes = b"",
+    timeout: float = 10,
+):
+    cam = cameras[camera_index]
+    target_url = camera_url_for_proxy(cam["url"], in_docker, camera_index) + target_path
+    headers = {"Accept": "application/json"}
+    if body:
+        headers["Content-Type"] = "application/json"
+    req = request_cls(target_url, data=body if body else None, headers=headers, method=method)
+    with urlopen_fn(req, timeout=timeout) as response:
+        payload = response.read()
+    return payload
+
+
+def proxy_camera_recording_request(
+    handler,
+    *,
+    target_path: str,
+    method: str,
+    cameras,
+    in_docker,
+    parse_index,
+    request_cls,
+    urlopen_fn,
+    timeout: float = 10,
+):
+    parsed = urlparse(handler.path)
+    try:
+        camera_index = parse_index(parsed.path)
+        body = _read_handler_body(handler) if method.upper() != "GET" else b""
+        payload = _proxy_camera_json(
+            handler,
+            camera_index=camera_index,
+            target_path=target_path,
+            method=method.upper(),
+            cameras=cameras,
+            in_docker=in_docker,
+            request_cls=request_cls,
+            urlopen_fn=urlopen_fn,
+            body=body,
+            timeout=timeout,
+        )
+        handler.send_response(200)
+        handler.send_header("Content-type", "application/json")
+        handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        handler.end_headers()
+        handler.wfile.write(payload)
+        return True
+    except (ValueError, URLError, TimeoutError) as e:
+        handler.send_response(503)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+    except HTTPError as e:
+        payload = e.read() if hasattr(e, "read") else b""
+        handler.send_response(e.code)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(payload or json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+    except Exception as e:
+        handler.send_response(500)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}).encode("utf-8"))
+        return True
+
+
 def handle_camera_mask(handler, *args):
     if not handler.path.startswith("/camera_mask/"):
         return False

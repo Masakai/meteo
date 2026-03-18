@@ -106,6 +106,60 @@ def test_handle_camera_snapshot_invalid_index(monkeypatch):
     assert handler.status == 503
 
 
+def test_handle_camera_recording_schedule_success(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        assert req.full_url.endswith("/recording/schedule")
+        assert req.get_method() == "POST"
+        assert timeout == 10
+        assert json.loads(req.data.decode("utf-8"))["duration_sec"] == 90
+        return _DummyResponse(b'{"success": true, "recording": {"state": "scheduled"}}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps({"start_at": "2026-03-19T21:30:00", "duration_sec": 90}).encode("utf-8")
+    handler = _DummyHandler("/camera_recording_schedule/0", body=body, headers={"Content-Type": "application/json"})
+    assert dr.handle_camera_recording_schedule(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["recording"]["state"] == "scheduled"
+
+
+def test_handle_camera_recording_stop_success(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        assert req.full_url.endswith("/recording/stop")
+        assert req.get_method() == "POST"
+        assert timeout == 10
+        return _DummyResponse(b'{"success": true, "recording": {"state": "stopped"}}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    handler = _DummyHandler("/camera_recording_stop/0")
+    assert dr.handle_camera_recording_stop(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["recording"]["state"] == "stopped"
+
+
+def test_handle_camera_recording_status_success(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        assert req.full_url.endswith("/recording/status")
+        assert req.get_method() == "GET"
+        assert timeout == 5
+        return _DummyResponse(b'{"success": true, "recording": {"state": "idle"}}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    handler = _DummyHandler("/camera_recording_status/0")
+    assert dr.handle_camera_recording_status(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["recording"]["state"] == "idle"
+
+
 def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"

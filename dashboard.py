@@ -180,6 +180,18 @@ def create_app() -> Flask:
     def camera_stats(camera_index: int) -> Response:
         return _dispatch(routes.handle_camera_stats, path=f"/camera_stats/{camera_index}")
 
+    @app.get("/camera_recording_status/<int:camera_index>")
+    def camera_recording_status(camera_index: int) -> Response:
+        return _dispatch(routes.handle_camera_recording_status, path=f"/camera_recording_status/{camera_index}")
+
+    @app.post("/camera_recording_schedule/<int:camera_index>")
+    def camera_recording_schedule(camera_index: int) -> Response:
+        return _dispatch(routes.handle_camera_recording_schedule, path=f"/camera_recording_schedule/{camera_index}")
+
+    @app.post("/camera_recording_stop/<int:camera_index>")
+    def camera_recording_stop(camera_index: int) -> Response:
+        return _dispatch(routes.handle_camera_recording_stop, path=f"/camera_recording_stop/{camera_index}")
+
     @app.get("/camera_settings/current")
     def camera_settings_current() -> Response:
         return _dispatch(routes.handle_camera_settings_current, path="/camera_settings/current")

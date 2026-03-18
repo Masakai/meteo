@@ -16,7 +16,7 @@ import argparse
 import cv2
 import numpy as np
 from typing import List, Tuple, Optional, Dict
-from threading import Thread, Lock, Event
+from threading import Thread, Lock, RLock, Event
 import json
 from pathlib import Path
 from datetime import datetime
@@ -25,6 +25,8 @@ import signal
 import sys
 import os
 import socket
+import subprocess
+import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socketserver
 from urllib.parse import urlparse, parse_qs
@@ -46,7 +48,7 @@ from meteor_mask_utils import (
     build_nuisance_mask_from_night,
 )
 
-VERSION = "3.0.0"
+VERSION = "3.2.0"
 
 # 天文薄暮期間の判定用
 try:
@@ -86,9 +88,12 @@ current_camera_name = ""  # 保存先・永続化用の識別子。display名は
 current_stop_flag = None
 current_runtime_fps = 0.0
 current_runtime_overrides_paths = []
+current_rtsp_url = ""
 current_pending_exclusion_mask = None
 current_pending_mask_save_path = None
 current_pending_mask_lock = Lock()
+current_recording_lock = RLock()
+current_recording_job = None
 try:
     STREAM_JPEG_QUALITY = max(30, min(95, int(os.environ.get("STREAM_JPEG_QUALITY", "60"))))
 except ValueError:
@@ -160,6 +165,178 @@ def _save_runtime_overrides(path: Path, payload: dict) -> None:
     with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
     tmp_path.replace(path)
+
+
+def _recordings_dir() -> Optional[Path]:
+    if current_output_dir is None or not current_camera_name:
+        return None
+    return Path(current_output_dir) / "manual_recordings" / _storage_camera_name(current_camera_name)
+
+
+def _recording_supported() -> bool:
+    return shutil.which("ffmpeg") is not None and bool(current_rtsp_url)
+
+
+def _format_recording_dt(value: Optional[datetime]) -> str:
+    if value is None:
+        return ""
+    try:
+        return value.astimezone().isoformat(timespec="seconds")
+    except Exception:
+        return value.isoformat(timespec="seconds")
+
+
+def _parse_recording_start_at(value) -> datetime:
+    text = str(value or "").strip()
+    if not text:
+        return datetime.now().astimezone()
+    dt = datetime.fromisoformat(text)
+    if dt.tzinfo is None:
+        return dt.astimezone()
+    return dt.astimezone()
+
+
+def _recording_snapshot_locked() -> dict:
+    now = datetime.now().astimezone()
+    payload = {
+        "supported": _recording_supported(),
+        "state": "idle",
+        "camera": current_camera_name or camera_name,
+        "job_id": "",
+        "start_at": "",
+        "scheduled_at": "",
+        "started_at": "",
+        "ended_at": "",
+        "duration_sec": 0,
+        "remaining_sec": 0,
+        "output_path": "",
+        "error": "",
+    }
+    job = current_recording_job
+    if not job:
+        return payload
+    payload.update(
+        {
+            "state": job.get("state", "idle"),
+            "job_id": job.get("job_id", ""),
+            "start_at": _format_recording_dt(job.get("start_at")),
+            "scheduled_at": _format_recording_dt(job.get("scheduled_at")),
+            "started_at": _format_recording_dt(job.get("started_at")),
+            "ended_at": _format_recording_dt(job.get("ended_at")),
+            "duration_sec": int(job.get("duration_sec", 0) or 0),
+            "output_path": str(job.get("output_path") or ""),
+            "error": str(job.get("error") or ""),
+        }
+    )
+    state = payload["state"]
+    start_at = job.get("start_at")
+    duration_sec = max(0, int(job.get("duration_sec", 0) or 0))
+    if state == "scheduled" and start_at is not None:
+        payload["remaining_sec"] = max(0, int((start_at - now).total_seconds()))
+    elif state == "recording":
+        started_at = job.get("started_at") or now
+        elapsed = max(0.0, (now - started_at).total_seconds())
+        payload["remaining_sec"] = max(0, int(duration_sec - elapsed))
+    return payload
+
+
+def _set_recording_job_state(job: dict, state: str, *, error: str = "") -> None:
+    with current_recording_lock:
+        if current_recording_job is not job:
+            return
+        job["state"] = state
+        if error:
+            job["error"] = error
+        if state == "scheduled":
+            job["scheduled_at"] = datetime.now().astimezone()
+        elif state == "recording":
+            job["started_at"] = datetime.now().astimezone()
+        elif state in ("completed", "failed", "stopped"):
+            job["ended_at"] = datetime.now().astimezone()
+            job["process"] = None
+
+
+def _stop_recording_process(job: dict, *, reason: str = "stopped") -> bool:
+    proc = job.get("process")
+    stop_event = job.get("stop_event")
+    if stop_event is not None:
+        stop_event.set()
+    if proc is None:
+        return False
+    try:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=3)
+    except Exception:
+        pass
+    _set_recording_job_state(job, "stopped", error=reason)
+    return True
+
+
+def _recording_worker(job: dict) -> None:
+    stop_event = job["stop_event"]
+    try:
+        wait_seconds = max(0.0, (job["start_at"] - datetime.now().astimezone()).total_seconds())
+        if wait_seconds > 0 and stop_event.wait(wait_seconds):
+            _set_recording_job_state(job, "stopped", error="cancelled before start")
+            return
+        if stop_event.is_set():
+            _set_recording_job_state(job, "stopped", error="cancelled before start")
+            return
+        recordings_dir = _recordings_dir()
+        if recordings_dir is None:
+            _set_recording_job_state(job, "failed", error="output directory not ready")
+            return
+        recordings_dir.mkdir(parents=True, exist_ok=True)
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            _set_recording_job_state(job, "failed", error="ffmpeg not found")
+            return
+        duration_sec = int(job["duration_sec"])
+        output_path = Path(job["output_path"])
+        cmd = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-rtsp_transport",
+            "tcp",
+            "-i",
+            current_rtsp_url,
+            "-t",
+            str(duration_sec),
+            "-c",
+            "copy",
+            "-movflags",
+            "+faststart",
+            "-y",
+            str(output_path),
+        ]
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        with current_recording_lock:
+            if current_recording_job is not job:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+                return
+            job["process"] = proc
+        _set_recording_job_state(job, "recording")
+        _, stderr = proc.communicate()
+        if stop_event.is_set():
+            _set_recording_job_state(job, "stopped", error="stopped")
+            return
+        if proc.returncode == 0:
+            _set_recording_job_state(job, "completed")
+            return
+        err_text = stderr.decode("utf-8", errors="ignore").strip()
+        _set_recording_job_state(job, "failed", error=err_text or f"ffmpeg exited with code {proc.returncode}")
+    except Exception as e:
+        _set_recording_job_state(job, "failed", error=str(e))
 
 
 class MJPEGHandler(BaseHTTPRequestHandler):
@@ -495,6 +672,8 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                     mask_active = current_detector.exclusion_mask is not None
             with current_pending_mask_lock:
                 has_pending_mask = current_pending_exclusion_mask is not None
+            with current_recording_lock:
+                recording = _recording_snapshot_locked()
             stats = {
                 "detections": detection_count,
                 "elapsed": round(elapsed, 1),
@@ -512,8 +691,20 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "detection_enabled": current_detection_enabled,
                 "mask_active": mask_active,
                 "mask_update_pending": has_pending_mask,
+                "recording": recording,
             }
             self.wfile.write(json.dumps(stats).encode())
+        elif path == '/recording/status':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            with current_recording_lock:
+                payload = {
+                    "success": True,
+                    "recording": _recording_snapshot_locked(),
+                }
+            self.wfile.write(json.dumps(payload).encode())
         elif path == '/mask':
             mask = None
             query = parse_qs(parsed.query)
@@ -564,7 +755,10 @@ class MJPEGHandler(BaseHTTPRequestHandler):
         global current_mask_dilate, current_nuisance_dilate, current_detection_enabled
         global current_clip_margin_before, current_clip_margin_after
         global current_pending_exclusion_mask, current_pending_mask_save_path
-        if self.path == '/restart':
+        global current_recording_job
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == '/restart':
             self.send_response(202)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -589,7 +783,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             }).encode())
             return
 
-        if self.path == '/update_mask':
+        if path == '/update_mask':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -636,7 +830,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             }).encode())
             return
 
-        if self.path == '/confirm_mask_update':
+        if path == '/confirm_mask_update':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -679,7 +873,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             }).encode())
             return
 
-        if self.path == '/discard_mask_update':
+        if path == '/discard_mask_update':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -696,7 +890,105 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             }).encode())
             return
 
-        if self.path == '/apply_settings':
+        if path == '/recording/schedule':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            if not _recording_supported():
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "recording is not available",
+                    "recording": _recording_snapshot_locked(),
+                }).encode())
+                return
+
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                raw_body = self.rfile.read(length)
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                if not isinstance(payload, dict):
+                    raise ValueError("payload must be object")
+                start_at = _parse_recording_start_at(payload.get("start_at"))
+                duration_sec = int(float(payload.get("duration_sec", 0)))
+                if duration_sec <= 0:
+                    raise ValueError("duration_sec must be > 0")
+                if duration_sec > 86400:
+                    raise ValueError("duration_sec must be <= 86400")
+            except Exception as e:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": f"invalid payload: {e}",
+                }).encode())
+                return
+
+            with current_recording_lock:
+                existing = current_recording_job
+                if existing and existing.get("state") in ("scheduled", "recording"):
+                    self.wfile.write(json.dumps({
+                        "success": False,
+                        "error": "recording already scheduled or running",
+                        "recording": _recording_snapshot_locked(),
+                    }).encode())
+                    return
+                recordings_dir = _recordings_dir()
+                if recordings_dir is None:
+                    self.wfile.write(json.dumps({
+                        "success": False,
+                        "error": "output directory not ready",
+                    }).encode())
+                    return
+                safe_camera = _storage_camera_name(current_camera_name or camera_name)
+                file_stamp = start_at.strftime("%Y%m%d_%H%M%S")
+                output_path = recordings_dir / f"manual_{safe_camera}_{file_stamp}_{duration_sec}s.mp4"
+                job = {
+                    "job_id": f"rec_{int(time.time() * 1000)}",
+                    "state": "scheduled",
+                    "scheduled_at": datetime.now().astimezone(),
+                    "start_at": start_at,
+                    "started_at": None,
+                    "ended_at": None,
+                    "duration_sec": duration_sec,
+                    "output_path": str(output_path),
+                    "error": "",
+                    "process": None,
+                    "stop_event": Event(),
+                }
+                current_recording_job = job
+                Thread(target=_recording_worker, args=(job,), daemon=True).start()
+                response = {
+                    "success": True,
+                    "message": "recording scheduled",
+                    "recording": _recording_snapshot_locked(),
+                }
+            self.wfile.write(json.dumps(response).encode())
+            return
+
+        if path == '/recording/stop':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            with current_recording_lock:
+                job = current_recording_job
+                if not job or job.get("state") not in ("scheduled", "recording"):
+                    self.wfile.write(json.dumps({
+                        "success": False,
+                        "error": "no scheduled or active recording",
+                        "recording": _recording_snapshot_locked(),
+                    }).encode())
+                    return
+                _stop_recording_process(job, reason="stopped by user")
+                payload = {
+                    "success": True,
+                    "message": "recording stop requested",
+                    "recording": _recording_snapshot_locked(),
+                }
+            self.wfile.write(json.dumps(payload).encode())
+            return
+
+        if path == '/apply_settings':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -1400,7 +1692,7 @@ def process_rtsp_stream(
 ):
     global current_frame, detection_count, start_time_global, camera_name, camera_display_name, current_settings
     global current_runtime_fps, current_runtime_overrides_paths
-    global current_stop_flag, current_detection_enabled
+    global current_stop_flag, current_detection_enabled, current_rtsp_url, current_recording_job
 
     params = params or DetectionParams()
     camera_name = _storage_camera_name(cam_name)
@@ -1584,6 +1876,7 @@ def process_rtsp_stream(
     fps = sanitize_fps(reader.fps, default=30.0)
 
     current_settings["source_fps"] = fps
+    current_rtsp_url = url
 
     print(f"解像度: {width}x{height}", flush=True)
     print("検出開始 (Ctrl+C で終了)", flush=True)
@@ -1646,6 +1939,11 @@ def process_rtsp_stream(
 
     # 検出スレッドの終了を待機
     detection_thread.join(timeout=5.0)
+
+    with current_recording_lock:
+        job = current_recording_job
+    if job and job.get("state") in ("scheduled", "recording"):
+        _stop_recording_process(job, reason="camera service shutting down")
 
     reader.stop()
     if httpd:

@@ -46,10 +46,27 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                             <input type="checkbox" id="stream-toggle{i}" checked onchange="toggleStreamEnabled({i}, this.checked)">
                             <span>常時表示</span>
                         </label>
+                        <button class="record-btn" id="record-btn{i}" onclick="toggleRecordingPanel({i})">録画予約</button>
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
                         <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
                         <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
+                    </div>
+                    <div class="recording-panel" id="recording-panel{i}" hidden>
+                        <div class="recording-form">
+                            <label>
+                                <span>開始</span>
+                                <input type="datetime-local" id="recording-start{i}" step="1">
+                            </label>
+                            <label>
+                                <span>秒数</span>
+                                <input type="number" id="recording-duration{i}" min="1" max="86400" step="1" value="60">
+                            </label>
+                            <button class="record-now-btn" type="button" onclick="setRecordingStartNow({i})">今すぐ</button>
+                            <button class="record-submit-btn" type="button" id="recording-submit{i}" onclick="scheduleRecording({i})">実行</button>
+                            <button class="record-stop-btn" type="button" id="recording-stop{i}" onclick="stopRecording({i})">停止</button>
+                        </div>
+                        <div class="recording-status" id="recording-status{i}">録画待機</div>
                     </div>
                     <div class="camera-video">
 {stream_view}
@@ -61,6 +78,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     </div>
                     <div class="camera-stats">
                         <span>検出: <b id="count{i}">-</b></span>
+                        <span class="recording-summary" id="recording-summary{i}">録画: 待機</span>
                         <span class="camera-params" id="params{i}"></span>
                     </div>
                 </div>
@@ -383,6 +401,86 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             opacity: 0.6;
             cursor: wait;
         }}
+        .record-btn {{
+            background: #3d2f12;
+            border: 1px solid #f0c75e;
+            color: #ffe7a6;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .record-btn:hover {{
+            background: #f0c75e;
+            color: #231a08;
+        }}
+        .recording-panel {{
+            padding: 10px 12px;
+            background: rgba(11, 19, 38, 0.92);
+            border-bottom: 3px solid #4a6f9f;
+        }}
+        .recording-form {{
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }}
+        .recording-form label {{
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            color: #9bb1d8;
+            font-size: 0.78em;
+        }}
+        .recording-form input {{
+            min-width: 150px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #3b5f9d;
+            background: #16213e;
+            color: #e6f0ff;
+        }}
+        .record-now-btn,
+        .record-submit-btn,
+        .record-stop-btn {{
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .record-now-btn {{
+            background: #203554;
+            border: 1px solid #4f84c4;
+            color: #bfe0ff;
+        }}
+        .record-submit-btn {{
+            background: #284d2c;
+            border: 1px solid #5dd67c;
+            color: #d6ffe0;
+        }}
+        .record-stop-btn {{
+            background: #512327;
+            border: 1px solid #ff7f7f;
+            color: #ffd0d0;
+        }}
+        .recording-status {{
+            margin-top: 8px;
+            color: #cbd9f8;
+            font-size: 0.8em;
+        }}
+        .recording-status.scheduled {{
+            color: #ffd27a;
+        }}
+        .recording-status.recording {{
+            color: #ff7f7f;
+        }}
+        .recording-status.completed {{
+            color: #74e39b;
+        }}
+        .recording-status.failed,
+        .recording-status.stopped {{
+            color: #ff9d9d;
+        }}
         .snapshot-btn {{
             background: #1e3b37;
             border: 1px solid #48d1bf;
@@ -483,6 +581,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         .camera-params {{
             font-size: 0.8em;
             color: #888;
+        }}
+        .recording-summary {{
+            color: #cbd9f8;
+            font-size: 0.8em;
         }}
         .camera-params .param {{
             display: inline-block;
@@ -1243,6 +1345,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         const cameraStatsState = [];
         const streamRetryState = [];
         const streamSelectionState = [];
+        const recordingPanelState = [];
         const STREAM_RETRY_DELAY_MS = 3000;
         const CAMERA_STATS_FETCH_TIMEOUT_MS = 5000;
         const FOCUS_RECOVERY_COOLDOWN_MS = 8000;
@@ -1258,6 +1361,27 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 }};
             }}
             return streamRetryState[i];
+        }}
+
+        function recordingLocalDateTimeValue(date = new Date()) {{
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            const second = String(date.getSeconds()).padStart(2, '0');
+            return `${{year}}-${{month}}-${{day}}T${{hour}}:${{minute}}:${{second}}`;
+        }}
+
+        function ensureRecordingDefaults(i) {{
+            const startInput = document.getElementById('recording-start' + i);
+            const durationInput = document.getElementById('recording-duration' + i);
+            if (startInput && !startInput.value) {{
+                startInput.value = recordingLocalDateTimeValue();
+            }}
+            if (durationInput && !durationInput.value) {{
+                durationInput.value = '60';
+            }}
         }}
 
         function loadStreamSelection() {{
@@ -1808,6 +1932,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                             setMaskOverlay(i, false);
                         }}
                     }}
+                    updateRecordingUI(i, data.recording || {{}});
                 }})
                 .catch(() => {{
                     if (dashboardBackgroundPaused) {{
@@ -1825,6 +1950,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         document.getElementById('status' + i).className = 'camera-status paused';
                     }}
                     updateDetectionIndicator(i, {{}}, false);
+                    updateRecordingUI(i, {{
+                        supported: true,
+                        state: 'idle',
+                    }});
                 }})
                 .finally(() => {{
                     scheduleCameraStats(i, cameraStatsState[i].delay);
@@ -1841,10 +1970,152 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             cameraSectionStarted = true;
             loadStreamSelection();
             cameras.forEach((cam, i) => {{
+                ensureRecordingDefaults(i);
                 updateCameraStats(i);
             }});
             startCameraStreams();
             syncDashboardVisibilityState();
+        }}
+
+        function toggleRecordingPanel(i) {{
+            const panel = document.getElementById('recording-panel' + i);
+            if (!panel) return;
+            const willShow = panel.hidden;
+            panel.hidden = !willShow;
+            recordingPanelState[i] = willShow;
+            if (willShow) {{
+                ensureRecordingDefaults(i);
+            }}
+        }}
+
+        function setRecordingStartNow(i) {{
+            const startInput = document.getElementById('recording-start' + i);
+            if (!startInput) return;
+            startInput.value = recordingLocalDateTimeValue();
+        }}
+
+        function formatRecordingTimestamp(value) {{
+            if (!value) return '';
+            const dt = new Date(value);
+            if (Number.isNaN(dt.getTime())) {{
+                return value;
+            }}
+            return dt.toLocaleString('ja-JP', {{
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            }});
+        }}
+
+        function renderRecordingText(recording) {{
+            const rec = recording || {{}};
+            const state = String(rec.state || 'idle');
+            if (rec.supported === false) {{
+                return '録画未対応';
+            }}
+            if (state === 'scheduled') {{
+                return `予約中: ${{formatRecordingTimestamp(rec.start_at)}} / ${{rec.duration_sec || 0}}秒`;
+            }}
+            if (state === 'recording') {{
+                return `録画中: 残り約${{Math.max(0, Number(rec.remaining_sec || 0))}}秒`;
+            }}
+            if (state === 'completed') {{
+                return `完了: ${{formatRecordingTimestamp(rec.ended_at)}}`;
+            }}
+            if (state === 'failed') {{
+                return `失敗: ${{rec.error || '不明なエラー'}}`;
+            }}
+            if (state === 'stopped') {{
+                return '停止済み';
+            }}
+            return '録画待機';
+        }}
+
+        function updateRecordingUI(i, recording) {{
+            const rec = recording || {{}};
+            const statusEl = document.getElementById('recording-status' + i);
+            const summaryEl = document.getElementById('recording-summary' + i);
+            const stopBtn = document.getElementById('recording-stop' + i);
+            const submitBtn = document.getElementById('recording-submit' + i);
+            const text = renderRecordingText(rec);
+            if (statusEl) {{
+                statusEl.textContent = text;
+                statusEl.className = 'recording-status ' + String(rec.state || 'idle');
+            }}
+            if (summaryEl) {{
+                summaryEl.textContent = '録画: ' + text;
+            }}
+            if (stopBtn) {{
+                stopBtn.disabled = !['scheduled', 'recording'].includes(String(rec.state || ''));
+            }}
+            if (submitBtn) {{
+                submitBtn.disabled = rec.supported === false || ['scheduled', 'recording'].includes(String(rec.state || ''));
+            }}
+        }}
+
+        function scheduleRecording(i) {{
+            const startInput = document.getElementById('recording-start' + i);
+            const durationInput = document.getElementById('recording-duration' + i);
+            const submitBtn = document.getElementById('recording-submit' + i);
+            if (!startInput || !durationInput || !submitBtn) return;
+            const durationSec = Number(durationInput.value);
+            if (!Number.isFinite(durationSec) || durationSec <= 0) {{
+                alert('録画秒数は 1 以上で入力してください。');
+                return;
+            }}
+            submitBtn.disabled = true;
+            submitBtn.textContent = '予約中...';
+            fetch('/camera_recording_schedule/' + i, {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/json'
+                }},
+                body: JSON.stringify({{
+                    start_at: startInput.value || '',
+                    duration_sec: durationSec
+                }})
+            }})
+                .then(r => r.json())
+                .then(data => {{
+                    if (!data.success) {{
+                        throw new Error(data.error || 'schedule failed');
+                    }}
+                    updateRecordingUI(i, data.recording || {{}});
+                }})
+                .catch((err) => {{
+                    alert('録画予約に失敗しました: ' + err.message);
+                }})
+                .finally(() => {{
+                    submitBtn.textContent = '実行';
+                    updateCameraStats(i);
+                }});
+        }}
+
+        function stopRecording(i) {{
+            const stopBtn = document.getElementById('recording-stop' + i);
+            if (!stopBtn) return;
+            stopBtn.disabled = true;
+            stopBtn.textContent = '停止中...';
+            fetch('/camera_recording_stop/' + i, {{
+                method: 'POST'
+            }})
+                .then(r => r.json())
+                .then(data => {{
+                    if (!data.success) {{
+                        throw new Error(data.error || 'stop failed');
+                    }}
+                    updateRecordingUI(i, data.recording || {{}});
+                }})
+                .catch((err) => {{
+                    alert('録画停止に失敗しました: ' + err.message);
+                }})
+                .finally(() => {{
+                    stopBtn.textContent = '停止';
+                    updateCameraStats(i);
+                }});
         }}
 
         // マスク更新
