@@ -359,6 +359,15 @@ def _compute_latest_mtime():
                     mtime = jsonl_file.stat().st_mtime
                     if mtime > latest_mtime:
                         latest_mtime = mtime
+                manual_dir = cam_dir / "manual_recordings"
+                if manual_dir.exists() and manual_dir.is_dir():
+                    for clip_path in manual_dir.rglob("*.mp4"):
+                        try:
+                            mtime = clip_path.stat().st_mtime
+                            if mtime > latest_mtime:
+                                latest_mtime = mtime
+                        except Exception:
+                            continue
     except Exception:
         pass
 
@@ -449,6 +458,45 @@ def _build_detections_payload():
                             "missing_video": 0,
                             "errors": 0,
                             "note": "detections.jsonl not found",
+                        }
+                    )
+                manual_root = cam_dir / "manual_recordings"
+                processed_manual = 0
+                if manual_root.exists() and manual_root.is_dir():
+                    for clip_path in sorted(manual_root.rglob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
+                        try:
+                            stat = clip_path.stat()
+                            timestamp = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                            relpath = clip_path.relative_to(Path(DETECTIONS_DIR)).as_posix()
+                            thumb_path = clip_path.with_suffix(".jpg")
+                            thumb_relpath = (
+                                thumb_path.relative_to(Path(DETECTIONS_DIR)).as_posix()
+                                if thumb_path.exists()
+                                else ""
+                            )
+                            total += 1
+                            processed_manual += 1
+                            detections.append(
+                                {
+                                    "id": f"manual_{cam_dir.name}_{clip_path.stem}",
+                                    "time": timestamp,
+                                    "camera": cam_dir.name,
+                                    "camera_display": _camera_display_name(cam_dir.name),
+                                    "confidence": "手動録画",
+                                    "image": thumb_relpath,
+                                    "mp4": relpath,
+                                    "composite_original": "",
+                                    "label": "",
+                                    "source_type": "manual_recording",
+                                }
+                            )
+                        except Exception:
+                            logger.exception("Failed to parse manual recording entry: clip=%s", clip_path)
+                if processed_manual:
+                    camera_summaries.append(
+                        {
+                            "camera": cam_dir.name,
+                            "processed_manual_recordings": processed_manual,
                         }
                     )
     except Exception:
@@ -1037,6 +1085,51 @@ def handle_delete_detection(handler):
     handler.send_response(404)
     handler.end_headers()
     return True
+
+
+def handle_delete_manual_recording(handler):
+    if not handler.path.startswith("/manual_recording/"):
+        return False
+
+    try:
+        relpath = Path(unquote(handler.path[len("/manual_recording/"):]))
+        if relpath.suffix.lower() != ".mp4":
+            raise ValueError("manual recording must be mp4")
+        if "manual_recordings" not in relpath.parts:
+            raise ValueError("path is not manual recording")
+        abs_path = (Path(DETECTIONS_DIR) / relpath).resolve()
+        detections_root = Path(DETECTIONS_DIR).resolve()
+        if detections_root not in abs_path.parents:
+            raise ValueError("path escapes detections dir")
+        if not abs_path.exists() or not abs_path.is_file():
+            raise FileNotFoundError(str(relpath))
+
+        abs_path.unlink()
+        thumb_path = abs_path.with_suffix(".jpg")
+        if thumb_path.exists() and thumb_path.is_file():
+            thumb_path.unlink()
+        _refresh_detection_cache(force=True)
+
+        handler.send_response(200)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(
+            json.dumps(
+                {
+                    "success": True,
+                    "path": relpath.as_posix(),
+                    "message": "手動録画を削除しました",
+                },
+                ensure_ascii=False,
+            ).encode("utf-8")
+        )
+        return True
+    except Exception as e:
+        handler.send_response(400 if isinstance(e, ValueError) else 404 if isinstance(e, FileNotFoundError) else 500)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": str(e)}, ensure_ascii=False).encode("utf-8"))
+        return True
 
 
 def handle_set_detection_label(handler):

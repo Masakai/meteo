@@ -125,3 +125,15 @@ def test_render_dashboard_includes_recording_controls():
     assert "function scheduleRecording(i)" in html
     assert "function stopRecording(i)" in html
     assert "camera_recording_schedule" in html
+
+
+def test_render_dashboard_detection_view_supports_manual_recordings():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+    )
+    assert "const isManualRecording = d.source_type === 'manual_recording';" in html
+    assert "種別: 手動録画" in html
+    assert "deleteManualRecording" in html
+    assert "プレビュー" in html

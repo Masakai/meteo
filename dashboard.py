@@ -323,6 +323,11 @@ def create_app() -> Flask:
         encoded_subpath = "/".join(quote(p, safe="") for p in subpath.split("/"))
         return _dispatch(routes.handle_delete_detection, path=f"/detection/{encoded_subpath}")
 
+    @app.delete("/manual_recording/<path:subpath>")
+    def delete_manual_recording(subpath: str) -> Response:
+        encoded_subpath = "/".join(quote(p, safe="") for p in subpath.split("/"))
+        return _dispatch(routes.handle_delete_manual_recording, path=f"/manual_recording/{encoded_subpath}")
+
     @app.post("/detection_label")
     def detection_label() -> Response:
         return _dispatch(routes.handle_set_detection_label, path="/detection_label")

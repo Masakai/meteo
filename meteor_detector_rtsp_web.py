@@ -48,7 +48,7 @@ from meteor_mask_utils import (
     build_nuisance_mask_from_night,
 )
 
-VERSION = "3.2.0"
+VERSION = "3.2.1"
 
 # 天文薄暮期間の判定用
 try:
@@ -307,6 +307,9 @@ def _recording_worker(job: dict) -> None:
             "tcp",
             "-i",
             current_rtsp_url,
+            "-map",
+            "0:v:0",
+            "-an",
             "-t",
             str(duration_sec),
             "-c",
@@ -331,6 +334,30 @@ def _recording_worker(job: dict) -> None:
             _set_recording_job_state(job, "stopped", error="stopped")
             return
         if proc.returncode == 0:
+            thumb_path = output_path.with_suffix(".jpg")
+            thumb_cmd = [
+                ffmpeg,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-ss",
+                "1",
+                "-i",
+                str(output_path),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "2",
+                "-y",
+                str(thumb_path),
+            ]
+            try:
+                thumb_proc = subprocess.run(thumb_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
+                if thumb_proc.returncode != 0 and thumb_path.exists():
+                    thumb_path.unlink(missing_ok=True)
+            except Exception:
+                if thumb_path.exists():
+                    thumb_path.unlink(missing_ok=True)
             _set_recording_job_state(job, "completed")
             return
         err_text = stderr.decode("utf-8", errors="ignore").strip()

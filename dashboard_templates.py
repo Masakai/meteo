@@ -2343,6 +2343,29 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }});
         }}
 
+        function deleteManualRecording(path, time, event) {{
+            event.stopPropagation();
+
+            if (!confirm(`この手動録画を削除しますか?\n${{time}}`)) {{
+                return;
+            }}
+
+            fetch(`/manual_recording/${{encodeURI(path)}}`, {{
+                method: 'DELETE'
+            }})
+            .then(r => r.json())
+            .then(data => {{
+                if (data.success) {{
+                    updateDetections();
+                }} else {{
+                    alert('手動録画の削除に失敗しました: ' + (data.error || '不明なエラー'));
+                }}
+            }})
+            .catch(err => {{
+                alert('手動録画の削除に失敗しました: ' + err.message);
+            }});
+        }}
+
         // それ以外を一括削除
         function bulkDeleteNonMeteor(camera, event) {{
             event.stopPropagation();
@@ -2648,13 +2671,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const items = dateItems.map((d, idx) => {{
                 const cameraKey = d.camera;
                 const cameraLabel = d.camera_display || d.camera;
+                const isManualRecording = d.source_type === 'manual_recording';
                 const thumb = d.image
                     ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{cameraLabel}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">`
                     : '';
                 const normalizedLabel = d.label === 'post_detected' ? 'post_detected' : 'detected';
                 const radioName = `label-${{cameraKey}}-${{d.id || d.time}}-${{idx}}`.replace(/[^a-zA-Z0-9_-]/g, '_');
                 const videoAction = d.mp4
-                    ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">VIDEO</span>`
+                    ? `<span class="detection-link" onclick="showVideo('${{d.mp4}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">${{isManualRecording ? 'プレビュー' : 'VIDEO'}}</span>`
                     : '';
                 const imageAction = d.image
                     ? `<span class="detection-link" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">画像</span>`
@@ -2662,17 +2686,12 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 const originalAction = d.composite_original
                     ? `<span class="detection-link" onclick="showImage('${{d.composite_original}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">元画像</span>`
                     : '';
-                return `
-                    <div class="detection-item">
-                        <div class="time">${{d.time}} | ${{cameraLabel}}</div>
-                        ${{thumb}}
-                        <div>信頼度: ${{d.confidence}}</div>
-                        <div class="detection-actions">
-                            <div class="detection-view-actions">
-                                ${{videoAction}}
-                                ${{imageAction}}
-                                ${{originalAction}}
+                const metaText = isManualRecording ? '種別: 手動録画' : `信頼度: ${{d.confidence}}`;
+                const manageActions = isManualRecording ? `
+                            <div class="detection-manage-actions">
+                                <button class="delete-btn" onclick="deleteManualRecording('${{d.mp4}}', '${{d.time}}', event)">削除</button>
                             </div>
+                ` : `
                             <div class="detection-manage-actions">
                                 <div class="label-radios" data-label="${{normalizedLabel}}">
                                     <label class="label-radio">
@@ -2688,6 +2707,19 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 </div>
                                 <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
                             </div>
+                `;
+                return `
+                    <div class="detection-item">
+                        <div class="time">${{d.time}} | ${{cameraLabel}}</div>
+                        ${{thumb}}
+                        <div>${{metaText}}</div>
+                        <div class="detection-actions">
+                            <div class="detection-view-actions">
+                                ${{videoAction}}
+                                ${{imageAction}}
+                                ${{originalAction}}
+                            </div>
+                            ${{manageActions}}
                         </div>
                     </div>
                 `;
@@ -2755,7 +2787,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     detectionPollDelay = detectionPollBaseDelay;
                     totalEl.textContent = data.total;
                     const detectionsKey = (data.recent || []).map(d =>
-                        `${{d.id || ''}}|${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}`
+                        `${{d.id || ''}}|${{d.camera}}|${{d.camera_display || d.camera}}|${{d.time}}|${{d.confidence}}|${{d.image}}|${{d.mp4}}|${{d.composite_original}}|${{d.label || ''}}|${{d.source_type || ''}}`
                     ).join('||');
                     if (detectionsKey === lastDetectionsKey) {{
                         return;

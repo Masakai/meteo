@@ -27,6 +27,12 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.2.1 - 手動録画の一覧統合とサムネイル対応
+- **修正**: 手動録画で `pcm_alaw` 音声を含む RTSP を MP4 へ保存する際に失敗していた問題を修正し、映像のみ保存するよう改善
+- **修正**: 手動録画ファイルの探索先を各カメラ出力ディレクトリ配下 `manual_recordings/...` に合わせ、検出一覧カレンダーへ反映されるよう修正
+- **変更**: 手動録画完了後にサムネイル JPEG を自動生成し、検出一覧でプレビュー可能化
+- **追加**: ダッシュボードに `DELETE /manual_recording/{path}` を追加し、手動録画 MP4 とサムネイルを削除可能化
+
 ### v3.2.0 - カメラ別手動録画予約の追加
 - **追加**: ダッシュボードに `GET /camera_recording_status/{index}`、`POST /camera_recording_schedule/{index}`、`POST /camera_recording_stop/{index}` を追加
 - **追加**: カメラ側 API に `GET /recording/status`、`POST /recording/schedule`、`POST /recording/stop` を追加
@@ -135,6 +141,7 @@ Licensed under the MIT License
 | `/camera_stats/{index}` | GET | カメラ統計情報取得 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
 | `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 |
+| `/manual_recording/{path}` | DELETE | 手動録画ファイル削除 |
 | `/bulk_delete_non_meteor/{camera_name}` | POST | カメラの非流星検出を一括削除 |
 | `/detection_label` | POST | 検出にラベルを設定 |
 | `/changelog` | GET | CHANGELOG表示 |
@@ -153,7 +160,7 @@ Licensed under the MIT License
 ```json
 {
   "status": "ok",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "camera_count": 3
 }
 ```
@@ -560,6 +567,21 @@ curl -OJ "http://localhost:8080/camera_snapshot/0?download=1"
     "error": ""
   }
 }
+```
+
+---
+
+### DELETE /manual_recording/{path}
+
+**説明**: 手動録画の MP4 と対応するサムネイル JPEG を削除
+
+**補足**:
+- 対象は `manual_recordings` 配下の `.mp4` のみ
+- 同名 `.jpg` があれば合わせて削除
+
+**使用例**:
+```bash
+curl -X DELETE "http://localhost:8080/manual_recording/camera1/manual_recordings/camera1/manual_camera1_20260319_213000_90s.mp4" | jq
 ```
 
 ---

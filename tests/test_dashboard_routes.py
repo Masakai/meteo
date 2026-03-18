@@ -221,6 +221,43 @@ def test_handle_detections_normalizes_legacy_label(monkeypatch, tmp_path):
     assert payload["recent"][0]["label"] == "detected"
 
 
+def test_handle_detections_includes_manual_recordings(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    manual_dir = tmp_path / "camera1" / "manual_recordings" / "camera1"
+    manual_dir.mkdir(parents=True, exist_ok=True)
+    clip_path = manual_dir / "manual_camera1_20260319_213000_90s.mp4"
+    clip_path.write_bytes(b"mp4")
+    thumb_path = manual_dir / "manual_camera1_20260319_213000_90s.jpg"
+    thumb_path.write_bytes(b"jpg")
+
+    handler = _DummyHandler("/detections")
+    assert dr.handle_detections(handler) is None
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["total"] == 1
+    assert payload["recent"][0]["source_type"] == "manual_recording"
+    assert payload["recent"][0]["camera"] == "camera1"
+    assert payload["recent"][0]["image"] == "camera1/manual_recordings/camera1/manual_camera1_20260319_213000_90s.jpg"
+    assert payload["recent"][0]["mp4"] == "camera1/manual_recordings/camera1/manual_camera1_20260319_213000_90s.mp4"
+    assert payload["recent"][0]["confidence"] == "手動録画"
+
+
+def test_handle_delete_manual_recording_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
+    clip = tmp_path / "camera1" / "manual_recordings" / "camera1" / "manual_camera1_20260319_213000_90s.mp4"
+    clip.parent.mkdir(parents=True, exist_ok=True)
+    clip.write_bytes(b"mp4")
+    thumb = clip.with_suffix(".jpg")
+    thumb.write_bytes(b"jpg")
+
+    handler = _DummyHandler("/manual_recording/camera1/manual_recordings/camera1/manual_camera1_20260319_213000_90s.mp4")
+    assert dr.handle_delete_manual_recording(handler) is True
+    assert handler.status == 200
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert not clip.exists()
+    assert not thumb.exists()
+
+
 def test_handle_dashboard_stats(monkeypatch):
     monkeypatch.setattr(dr, "get_dashboard_cpu_snapshot", lambda refresh=True: {"cpu_percent": 12.3})
     handler = _DummyHandler("/dashboard_stats")
