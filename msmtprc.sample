@@ -1,0 +1,27 @@
+# msmtp 設定サンプル
+# 使い方:
+#   1. このファイルを /etc/msmtprc にコピーする
+#      sudo cp msmtprc.sample /etc/msmtprc
+#   2. password をGmailのアプリパスワードに書き換える
+#      sudo nano /etc/msmtprc
+#   3. パーミッションを設定する
+#      sudo chmod 640 /etc/msmtprc
+#   4. 送信テスト
+#      echo "テスト" | mail -s "[Meteo] テスト" 宛先アドレス@example.com
+#
+# Gmail アプリパスワードの取得:
+#   https://myaccount.google.com/apppasswords
+#   ※ Googleアカウントの2段階認証を有効にした上で取得してください
+
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/msmtp.log
+
+account        default
+host           smtp.gmail.com
+port           587
+from           masanorisakai@gmail.com
+user           masanorisakai@gmail.com
+password       xxxx xxxx xxxx xxxx

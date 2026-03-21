@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.3] - 2026-03-21
+### Added
+- GitHub に新バージョンが push された際に自動で pull & rebuild する `auto_update.sh` を追加。
+- msmtp を使ったメール通知に対応。更新完了・失敗時に `[Meteo]` 件名でメールを送信。
+- msmtp 設定のサンプルファイル `msmtprc.sample` を追加。
+
 ## [3.2.2] - 2026-03-21
 ### Fixed
 - 画像リクエストのパスが検出ディレクトリ外に逸脱するパストラバーサルを修正。
