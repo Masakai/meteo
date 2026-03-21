@@ -2879,25 +2879,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             document.getElementById('changelog-modal').classList.add('active');
             fetch('/changelog')
                 .then(r => r.text())
-                .then(text => {{
-                    // マークダウンを簡易HTMLに変換
-                    const lines = text.split('\\n');
-                    let html = '';
-                    for (let line of lines) {{
-                        if (line.startsWith('# ')) {{
-                            html += '<h1>' + line.substring(2) + '</h1>';
-                        }} else if (line.startsWith('## ')) {{
-                            html += '<h2>' + line.substring(3) + '</h2>';
-                        }} else if (line.startsWith('### ')) {{
-                            html += '<h3>' + line.substring(4) + '</h3>';
-                        }} else if (line.startsWith('- ')) {{
-                            html += '<li>' + line.substring(2) + '</li>';
-                        }} else if (line.trim() === '') {{
-                            html += '<br>';
-                        }} else {{
-                            html += '<p>' + line + '</p>';
-                        }}
-                    }}
+                .then(html => {{
                     document.getElementById('changelog-text').innerHTML = html;
                 }})
                 .catch(() => {{

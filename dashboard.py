@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import Request, urlopen
 
 from flask import Flask, Response, jsonify, request
+import markdown
 
 import dashboard_routes as routes
 from dashboard_config import CAMERAS, PORT, VERSION
@@ -153,9 +154,14 @@ def create_app() -> Flask:
     def changelog() -> Response:
         changelog_path = Path(__file__).parent / "CHANGELOG.md"
         if not changelog_path.exists():
-            return Response("CHANGELOG.md not found", content_type="text/plain; charset=utf-8")
+            return Response("<p>CHANGELOG.md not found</p>", content_type="text/html; charset=utf-8")
+        changelog_html = markdown.markdown(
+            changelog_path.read_text(encoding="utf-8"),
+            extensions=["extra", "sane_lists", "nl2br"],
+            output_format="html5",
+        )
         return _apply_no_cache_headers(
-            Response(changelog_path.read_text(encoding="utf-8"), content_type="text/plain; charset=utf-8")
+            Response(changelog_html, content_type="text/html; charset=utf-8")
         )
 
     @app.get("/detections")

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.5] - 2026-03-22
+### Fixed
+- ダッシュボードのフッタにあるバージョンリンクから `CHANGELOG.md` を開けない問題を修正し、`CHANGELOG.md` をダッシュボードコンテナへ同梱。
+
+### Changed
+- `/changelog` エンドポイントをサーバ側 Markdown レンダリングへ切り替え、モーダル表示を HTML ベースに変更。
+- changelog レンダリング用に `Markdown` 依存を追加し、関連するダッシュボードテストを更新。
+
 ## [3.2.4] - 2026-03-21
 ### Changed
 - カメラライブ通信方式の既定値を `webrtc` に変更し、`CAMERA*_STREAM_KIND` 未指定時も WebRTC を優先するよう統一。

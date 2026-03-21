@@ -38,6 +38,20 @@ def test_create_app_dashboard_page_has_no_cache_headers(monkeypatch):
     assert response.headers["Pragma"] == "no-cache"
 
 
+def test_create_app_changelog_endpoint_returns_markdown(monkeypatch):
+    monkeypatch.setattr(dashboard, "_started", True)
+
+    app = dashboard.create_app()
+    client = app.test_client()
+
+    response = client.get("/changelog")
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "<h1>Changelog</h1>" in body
+    assert "text/html; charset=utf-8" in response.headers["Content-Type"]
+
+
 def test_monitors_start_once_when_served_via_wsgi(monkeypatch):
     calls = {"detection": 0, "camera": 0}
 
@@ -90,7 +104,7 @@ def test_create_app_camera_embed_page(monkeypatch):
     assert "/go2rtc_asset/video-stream.js" in body
     assert "const go2rtcPort = 1984;" in body
     assert "const sourceName = 'camera1';" in body
-    assert "const wsOrigin = `${wsScheme}//${hostname}:${go2rtcPort}`;" in body
+    assert "const wsOrigin = `${wsScheme}://${hostname}:${go2rtcPort}`;" in body
     assert "player.media = 'video';" in body
     assert "player.src = wsUrl.toString();" in body
 
