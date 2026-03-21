@@ -113,6 +113,16 @@ def test_render_dashboard_supports_webrtc_camera_embed():
     assert "stream.html?src=camera1&mode=webrtc&mode=mse" in html
 
 
+def test_render_dashboard_defaults_camera_stream_kind_to_webrtc():
+    html = render_dashboard_html(
+        cameras=[{"name": "cam1", "url": "http://localhost:8081"}],
+        version="0.0.0",
+        server_start_time=0.0,
+        page_mode="cameras",
+    )
+    assert "return String(cam.stream_kind || 'webrtc').toLowerCase();" in html
+
+
 def test_render_dashboard_includes_recording_controls():
     html = render_dashboard_html(
         cameras=[{"name": "cam1", "url": "http://localhost:8081"}],

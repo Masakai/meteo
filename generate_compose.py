@@ -191,7 +191,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
 def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     """ダッシュボードサービスを生成"""
 
-    streaming_mode = settings.get("streaming_mode", "mjpeg").strip().lower()
+    streaming_mode = settings.get("streaming_mode", "webrtc").strip().lower()
     go2rtc_api_port = int(settings.get("go2rtc_api_port", 1984))
 
     # カメラ環境変数
@@ -370,7 +370,7 @@ services:"""
     # ダッシュボード
     compose += generate_dashboard(cameras, base_port, settings)
 
-    if settings.get("streaming_mode", "mjpeg").strip().lower() == "webrtc":
+    if settings.get("streaming_mode", "webrtc").strip().lower() == "webrtc":
         compose += generate_go2rtc_service(settings)
 
     # カメラサービス
@@ -436,9 +436,9 @@ streamersファイルの形式:
                        help="除外マスクの拡張ピクセル数 (default: 20)")
     parser.add_argument("--mask-save", default="",
                        help="生成マスク画像の保存先 (空で保存しない)")
-    parser.add_argument("--streaming-mode", default="mjpeg",
+    parser.add_argument("--streaming-mode", default="webrtc",
                        choices=["mjpeg", "webrtc"],
-                       help="ダッシュボード表示方式 (default: mjpeg)")
+                       help="ダッシュボード表示方式 (default: webrtc)")
     parser.add_argument("--go2rtc-api-port", type=int, default=1984,
                        help="go2rtc のWeb UI / WebRTCページ公開ポート (default: 1984)")
     parser.add_argument("--go2rtc-webrtc-port", type=int, default=8555,

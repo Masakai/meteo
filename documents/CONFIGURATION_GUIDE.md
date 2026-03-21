@@ -79,7 +79,7 @@ docker-compose.ymlで設定される環境変数:
 | `CAMERA1_NAME` | - | カメラ1の内部名（ディレクトリ名・識別子） |
 | `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名（UI専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
 | `CAMERA1_URL` | - | カメラ1のURL |
-| `CAMERA1_STREAM_KIND` | `mjpeg` | ライブ表示方式 (`mjpeg` / `webrtc`) |
+| `CAMERA1_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
 | `CAMERA1_STREAM_URL` | `CAMERA1_URL` | ライブ表示用URL (`webrtc` 時は `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse...` など。埋め込み時はダッシュボード表示中のホスト名を優先して接続) |
 | `DETECTIONS_DIR` | `/output` | 検出結果ディレクトリ |
 | `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |

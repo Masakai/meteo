@@ -22,7 +22,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     if is_camera_page:
         for i, cam in enumerate(cameras):
             display_name = cam.get('display_name', cam['name'])
-            stream_kind = cam.get('stream_kind', 'mjpeg')
+            stream_kind = cam.get('stream_kind', 'webrtc')
             stream_view = f'''
                         <img id="stream{i}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="{cam['name']}"
                              data-stream-kind="{stream_kind}">
@@ -1426,7 +1426,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
 
         function getCameraStreamKind(i) {{
             const cam = cameras[i] || {{}};
-            return String(cam.stream_kind || 'mjpeg').toLowerCase();
+            return String(cam.stream_kind || 'webrtc').toLowerCase();
         }}
 
         function isWebRTCStream(i) {{

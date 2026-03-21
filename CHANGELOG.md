@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.4] - 2026-03-21
+### Changed
+- カメラライブ通信方式の既定値を `webrtc` に変更し、`CAMERA*_STREAM_KIND` 未指定時も WebRTC を優先するよう統一。
+- `generate_compose.py` の `--streaming-mode` 既定値を `webrtc` に変更し、新規生成される構成で `go2rtc` を前提としたライブ表示を有効化。
+- 設定ガイドと関連テストを更新し、既定のライブ表示方式が `webrtc` であることを反映。
+
 ## [3.2.3] - 2026-03-21
 ### Added
 - GitHub に新バージョンが push された際に自動で pull & rebuild する `auto_update.sh` を追加。

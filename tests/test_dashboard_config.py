@@ -23,3 +23,15 @@ def test_dashboard_config_reads_stream_settings(monkeypatch):
         ]
     finally:
         importlib.reload(dashboard_config)
+
+
+def test_dashboard_config_defaults_stream_kind_to_webrtc(monkeypatch):
+    monkeypatch.setenv("CAMERA1_NAME", "cam1")
+    monkeypatch.setenv("CAMERA1_URL", "http://localhost:8081")
+    monkeypatch.delenv("CAMERA1_STREAM_KIND", raising=False)
+
+    module = importlib.reload(dashboard_config)
+    try:
+        assert module.CAMERAS[0]["stream_kind"] == "webrtc"
+    finally:
+        importlib.reload(dashboard_config)

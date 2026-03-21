@@ -83,7 +83,7 @@ def _camera_embed_info(camera_index: int) -> dict | None:
     if camera_index < 0 or camera_index >= len(CAMERAS):
         return None
     cam = CAMERAS[camera_index]
-    stream_kind = str(cam.get("stream_kind", "mjpeg")).lower()
+    stream_kind = str(cam.get("stream_kind", "webrtc")).lower()
     if stream_kind != "webrtc":
         return None
     stream_url = str(cam.get("stream_url") or "").strip()
