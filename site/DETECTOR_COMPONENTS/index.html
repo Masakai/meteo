@@ -1,0 +1,3564 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="流星・雲検出システム Meteo の公式ドキュメント">
+      
+      
+      
+        <link rel="canonical" href="https://masakai.github.io/meteo/DETECTOR_COMPONENTS/">
+      
+      
+        <link rel="prev" href="../DOCKER_ARCHITECTURE/">
+      
+      
+        <link rel="next" href="../ASTRO_UTILS/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/mascot-meteo-cam.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>検出コンポーネント - Meteo Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Zen+Kaku+Gothic+New:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Zen Kaku Gothic New";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  <meta property="og:site_name" content="Meteo Documentation">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="検出コンポーネント | Meteo Documentation">
+  <meta property="og:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta property="og:url" content="https://masakai.github.io/meteo/DETECTOR_COMPONENTS/">
+  <meta property="og:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:secure_url" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="検出コンポーネント | Meteo Documentation">
+  <meta name="twitter:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta name="twitter:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <script>
+    document$.subscribe(function() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e2ecff",
+          primaryTextColor: "#111111",
+          primaryBorderColor: "#7a92bf",
+          secondaryColor: "#dff3e2",
+          secondaryTextColor: "#111111",
+          secondaryBorderColor: "#6f9a79",
+          tertiaryColor: "#ffe8cc",
+          tertiaryTextColor: "#111111",
+          tertiaryBorderColor: "#c28a4a",
+          lineColor: "#7b8794",
+          textColor: "#111111",
+          mainBkg: "#e2ecff",
+          nodeBkg: "#e2ecff",
+          nodeBorder: "#7a92bf",
+          clusterBkg: "#f7f4ff",
+          clusterBorder: "#b8abd9",
+          defaultLinkColor: "#7b8794",
+          titleColor: "#111111",
+          edgeLabelBackground: "#ffffff",
+          actorBkg: "#e2ecff",
+          actorBorder: "#7a92bf",
+          actorTextColor: "#111111",
+          actorLineColor: "#7b8794",
+          signalColor: "#111111",
+          signalTextColor: "#111111",
+          labelBoxBkgColor: "#fff7e8",
+          labelBoxBorderColor: "#c28a4a",
+          labelTextColor: "#111111",
+          loopTextColor: "#111111",
+          noteBkgColor: "#fff7e8",
+          noteBorderColor: "#d1b27c",
+          noteTextColor: "#111111",
+          activationBkgColor: "#efe6ff",
+          activationBorderColor: "#ab92cf",
+          sectionBkgColor: "#f8fbff",
+          altSectionBkgColor: "#fef6ea",
+          gridColor: "#d6deea",
+          cScale0: "#f8d7da",
+          cScale1: "#ffe3c4",
+          cScale2: "#fff1bf",
+          cScale3: "#dff3e2",
+          cScale4: "#e2ecff",
+          cScale5: "#efe6ff",
+          cScale6: "#f7dff0",
+          cScale7: "#dff2f6"
+        }
+      });
+    });
+  </script>
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#meteor_detector_rtsp_webpy-" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href=".." title="Meteo Documentation" class="md-header__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Meteo Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              検出コンポーネント
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-label="ダークモードに切り替え"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切り替え" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="検索" placeholder="検索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="検索">
+        
+        <button type="reset" class="md-search__icon md-icon" title="クリア" aria-label="クリア" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            検索を初期化
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="タブ" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  ホーム
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SETUP_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セットアップ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  設定ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  運用ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../API_REFERENCE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API リファレンス
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../DETECTION_TUNING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  検出感度チューニング
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SECURITY/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セキュリティ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../ARCHITECTURE/" class="md-tabs__link">
+          
+  
+  
+  アーキテクチャ
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Meteo Documentation" class="md-nav__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    Meteo Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セットアップ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設定ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTION_TUNING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出感度チューニング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セキュリティ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アーキテクチャ
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    アーキテクチャ
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    全体構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOCKER_ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker 構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出コンポーネント
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出コンポーネント
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アーキテクチャ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="アーキテクチャ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全体構成図
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コアコンポーネント
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="コアコンポーネント">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rtspreader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RTSPReader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. RTSPReader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        状態管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主要メソッド
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロパティ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        シーケンス図
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-ringbuffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. RingBuffer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. RingBuffer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        データ構造
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        メソッド
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-realtimemeteordetector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. RealtimeMeteorDetector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. RealtimeMeteorDetector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出アルゴリズムフロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラッキング状態管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detectionparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出パラメータ (DetectionParams)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        除外マスク（固定カメラ向け）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ノイズ帯マスク（電線・部分照明対策）(v1.12.0)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ノイズ帯マスク（電線・部分照明対策）(v1.12.0)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ノイズ帯除外の2段階フィルタリング
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連パラメータ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        感度プリセット
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        信頼度計算
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-meteor_detector_commonpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 共通ユーティリティ (meteor_detector_common.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-meteorevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. MeteorEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. MeteorEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロパティ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON出力形式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-detection_thread_worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. detection_thread_worker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. detection_thread_worker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        処理フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        グローバル変数（Webサーバー連携用）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-mjpeghandler-web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. MJPEGHandler (Webサーバー)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. MJPEGHandler (Webサーバー)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エンドポイント
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /stream 処理フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /stats レスポンス
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apply_settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /apply_settings による運用時設定反映
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        データフロー全体像
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#save_meteor_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存処理 (save_meteor_event)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="保存処理 (save_meteor_event)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存ファイル構成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンポジット画像生成アルゴリズム
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数による設定
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        スレッド構成とロック
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="スレッド構成とロック">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ロック戦略
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        パフォーマンス最適化
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="パフォーマンス最適化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 処理スケール調整
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. キューサイズ制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. モルフォロジー処理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーハンドリング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="エラーハンドリング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rtsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RTSP接続エラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フレーム読み込みエラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テスト・デバッグ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="テスト・デバッグ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ログ出力
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プレビュー表示（検出状態の可視化）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ファイル
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ASTRO_UTILS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    天文計算モジュール
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        アーキテクチャ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="アーキテクチャ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        全体構成図
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コアコンポーネント
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="コアコンポーネント">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rtspreader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RTSPReader
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. RTSPReader">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        状態管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主要メソッド
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロパティ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        シーケンス図
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-ringbuffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. RingBuffer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. RingBuffer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        データ構造
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        メソッド
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-realtimemeteordetector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. RealtimeMeteorDetector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. RealtimeMeteorDetector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出アルゴリズムフロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラッキング状態管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detectionparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出パラメータ (DetectionParams)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        除外マスク（固定カメラ向け）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ノイズ帯マスク（電線・部分照明対策）(v1.12.0)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ノイズ帯マスク（電線・部分照明対策）(v1.12.0)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ノイズ帯除外の2段階フィルタリング
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連パラメータ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        感度プリセット
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        信頼度計算
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-meteor_detector_commonpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. 共通ユーティリティ (meteor_detector_common.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-meteorevent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. MeteorEvent
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. MeteorEvent">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        クラス定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プロパティ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON出力形式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-detection_thread_worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. detection_thread_worker
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. detection_thread_worker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        処理フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        グローバル変数（Webサーバー連携用）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-mjpeghandler-web" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. MJPEGHandler (Webサーバー)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. MJPEGHandler (Webサーバー)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エンドポイント
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /stream 処理フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /stats レスポンス
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apply_settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        /apply_settings による運用時設定反映
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        データフロー全体像
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#save_meteor_event" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存処理 (save_meteor_event)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="保存処理 (save_meteor_event)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        保存ファイル構成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンポジット画像生成アルゴリズム
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数による設定
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        スレッド構成とロック
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="スレッド構成とロック">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ロック戦略
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        パフォーマンス最適化
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="パフォーマンス最適化">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 処理スケール調整
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. キューサイズ制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. モルフォロジー処理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーハンドリング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="エラーハンドリング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rtsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RTSP接続エラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        フレーム読み込みエラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テスト・デバッグ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="テスト・デバッグ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ログ出力
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プレビュー表示（検出状態の可視化）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ファイル
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="meteor_detector_rtsp_webpy-">meteor_detector_rtsp_web.py - 内部コンポーネント仕様書</h1>
+<hr />
+<p><strong>Copyright (c) 2026 Masanori Sakai</strong></p>
+<p>Licensed under the MIT License</p>
+<hr />
+<h2 id="_1">概要</h2>
+<p><code>meteor_detector_rtsp_web.py</code> は、RTSPストリームから流星を検出し、Webプレビューを提供するリアルタイム検出エンジンです。</p>
+<h2 id="_2">アーキテクチャ</h2>
+<h3 id="_3">全体構成図</h3>
+<pre><code class="language-mermaid">graph TB
+    RTSP[&quot;RTSP映像ソース&quot;]
+    Reader[&quot;RTSPReader&lt;br/&gt;スレッド1&quot;]
+    Queue[&quot;Queue&lt;br/&gt;maxsize=30&quot;]
+    DetectionWorker[&quot;detection_thread_worker&lt;br/&gt;スレッド2&quot;]
+    RingBuffer[&quot;RingBuffer&lt;br/&gt;15秒分のフレーム&quot;]
+    Detector[&quot;RealtimeMeteorDetector&lt;br/&gt;検出ロジック&quot;]
+    Storage[&quot;ファイルシステム&lt;br/&gt;/output/&quot;]
+    WebServer[&quot;ThreadedHTTPServer&lt;br/&gt;MJPEGHandler&quot;]
+    Browser[&quot;Webブラウザ&quot;]
+
+    RTSP --&gt;|&quot;フレーム取得&quot;| Reader
+    Reader --&gt;|&quot;Queue.put&quot;| Queue
+    Queue --&gt;|&quot;Queue.get&quot;| DetectionWorker
+    DetectionWorker --&gt;|&quot;add(frame)&quot;| RingBuffer
+    DetectionWorker --&gt;|&quot;detect_bright_objects&quot;| Detector
+    DetectionWorker --&gt;|&quot;track_objects&quot;| Detector
+    Detector --&gt;|&quot;MeteorEvent&quot;| DetectionWorker
+    DetectionWorker --&gt;|&quot;get_range&quot;| RingBuffer
+    DetectionWorker --&gt;|&quot;保存&quot;| Storage
+    DetectionWorker --&gt;|&quot;current_frame更新&quot;| WebServer
+    WebServer --&gt;|&quot;MJPEGストリーム&quot;| Browser
+    Browser --&gt;|&quot;HTTP GET /stats&quot;| WebServer
+
+    style Reader fill:#e2eafc
+    style DetectionWorker fill:#e2eafc
+    style WebServer fill:#e2eafc
+    style Detector fill:#dce6ff
+    style RingBuffer fill:#dce6ff
+</code></pre>
+<h2 id="_4">コアコンポーネント</h2>
+<h3 id="1-rtspreader">1. RTSPReader</h3>
+<p><strong>責務</strong>: RTSPストリームからフレームを読み込み、キューに供給する</p>
+<h4 id="_5">クラス定義</h4>
+<pre><code class="language-python">class RTSPReader:
+    def __init__(self, url: str, reconnect_delay: float = 5.0)
+    def start(self) -&gt; RTSPReader
+    def read(self) -&gt; Tuple[bool, float, Optional[np.ndarray]]
+    def stop(self)
+    def _read_loop(self)  # 内部スレッド
+</code></pre>
+<h4 id="_6">状態管理</h4>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; Stopped
+    Stopped --&gt; Connecting: start()
+    Connecting --&gt; Connected: 接続成功
+    Connecting --&gt; Reconnecting: 接続失敗
+    Connected --&gt; Reading: フレーム読み込み
+    Reading --&gt; Connected: フレーム取得成功
+    Reading --&gt; Reconnecting: 連続30回失敗
+    Reconnecting --&gt; Connecting: 5秒待機後
+    Connected --&gt; Stopped: stop()
+    Reconnecting --&gt; Stopped: stop()
+</code></pre>
+<h4 id="_7">主要メソッド</h4>
+<table>
+<thead>
+<tr>
+<th>メソッド</th>
+<th>説明</th>
+<th>戻り値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>start()</code></td>
+<td>RTSPリーダースレッドを起動</td>
+<td><code>self</code></td>
+</tr>
+<tr>
+<td><code>read()</code></td>
+<td>キューからフレームを取得（タイムアウト1秒）</td>
+<td><code>(success, timestamp, frame)</code></td>
+</tr>
+<tr>
+<td><code>stop()</code></td>
+<td>スレッドを停止</td>
+<td>なし</td>
+</tr>
+<tr>
+<td><code>_read_loop()</code></td>
+<td>内部ループ（別スレッド）</td>
+<td>なし</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_8">プロパティ</h4>
+<table>
+<thead>
+<tr>
+<th>プロパティ</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>queue</code></td>
+<td><code>Queue[Tuple[float, np.ndarray]]</code></td>
+<td>フレームキュー（最大30フレーム）</td>
+</tr>
+<tr>
+<td><code>stopped</code></td>
+<td><code>Event</code></td>
+<td>停止フラグ</td>
+</tr>
+<tr>
+<td><code>connected</code></td>
+<td><code>Event</code></td>
+<td>接続状態フラグ</td>
+</tr>
+<tr>
+<td><code>fps</code></td>
+<td><code>float</code></td>
+<td>ストリームのFPS</td>
+</tr>
+<tr>
+<td><code>width</code>, <code>height</code></td>
+<td><code>int</code></td>
+<td>フレーム解像度</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_9">シーケンス図</h4>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Main
+    participant RTSPReader
+    participant Thread
+    participant OpenCV
+    participant Queue
+
+    Main-&gt;&gt;RTSPReader: start()
+    RTSPReader-&gt;&gt;Thread: スレッド起動
+    Thread-&gt;&gt;OpenCV: cv2.VideoCapture(url)
+
+    alt 接続成功
+        OpenCV--&gt;&gt;Thread: cap.isOpened() = True
+        Thread-&gt;&gt;Thread: connected.set()
+        loop フレーム読み込み
+            Thread-&gt;&gt;OpenCV: cap.read()
+            OpenCV--&gt;&gt;Thread: (ret, frame)
+            alt フレーム取得成功
+                Thread-&gt;&gt;Queue: put((timestamp, frame))
+            else 失敗が30回連続
+                Thread-&gt;&gt;OpenCV: cap.release()
+                Thread-&gt;&gt;Thread: 5秒待機して再接続
+            end
+        end
+    else 接続失敗
+        OpenCV--&gt;&gt;Thread: cap.isOpened() = False
+        Thread-&gt;&gt;Thread: 5秒待機して再接続
+    end
+
+    Main-&gt;&gt;RTSPReader: read()
+    RTSPReader-&gt;&gt;Queue: get(timeout=1.0)
+    Queue--&gt;&gt;RTSPReader: (timestamp, frame)
+    RTSPReader--&gt;&gt;Main: (True, timestamp, frame)
+</code></pre>
+<hr />
+<h3 id="2-ringbuffer">2. RingBuffer</h3>
+<p><strong>責務</strong>: 過去N秒分のフレームをメモリに保持し、流星検出時に前後のフレームを提供</p>
+<h4 id="_10">クラス定義</h4>
+<pre><code class="language-python">class RingBuffer:
+    def __init__(self, max_seconds: float, fps: float = 30)
+    def add(self, timestamp: float, frame: np.ndarray)
+    def get_range(self, start_time: float, end_time: float) -&gt; List[Tuple[float, np.ndarray]]
+</code></pre>
+<h4 id="_11">データ構造</h4>
+<pre><code class="language-mermaid">graph LR
+    subgraph &quot;RingBuffer (maxlen=360 for 12秒@30fps)&quot;
+        F1[&quot;(t=0.00, frame1)&quot;]
+        F2[&quot;(t=0.03, frame2)&quot;]
+        F3[&quot;(t=0.07, frame3)&quot;]
+        Dots[&quot;...&quot;]
+        F360[&quot;(t=11.97, frame360)&quot;]
+    end
+
+    F1 --&gt; F2
+    F2 --&gt; F3
+    F3 --&gt; Dots
+    Dots --&gt; F360
+    F360 -.-&gt;|&quot;新フレーム追加で&lt;br/&gt;古いフレーム削除&quot;| F1
+
+    style F1 fill:#e2eafc
+    style F360 fill:#dce6ff
+</code></pre>
+<h4 id="_12">メソッド</h4>
+<table>
+<thead>
+<tr>
+<th>メソッド</th>
+<th>説明</th>
+<th>戻り値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add(timestamp, frame)</code></td>
+<td>フレームを追加（スレッドセーフ）</td>
+<td>なし</td>
+</tr>
+<tr>
+<td><code>get_range(start, end)</code></td>
+<td>指定時間範囲のフレームを取得</td>
+<td><code>List[Tuple[float, np.ndarray]]</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="_13">使用例</h4>
+<pre><code class="language-python"># 初期化（12秒、30fps = 最大360フレーム）
+ring_buffer = RingBuffer(max_seconds=12.0, fps=30.0)
+
+# フレーム追加
+ring_buffer.add(timestamp=0.0, frame=frame1)
+ring_buffer.add(timestamp=0.033, frame=frame2)
+
+# 流星検出時: 検出時刻の前後1秒を取得
+event_frames = ring_buffer.get_range(
+    start_time=event.start_time - 1.0,
+    end_time=event.end_time + 1.0
+)
+</code></pre>
+<p>RTSP Web版では <code>buffer_seconds</code> が <code>max_duration + 2.0</code> 秒を上限に自動調整されます。</p>
+<hr />
+<h3 id="3-realtimemeteordetector">3. RealtimeMeteorDetector</h3>
+<p><strong>責務</strong>: フレームから明るい移動物体を検出し、流星かどうか判定する</p>
+<h4 id="_14">クラス定義</h4>
+<pre><code class="language-python">class RealtimeMeteorDetector:
+    def __init__(
+        self,
+        params: DetectionParams,
+        fps: float = 30,
+        exclusion_mask: Optional[np.ndarray] = None,
+        nuisance_mask: Optional[np.ndarray] = None,
+    )
+    def detect_bright_objects(self, frame, prev_frame) -&gt; List[dict]
+    def track_objects(self, objects, timestamp) -&gt; List[MeteorEvent]
+    def finalize_all(self) -&gt; List[MeteorEvent]
+    def update_exclusion_mask(self, new_mask: Optional[np.ndarray]) -&gt; None
+    def update_nuisance_mask(self, new_mask: Optional[np.ndarray]) -&gt; None
+</code></pre>
+<h4 id="_15">検出アルゴリズムフロー</h4>
+<pre><code class="language-mermaid">flowchart TD
+    Start[&quot;フレーム取得&lt;br/&gt;(gray, prev_gray)&quot;]
+    Diff[&quot;差分計算&lt;br/&gt;cv2.absdiff()&quot;]
+    Thresh[&quot;二値化&lt;br/&gt;threshold &gt; 30&quot;]
+    Mask[&quot;除外マスク適用&lt;br/&gt;mask &gt; 0 を除外&quot;]
+    Morph[&quot;モルフォロジー処理&lt;br/&gt;open → close&quot;]
+    Contours[&quot;輪郭検出&lt;br/&gt;findContours()&quot;]
+
+    Filter1{&quot;面積フィルタ&lt;br/&gt;5 ≤ area ≤ 10000&quot;}
+    Filter2{&quot;輝度フィルタ&lt;br/&gt;brightness ≥ min_brightness&quot;}
+    Filter2b{&quot;ノイズ帯重なり除外&lt;br/&gt;(v1.12.0)&lt;br/&gt;small_area &amp; overlap高&quot;}
+    Filter3{&quot;画面下部除外&lt;br/&gt;y &lt; height×(1-exclude_bottom)&quot;}
+    Filter4{&quot;画面端除外&lt;br/&gt;(v1.16.0)&lt;br/&gt;exclude_edge_ratio適用&quot;}
+
+    Objects[&quot;検出物体リスト&lt;br/&gt;{centroid, brightness, area}&quot;]
+    Track[&quot;トラッキング&lt;br/&gt;track_objects()&quot;]
+
+    Decision{&quot;軌跡が完了&lt;br/&gt;かつ判定条件を満たす&quot;}
+    NuisanceCheck{&quot;ノイズ帯経路除外&lt;br/&gt;(v1.12.0)&lt;br/&gt;path_overlap高&quot;}
+    Meteor[&quot;MeteorEvent生成&quot;]
+    End[&quot;次フレームへ&quot;]
+
+    Start --&gt; Diff
+    Diff --&gt; Thresh
+    Thresh --&gt; Mask
+    Mask --&gt; Morph
+    Morph --&gt; Contours
+    Contours --&gt; Filter1
+    Filter1 --&gt;|&quot;No&quot;| End
+    Filter1 --&gt;|&quot;Yes&quot;| Filter2
+    Filter2 --&gt;|&quot;No&quot;| End
+    Filter2 --&gt;|&quot;Yes&quot;| Filter2b
+    Filter2b --&gt;|&quot;除外&quot;| End
+    Filter2b --&gt;|&quot;通過&quot;| Filter3
+    Filter3 --&gt;|&quot;No&quot;| End
+    Filter3 --&gt;|&quot;Yes&quot;| Filter4
+    Filter4 --&gt;|&quot;No&quot;| End
+    Filter4 --&gt;|&quot;Yes&quot;| Objects
+    Objects --&gt; Track
+    Track --&gt; Decision
+    Decision --&gt;|&quot;No&quot;| End
+    Decision --&gt;|&quot;Yes&quot;| NuisanceCheck
+    NuisanceCheck --&gt;|&quot;除外&quot;| End
+    NuisanceCheck --&gt;|&quot;通過&quot;| Meteor
+    Meteor --&gt; End
+
+    style Start fill:#e2eafc
+    style Meteor fill:#f8d7da
+    style Objects fill:#dce6ff
+    style Filter2b fill:#ffe3c4
+    style Filter4 fill:#ffe3c4
+    style NuisanceCheck fill:#ffe3c4
+</code></pre>
+<h4 id="_16">トラッキング状態管理</h4>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; NewObject: 物体検出
+    NewObject --&gt; Tracking: 次フレームで追跡成功
+    Tracking --&gt; Tracking: 連続追跡
+    Tracking --&gt; Lost: max_gap_time (2.0秒) 超過
+    Tracking --&gt; Completed: トラック終了判定
+    Lost --&gt; Finalize: 軌跡評価
+    Completed --&gt; Finalize: 軌跡評価
+
+    Finalize --&gt; Meteor: 全条件クリア
+    Finalize --&gt; Discard: 条件未達
+
+    Meteor --&gt; [*]
+    Discard --&gt; [*]
+
+    note right of Finalize
+        判定条件:
+        - 0.1秒 ≤ duration ≤ 10秒
+        - 20px ≤ length ≤ 5000px
+        - speed ≥ 50 px/s
+        - linearity ≥ 0.7
+        - track_points ≥ min_track_points
+        - stationary_ratio ≤ max_stationary_ratio
+        - nuisance_path_overlap ≤ nuisance_path_overlap_threshold
+    end note
+</code></pre>
+<h4 id="detectionparams">検出パラメータ (DetectionParams)</h4>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>デフォルト値</th>
+<th>説明</th>
+<th>導入バージョン</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>diff_threshold</code></td>
+<td>30</td>
+<td>差分閾値</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>min_brightness</code></td>
+<td>200</td>
+<td>最小輝度</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>min_brightness_tracking</code></td>
+<td>min_brightness</td>
+<td>追跡時の最小輝度</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>min_length</code></td>
+<td>20 px</td>
+<td>最小軌跡長</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>max_length</code></td>
+<td>5000 px</td>
+<td>最大軌跡長</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>min_duration</code></td>
+<td>0.1 秒</td>
+<td>最小継続時間</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>max_duration</code></td>
+<td>10.0 秒</td>
+<td>最大継続時間</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>min_speed</code></td>
+<td>50.0 px/s</td>
+<td>最小速度</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>min_linearity</code></td>
+<td>0.7</td>
+<td>最小直線性 (0-1)</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>min_area</code></td>
+<td>5 px²</td>
+<td>最小面積</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>max_area</code></td>
+<td>10000 px²</td>
+<td>最大面積</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>max_gap_time</code></td>
+<td>2.0 秒</td>
+<td>最大トラッキング間隔</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>max_distance</code></td>
+<td>80 px</td>
+<td>最大移動距離</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>merge_max_gap_time</code></td>
+<td>1.5 秒</td>
+<td>イベント結合の最大間隔</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>merge_max_distance</code></td>
+<td>80 px</td>
+<td>イベント結合の最大距離</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>merge_max_speed_ratio</code></td>
+<td>0.5</td>
+<td>イベント結合の最大速度比</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>exclude_bottom_ratio</code></td>
+<td>1/16</td>
+<td>画面下部除外率</td>
+<td>v1.0.0</td>
+</tr>
+<tr>
+<td><code>nuisance_overlap_threshold</code></td>
+<td>0.60</td>
+<td>ノイズ帯重なり閾値（候補段階）</td>
+<td>v1.12.0</td>
+</tr>
+<tr>
+<td><code>nuisance_path_overlap_threshold</code></td>
+<td>0.70</td>
+<td>ノイズ帯経路重なり閾値（トラック確定時）</td>
+<td>v1.12.0</td>
+</tr>
+<tr>
+<td><code>min_track_points</code></td>
+<td>4</td>
+<td>最小追跡点数</td>
+<td>v1.12.0</td>
+</tr>
+<tr>
+<td><code>max_stationary_ratio</code></td>
+<td>0.40</td>
+<td>静止率上限（停滞物体除外）</td>
+<td>v1.12.0</td>
+</tr>
+<tr>
+<td><code>small_area_threshold</code></td>
+<td>40</td>
+<td>小領域判定閾値（px²）</td>
+<td>v1.12.0</td>
+</tr>
+<tr>
+<td><code>clip_margin_before</code></td>
+<td>1.0 秒</td>
+<td>録画開始マージン（イベント前）</td>
+<td>v1.14.0</td>
+</tr>
+<tr>
+<td><code>clip_margin_after</code></td>
+<td>1.0 秒</td>
+<td>録画終了マージン（イベント後）</td>
+<td>v1.14.0</td>
+</tr>
+<tr>
+<td><code>exclude_edge_ratio</code></td>
+<td>0.0</td>
+<td>画面端除外率（0.0-0.5、0=無効）</td>
+<td>v1.16.0</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_17">除外マスク（固定カメラ向け）</h4>
+<ul>
+<li>事前生成済みマスク（<code>MASK_IMAGE</code>）がある場合は優先して適用</li>
+<li><code>MASK_FROM_DAY</code> が設定されている場合は、昼間画像からマスクを生成</li>
+<li>ダッシュボードの「マスク更新」ボタンで現在フレームから再生成（永続化）</li>
+</ul>
+<h4 id="v1120">ノイズ帯マスク（電線・部分照明対策）(v1.12.0)</h4>
+<ul>
+<li><code>nuisance_mask</code> は除外マスクとは別の誤検出抑制マスク</li>
+<li><strong>目的</strong>: 電線、街灯、部分照明など、静止しているが明滅する物体による誤検出を抑制</li>
+<li><strong>設定方法</strong>:</li>
+<li><code>nuisance_mask_image</code>: 手動マスク画像パス</li>
+<li><code>nuisance_from_night</code>: 夜間基準画像から自動生成</li>
+<li><strong>自動生成アルゴリズム</strong>:
+  ```python
+  # 1. Canny エッジ検出
+  edges = cv2.Canny(reference_frame, 50, 150, apertureSize=3)</li>
+</ul>
+<p># 2. HoughLinesP で直線検出（電線など）
+  lines = cv2.HoughLinesP(edges, 1, np.pi/180, 50, minLineLength=30, maxLineGap=10)</p>
+<p># 3. dilate で線を太くする（nuisance_dilate ピクセル）
+  mask = cv2.dilate(line_mask, kernel, iterations=nuisance_dilate)
+  ```</p>
+<h5 id="2">ノイズ帯除外の2段階フィルタリング</h5>
+<p><strong>1. 候補段階の除外</strong> (<code>detect_bright_objects</code> 内)
+- 小領域 (<code>area &lt; small_area_threshold</code>) の候補のみ対象
+- 候補バウンディングボックスとノイズ帯の重なり率を計算
+- <code>nuisance_overlap_threshold</code> (デフォルト 0.60) を超える場合は候補を除外</p>
+<pre><code class="language-python">if area &lt; params.small_area_threshold and nuisance_mask is not None:
+    overlap_ratio = calculate_mask_overlap(bbox, nuisance_mask)
+    if overlap_ratio &gt; params.nuisance_overlap_threshold:
+        continue  # 候補として採用しない
+</code></pre>
+<p><strong>2. トラック確定時の除外</strong> (<code>track_objects</code> 内)
+- 確定したトラックの全経路とノイズ帯の重なり率を計算
+- <code>nuisance_path_overlap_threshold</code> (デフォルト 0.70) を超える場合はイベント除外
+- 追加条件も評価:
+  - <code>min_track_points</code>: 最小追跡点数（デフォルト 4点）
+  - <code>max_stationary_ratio</code>: 停滞物体の除外（デフォルト 0.40）</p>
+<pre><code class="language-python"># トラック経路とノイズ帯の重なり計算
+path_overlap = calculate_path_overlap(track.positions, nuisance_mask)
+
+if path_overlap &gt; params.nuisance_path_overlap_threshold:
+    # 流星イベントとして採用しない
+    continue
+</code></pre>
+<h5 id="_18">関連パラメータ</h5>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>用途</th>
+<th>デフォルト値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nuisance_overlap_threshold</code></td>
+<td>候補段階の重なり閾値</td>
+<td>0.60</td>
+</tr>
+<tr>
+<td><code>nuisance_path_overlap_threshold</code></td>
+<td>トラック確定時の経路重なり閾値</td>
+<td>0.70</td>
+</tr>
+<tr>
+<td><code>small_area_threshold</code></td>
+<td>小領域判定の面積閾値（px²）</td>
+<td>40</td>
+</tr>
+<tr>
+<td><code>min_track_points</code></td>
+<td>最小追跡点数</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>max_stationary_ratio</code></td>
+<td>停滞物体の除外閾値</td>
+<td>0.40</td>
+</tr>
+<tr>
+<td><code>nuisance_dilate</code></td>
+<td>マスク膨張イテレーション数</td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_19">感度プリセット</h4>
+<table>
+<thead>
+<tr>
+<th>プリセット</th>
+<th>diff_threshold</th>
+<th>min_brightness</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>low</code></td>
+<td>40</td>
+<td>220</td>
+<td>明るい流星のみ</td>
+</tr>
+<tr>
+<td><code>medium</code> (デフォルト)</td>
+<td>30</td>
+<td>200</td>
+<td>バランス型</td>
+</tr>
+<tr>
+<td><code>high</code></td>
+<td>20</td>
+<td>180</td>
+<td>暗い流星も検出</td>
+</tr>
+<tr>
+<td><code>faint</code></td>
+<td>16</td>
+<td>150</td>
+<td>短く暗い流星の取りこぼし低減</td>
+</tr>
+<tr>
+<td><code>fireball</code></td>
+<td>15</td>
+<td>150</td>
+<td>火球専用（長時間OK）</td>
+</tr>
+</tbody>
+</table>
+<p>追跡中は <code>min_brightness_tracking</code> を使用します。RTSP Webでは <code>faint</code> のみ <code>min_brightness</code> の80%に自動設定されるため、現行値では <code>120</code> になります。それ以外は <code>min_brightness</code> と同値です。</p>
+<h4 id="_20">信頼度計算</h4>
+<pre><code class="language-python">def calculate_confidence(length, speed, linearity, brightness, duration) -&gt; float:
+    length_score = min(1.0, length / 100.0)         # 25%の重み
+    speed_score = min(1.0, speed / 20.0)            # 20%の重み
+    linearity_score = linearity                     # 25%の重み
+    brightness_score = min(1.0, brightness / 255)   # 20%の重み
+    duration_bonus = min(0.2, duration / 100.0 * 0.2)  # 最大20%のボーナス
+
+    return min(1.0, length_score * 0.25 + speed_score * 0.2 +
+               linearity_score * 0.25 + brightness_score * 0.2 + duration_bonus)
+</code></pre>
+<hr />
+<h3 id="4-meteor_detector_commonpy">4. 共通ユーティリティ (meteor_detector_common.py)</h3>
+<p>RTSP/MP4検出で共通利用する補助関数群です。</p>
+<ul>
+<li><code>calculate_linearity(xs, ys)</code>: 直線性の評価</li>
+<li><code>calculate_confidence(...)</code>: 信頼度スコアの算出</li>
+<li><code>open_video_writer(...)</code>: 利用可能なコーデックでVideoWriterを初期化</li>
+</ul>
+<hr />
+<h3 id="5-meteorevent">5. MeteorEvent</h3>
+<p><strong>責務</strong>: 検出された流星イベントのデータクラス</p>
+<h4 id="_21">クラス定義</h4>
+<pre><code class="language-python">@dataclass
+class MeteorEvent:
+    timestamp: datetime          # 検出時刻
+    start_time: float            # 開始時刻（相対）
+    end_time: float              # 終了時刻（相対）
+    start_point: Tuple[int, int] # 開始座標
+    end_point: Tuple[int, int]   # 終了座標
+    peak_brightness: float       # ピーク輝度
+    confidence: float            # 信頼度 (0-1)
+    frames: List[Tuple[float, np.ndarray]]  # フレームリスト
+</code></pre>
+<h4 id="_22">プロパティ</h4>
+<table>
+<thead>
+<tr>
+<th>プロパティ</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>duration</code></td>
+<td><code>float</code></td>
+<td>継続時間（秒）</td>
+</tr>
+<tr>
+<td><code>length</code></td>
+<td><code>float</code></td>
+<td>軌跡長（ピクセル）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="json">JSON出力形式</h4>
+<pre><code class="language-json">{
+  &quot;timestamp&quot;: &quot;2026-02-02T06:55:33.411811&quot;,
+  &quot;start_time&quot;: 125.340,
+  &quot;end_time&quot;: 125.780,
+  &quot;duration&quot;: 0.440,
+  &quot;start_point&quot;: [320, 180],
+  &quot;end_point&quot;: [450, 220],
+  &quot;length_pixels&quot;: 135.6,
+  &quot;peak_brightness&quot;: 245.3,
+  &quot;confidence&quot;: 0.87
+}
+</code></pre>
+<hr />
+<h3 id="5-detection_thread_worker">5. detection_thread_worker</h3>
+<p><strong>責務</strong>: メイン検出ループを実行する（別スレッド）</p>
+<h4 id="_23">処理フロー</h4>
+<pre><code class="language-mermaid">flowchart TD
+    Start[&quot;スレッド開始&quot;]
+    Init[&quot;初期化&lt;br/&gt;RingBuffer, Detector&quot;]
+
+    Loop[&quot;フレーム取得ループ&quot;]
+    ReadFrame[&quot;RTSPReader.read()&quot;]
+    CheckTime{&quot;天文薄暮&lt;br/&gt;時間帯?&quot;}
+
+    AddBuffer[&quot;RingBuffer.add()&quot;]
+    Resize[&quot;リサイズ&lt;br/&gt;(scale=0.5)&quot;]
+    Gray[&quot;グレースケール変換&quot;]
+
+    Detect[&quot;detect_bright_objects()&quot;]
+    Track[&quot;track_objects()&quot;]
+
+    CheckEvent{&quot;MeteorEvent&lt;br/&gt;発生?&quot;}
+    SaveEvent[&quot;save_meteor_event()&lt;br/&gt;- 動画(オプション)&lt;br/&gt;- コンポジット画像&lt;br/&gt;- JSONL追記&quot;]
+
+    UpdatePreview[&quot;プレビューフレーム生成&lt;br/&gt;current_frame更新&quot;]
+
+    CheckStop{&quot;stop_flag&lt;br/&gt;?&quot;}
+    Finalize[&quot;finalize_all()&quot;]
+    End[&quot;スレッド終了&quot;]
+
+    Start --&gt; Init
+    Init --&gt; Loop
+    Loop --&gt; ReadFrame
+    ReadFrame --&gt; AddBuffer
+    AddBuffer --&gt; Resize
+    Resize --&gt; Gray
+    Gray --&gt; CheckTime
+
+    CheckTime --&gt;|&quot;Yes&quot;| Detect
+    CheckTime --&gt;|&quot;No&quot;| UpdatePreview
+
+    Detect --&gt; Track
+    Track --&gt; CheckEvent
+    CheckEvent --&gt;|&quot;Yes&quot;| SaveEvent
+    CheckEvent --&gt;|&quot;No&quot;| UpdatePreview
+    SaveEvent --&gt; UpdatePreview
+
+    UpdatePreview --&gt; CheckStop
+    CheckStop --&gt;|&quot;No&quot;| Loop
+    CheckStop --&gt;|&quot;Yes&quot;| Finalize
+    Finalize --&gt; End
+
+    style Start fill:#e2eafc
+    style SaveEvent fill:#dce6ff
+    style CheckTime fill:#ffe3c4
+    style End fill:#e2eafc
+</code></pre>
+<h4 id="web">グローバル変数（Webサーバー連携用）</h4>
+<table>
+<thead>
+<tr>
+<th>変数名</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>current_frame</code></td>
+<td><code>np.ndarray</code></td>
+<td>現在のプレビューフレーム</td>
+</tr>
+<tr>
+<td><code>current_frame_lock</code></td>
+<td><code>Lock</code></td>
+<td>フレーム更新用ロック</td>
+</tr>
+<tr>
+<td><code>detection_count</code></td>
+<td><code>int</code></td>
+<td>検出数カウンター</td>
+</tr>
+<tr>
+<td><code>last_frame_time</code></td>
+<td><code>float</code></td>
+<td>最終フレーム受信時刻</td>
+</tr>
+<tr>
+<td><code>is_detecting_now</code></td>
+<td><code>bool</code></td>
+<td>検出処理中フラグ</td>
+</tr>
+<tr>
+<td><code>current_settings</code></td>
+<td><code>dict</code></td>
+<td>設定情報</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="6-mjpeghandler-web">6. MJPEGHandler (Webサーバー)</h3>
+<p><strong>責務</strong>: HTTP経由でプレビューストリームと統計情報を提供</p>
+<h4 id="_24">エンドポイント</h4>
+<pre><code class="language-mermaid">graph LR
+    Browser[&quot;ブラウザ&quot;]
+
+    subgraph &quot;MJPEGHandler&quot;
+        Root[&quot;/&quot;]
+        Stream[&quot;/stream&quot;]
+        Stats[&quot;/stats&quot;]
+    end
+
+    HTML[&quot;HTML&lt;br/&gt;プレビューページ&quot;]
+    MJPEG[&quot;MJPEGストリーム&lt;br/&gt;multipart/x-mixed-replace&quot;]
+    JSON[&quot;統計情報&lt;br/&gt;application/json&quot;]
+
+    Browser --&gt;|&quot;GET /&quot;| Root
+    Root --&gt; HTML
+
+    Browser --&gt;|&quot;GET /stream&quot;| Stream
+    Stream --&gt; MJPEG
+
+    Browser --&gt;|&quot;GET /stats&quot;| Stats
+    Stats --&gt; JSON
+
+    style Root fill:#e2eafc
+    style Stream fill:#e2eafc
+    style Stats fill:#e2eafc
+</code></pre>
+<h4 id="stream">/stream 処理フロー</h4>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Browser
+    participant MJPEGHandler
+    participant GlobalFrame as current_frame&lt;br/&gt;(グローバル変数)
+
+    Browser-&gt;&gt;MJPEGHandler: GET /stream
+    MJPEGHandler--&gt;&gt;Browser: 200 OK&lt;br/&gt;Content-Type: multipart/x-mixed-replace
+
+    loop 30fps配信
+        MJPEGHandler-&gt;&gt;GlobalFrame: Lock取得
+        GlobalFrame--&gt;&gt;MJPEGHandler: current_frame
+        MJPEGHandler-&gt;&gt;MJPEGHandler: cv2.imencode('.jpg', frame)
+        MJPEGHandler--&gt;&gt;Browser: --frame\r\n&lt;JPEG data&gt;\r\n
+        MJPEGHandler-&gt;&gt;MJPEGHandler: sleep(0.033秒)
+    end
+</code></pre>
+<h4 id="stats">/stats レスポンス</h4>
+<pre><code class="language-json">{
+  &quot;detections&quot;: 5,
+  &quot;elapsed&quot;: 3600.5,
+  &quot;camera&quot;: &quot;camera1_10.0.1.25&quot;,
+  &quot;settings&quot;: {
+    &quot;sensitivity&quot;: &quot;medium&quot;,
+    &quot;scale&quot;: 0.5,
+    &quot;buffer&quot;: 12.0,
+    &quot;extract_clips&quot;: true,
+    &quot;exclude_bottom&quot;: 0.0625,
+    &quot;nuisance_overlap_threshold&quot;: 0.6,
+    &quot;nuisance_path_overlap_threshold&quot;: 0.7,
+    &quot;min_track_points&quot;: 4,
+    &quot;max_stationary_ratio&quot;: 0.4,
+    &quot;small_area_threshold&quot;: 40,
+    &quot;mask_image&quot;: &quot;&quot;,
+    &quot;mask_from_day&quot;: &quot;&quot;,
+    &quot;mask_dilate&quot;: 5,
+    &quot;nuisance_mask_image&quot;: &quot;&quot;,
+    &quot;nuisance_from_night&quot;: &quot;&quot;,
+    &quot;nuisance_dilate&quot;: 3
+  },
+  &quot;stream_alive&quot;: true,
+  &quot;time_since_last_frame&quot;: 0.03,
+  &quot;is_detecting&quot;: true
+}
+</code></pre>
+<h4 id="apply_settings">/apply_settings による運用時設定反映</h4>
+<ul>
+<li>ダッシュボード設定ページまたはAPIから <code>POST /apply_settings</code> で反映可能</li>
+<li>即時反映:</li>
+<li>しきい値群、誤検出抑制パラメータ、マスク更新系</li>
+<li>自動再起動で反映:</li>
+<li><code>sensitivity</code>, <code>scale</code>, <code>buffer</code>, <code>extract_clips</code></li>
+<li>起動時依存項目は <code>output/runtime_settings/&lt;camera&gt;.json</code> に保存され、再起動後も維持</li>
+</ul>
+<hr />
+<h2 id="_25">データフロー全体像</h2>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant RTSP
+    participant RTSPReader
+    participant Queue
+    participant Worker as detection_thread_worker
+    participant Buffer as RingBuffer
+    participant Detector
+    participant Storage
+    participant Web as MJPEGHandler
+    participant Browser
+
+    RTSP-&gt;&gt;RTSPReader: 映像フレーム配信
+    RTSPReader-&gt;&gt;Queue: put(timestamp, frame)
+
+    Worker-&gt;&gt;Queue: get()
+    Queue--&gt;&gt;Worker: (timestamp, frame)
+
+    Worker-&gt;&gt;Buffer: add(timestamp, frame)
+
+    Worker-&gt;&gt;Worker: リサイズ &amp; グレースケール
+
+    Worker-&gt;&gt;Detector: detect_bright_objects(gray, prev_gray)
+    Detector--&gt;&gt;Worker: objects[]
+
+    Worker-&gt;&gt;Detector: track_objects(objects, timestamp)
+
+    alt 流星検出
+        Detector--&gt;&gt;Worker: MeteorEvent
+        Worker-&gt;&gt;Buffer: get_range(start-1s, end+1s)
+        Buffer--&gt;&gt;Worker: frames[]
+        Worker-&gt;&gt;Storage: 動画 + JPEG + JSONL保存
+    end
+
+    Worker-&gt;&gt;Worker: プレビュー生成
+    Worker-&gt;&gt;Web: current_frame更新 (Lock)
+
+    Browser-&gt;&gt;Web: GET /stream
+    Web-&gt;&gt;Web: current_frame読み込み (Lock)
+    Web--&gt;&gt;Browser: MJPEG配信
+
+    Browser-&gt;&gt;Web: GET /stats
+    Web--&gt;&gt;Browser: 統計情報JSON
+</code></pre>
+<hr />
+<h2 id="save_meteor_event">保存処理 (save_meteor_event)</h2>
+<h3 id="_26">保存ファイル構成</h3>
+<pre><code class="language-mermaid">graph TD
+    Event[&quot;MeteorEvent&quot;]
+
+    subgraph &quot;save_meteor_event()&quot;
+        GetFrames[&quot;RingBuffer.get_range&lt;br/&gt;(start-1s, end+1s)&quot;]
+
+        Video[&quot;MP4動画&lt;br/&gt;meteor_YYYYMMDD_HHMMSS.mp4&quot;]
+        Composite[&quot;コンポジット画像&lt;br/&gt;meteor_YYYYMMDD_HHMMSS_composite.jpg&quot;]
+        Original[&quot;オリジナル合成&lt;br/&gt;meteor_YYYYMMDD_HHMMSS_composite_original.jpg&quot;]
+        JSONL[&quot;検出ログ&lt;br/&gt;detections.jsonl&quot;]
+    end
+
+    Event --&gt; GetFrames
+    GetFrames --&gt; Video
+    GetFrames --&gt; Composite
+    GetFrames --&gt; Original
+    Event --&gt; JSONL
+
+    style Video fill:#e2eafc
+    style Composite fill:#dce6ff
+    style Original fill:#dce6ff
+    style JSONL fill:#ffe3c4
+</code></pre>
+<h3 id="_27">コンポジット画像生成アルゴリズム</h3>
+<pre><code class="language-python"># イベント期間中の全フレームの最大値合成
+composite = event_frames[0][1].astype(np.float32)
+for _, frame in event_frames[1:]:
+    composite = np.maximum(composite, frame.astype(np.float32))
+composite = np.clip(composite, 0, 255).astype(np.uint8)
+
+# 軌跡をマーキング
+cv2.line(composite, start_point, end_point, (0, 255, 255), 2)
+cv2.circle(composite, start_point, 6, (0, 255, 0), 2)  # 開始点（緑）
+cv2.circle(composite, end_point, 6, (0, 0, 255), 2)    # 終了点（赤）
+</code></pre>
+<hr />
+<h2 id="_28">環境変数による設定</h2>
+<table>
+<thead>
+<tr>
+<th>環境変数</th>
+<th>デフォルト値</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_TIME_WINDOW</code></td>
+<td><code>false</code></td>
+<td>天文薄暮時間帯制限の有効化</td>
+</tr>
+<tr>
+<td><code>LATITUDE</code></td>
+<td><code>35.3606</code></td>
+<td>観測地の緯度（富士山頂）</td>
+</tr>
+<tr>
+<td><code>LONGITUDE</code></td>
+<td><code>138.7274</code></td>
+<td>観測地の経度（富士山頂）</td>
+</tr>
+<tr>
+<td><code>TIMEZONE</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン</td>
+</tr>
+<tr>
+<td><code>EXTRACT_CLIPS</code></td>
+<td><code>true</code></td>
+<td>クリップ動画保存の有効化</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_29">スレッド構成とロック</h2>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;プロセス: meteor_detector_rtsp_web.py&quot;
+        Main[&quot;メインスレッド&quot;]
+        Thread1[&quot;RTSPReaderスレッド&quot;]
+        Thread2[&quot;detection_thread_worker&quot;]
+        Thread3[&quot;MJPEGHandlerスレッド群&quot;]
+
+        Queue[&quot;Queue&lt;br/&gt;(スレッドセーフ)&quot;]
+        BufferLock[&quot;RingBuffer.lock&quot;]
+        DetectorLock[&quot;Detector.lock&quot;]
+        FrameLock[&quot;current_frame_lock&quot;]
+
+        Thread1 --&gt;|&quot;put&quot;| Queue
+        Thread2 --&gt;|&quot;get&quot;| Queue
+        Thread2 --&gt;|&quot;取得&quot;| BufferLock
+        Thread2 --&gt;|&quot;取得&quot;| DetectorLock
+        Thread2 --&gt;|&quot;取得&quot;| FrameLock
+        Thread3 --&gt;|&quot;取得&quot;| FrameLock
+    end
+
+    style Main fill:#dbe7f6
+    style Thread1 fill:#e2eafc
+    style Thread2 fill:#e2eafc
+    style Thread3 fill:#e2eafc
+    style Queue fill:#dce6ff
+</code></pre>
+<h3 id="_30">ロック戦略</h3>
+<table>
+<thead>
+<tr>
+<th>ロック</th>
+<th>保護対象</th>
+<th>取得スレッド</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RingBuffer.lock</code></td>
+<td><code>buffer: deque</code></td>
+<td>detection_thread_worker</td>
+</tr>
+<tr>
+<td><code>Detector.lock</code></td>
+<td><code>active_tracks: dict</code></td>
+<td>detection_thread_worker</td>
+</tr>
+<tr>
+<td><code>current_frame_lock</code></td>
+<td><code>current_frame: np.ndarray</code></td>
+<td>detection_thread_worker, MJPEGHandler</td>
+</tr>
+<tr>
+<td>Queue内部ロック</td>
+<td>キューの操作</td>
+<td>RTSPReader, detection_thread_worker</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_31">パフォーマンス最適化</h2>
+<h3 id="1">1. 処理スケール調整</h3>
+<pre><code class="language-python"># フレームを0.5倍にリサイズして処理負荷を削減
+process_scale = 0.5  # デフォルト
+proc_frame = cv2.resize(frame, (width*0.5, height*0.5), interpolation=cv2.INTER_AREA)
+
+# 検出座標は元のスケールに戻す
+for obj in objects:
+    cx, cy = obj[&quot;centroid&quot;]
+    obj[&quot;centroid&quot;] = (int(cx / process_scale), int(cy / process_scale))
+</code></pre>
+<h3 id="2_1">2. キューサイズ制限</h3>
+<pre><code class="language-python"># 最大30フレーム保持（約1秒分 @ 30fps）
+self.queue = Queue(maxsize=30)
+
+# キューが満杯の場合は古いフレームを削除
+if self.queue.full():
+    self.queue.get_nowait()
+self.queue.put((timestamp, frame))
+</code></pre>
+<h3 id="3">3. モルフォロジー処理</h3>
+<pre><code class="language-python"># ノイズ除去と輪郭のスムージング
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)   # 小さなノイズ除去
+thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)  # 小さな穴を埋める
+</code></pre>
+<hr />
+<h2 id="_32">エラーハンドリング</h2>
+<h3 id="rtsp">RTSP接続エラー</h3>
+<pre><code class="language-python"># 自動再接続メカニズム
+while not self.stopped.is_set():
+    cap = cv2.VideoCapture(self.url)
+    if not cap.isOpened():
+        print(f&quot;接続失敗: {self.url}&quot;)
+        time.sleep(self.reconnect_delay)  # 5秒待機
+        continue
+    # ... 正常処理 ...
+</code></pre>
+<h3 id="_33">フレーム読み込みエラー</h3>
+<pre><code class="language-python">consecutive_failures = 0
+while not self.stopped.is_set():
+    ret, frame = cap.read()
+    if not ret:
+        consecutive_failures += 1
+        if consecutive_failures &gt; 30:  # 30回連続失敗で再接続
+            break
+        time.sleep(0.01)
+        continue
+    consecutive_failures = 0  # リセット
+</code></pre>
+<hr />
+<h2 id="_34">テスト・デバッグ</h2>
+<h3 id="_35">ログ出力</h3>
+<pre><code class="language-python"># 1分ごとの稼働状況
+if frame_count % (int(fps) * 60) == 0:
+    elapsed = time.time() - start_time_global
+    print(f&quot;[{datetime.now().strftime('%H:%M:%S')}] 稼働: {elapsed/60:.1f}分, 検出: {detection_count}個&quot;)
+
+# 流星検出時
+print(f&quot;\n[{event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{detection_count}&quot;)
+print(f&quot;  長さ: {event.length:.1f}px, 時間: {event.duration:.2f}秒&quot;)
+</code></pre>
+<h3 id="_36">プレビュー表示（検出状態の可視化）</h3>
+<ul>
+<li><strong>緑丸</strong>: 検出中の明るい物体</li>
+<li><strong>黄線</strong>: 追跡中の軌跡</li>
+<li><strong>赤表示</strong>: 流星検出完了</li>
+</ul>
+<hr />
+<h2 id="_37">関連ファイル</h2>
+<ul>
+<li><code>astro_utils.py</code>: 天文薄暮期間の判定関数 <code>is_detection_active()</code></li>
+<li><code>DetectionParams</code>: 検出パラメータのデータクラス</li>
+<li><code>docker-compose.yml</code>: コンテナ設定（環境変数、ポート、ボリューム）</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  ページトップへ戻る
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f", "clipboard.copy": "\u30af\u30ea\u30c3\u30d7\u30dc\u30fc\u30c9\u3078\u30b3\u30d4\u30fc", "search.result.more.one": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3082\u30461\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.more.other": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3042\u3068#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.none": "\u4f55\u3082\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f", "search.result.one": "1\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.other": "#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.placeholder": "\u691c\u7d22\u30ad\u30fc\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "search.result.term.missing": "\u691c\u7d22\u306b\u542b\u307e\u308c\u306a\u3044", "select.version": "\u30d0\u30fc\u30b8\u30e7\u30f3\u5207\u308a\u66ff\u3048"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4581 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="流星・雲検出システム Meteo の公式ドキュメント">
+      
+      
+      
+        <link rel="canonical" href="https://masakai.github.io/meteo/API_REFERENCE/">
+      
+      
+        <link rel="prev" href="../OPERATIONS_GUIDE/">
+      
+      
+        <link rel="next" href="../DETECTION_TUNING/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/mascot-meteo-cam.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>API リファレンス - Meteo Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Zen+Kaku+Gothic+New:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Zen Kaku Gothic New";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  <meta property="og:site_name" content="Meteo Documentation">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="API リファレンス | Meteo Documentation">
+  <meta property="og:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta property="og:url" content="https://masakai.github.io/meteo/API_REFERENCE/">
+  <meta property="og:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:secure_url" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="API リファレンス | Meteo Documentation">
+  <meta name="twitter:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta name="twitter:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <script>
+    document$.subscribe(function() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e2ecff",
+          primaryTextColor: "#111111",
+          primaryBorderColor: "#7a92bf",
+          secondaryColor: "#dff3e2",
+          secondaryTextColor: "#111111",
+          secondaryBorderColor: "#6f9a79",
+          tertiaryColor: "#ffe8cc",
+          tertiaryTextColor: "#111111",
+          tertiaryBorderColor: "#c28a4a",
+          lineColor: "#7b8794",
+          textColor: "#111111",
+          mainBkg: "#e2ecff",
+          nodeBkg: "#e2ecff",
+          nodeBorder: "#7a92bf",
+          clusterBkg: "#f7f4ff",
+          clusterBorder: "#b8abd9",
+          defaultLinkColor: "#7b8794",
+          titleColor: "#111111",
+          edgeLabelBackground: "#ffffff",
+          actorBkg: "#e2ecff",
+          actorBorder: "#7a92bf",
+          actorTextColor: "#111111",
+          actorLineColor: "#7b8794",
+          signalColor: "#111111",
+          signalTextColor: "#111111",
+          labelBoxBkgColor: "#fff7e8",
+          labelBoxBorderColor: "#c28a4a",
+          labelTextColor: "#111111",
+          loopTextColor: "#111111",
+          noteBkgColor: "#fff7e8",
+          noteBorderColor: "#d1b27c",
+          noteTextColor: "#111111",
+          activationBkgColor: "#efe6ff",
+          activationBorderColor: "#ab92cf",
+          sectionBkgColor: "#f8fbff",
+          altSectionBkgColor: "#fef6ea",
+          gridColor: "#d6deea",
+          cScale0: "#f8d7da",
+          cScale1: "#ffe3c4",
+          cScale2: "#fff1bf",
+          cScale3: "#dff3e2",
+          cScale4: "#e2ecff",
+          cScale5: "#efe6ff",
+          cScale6: "#f7dff0",
+          cScale7: "#dff2f6"
+        }
+      });
+    });
+  </script>
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#api-api-reference" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href=".." title="Meteo Documentation" class="md-header__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Meteo Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API リファレンス
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-label="ダークモードに切り替え"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切り替え" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="検索" placeholder="検索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="検索">
+        
+        <button type="reset" class="md-search__icon md-icon" title="クリア" aria-label="クリア" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            検索を初期化
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="タブ" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  ホーム
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SETUP_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セットアップ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  設定ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  運用ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API リファレンス
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../DETECTION_TUNING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  検出感度チューニング
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SECURITY/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セキュリティ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../ARCHITECTURE/" class="md-tabs__link">
+          
+  
+  
+  アーキテクチャ
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Meteo Documentation" class="md-nav__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    Meteo Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セットアップ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設定ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API リファレンス
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目次
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        バージョン履歴
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="バージョン履歴">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v311-webrtc-candidate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v3.1.1 - WebRTC candidate 自動検出と生成安定化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v310-webrtc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v3.1.0 - WebRTC ライブ表示の正式対応
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v300-mp4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v3.0.0 - 旧互換 MP4 正規化設定の削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1241-flask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.24.1 - ダッシュボードの Flask アプリ運用整備
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1240-id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.24.0 - 検出 ID 管理と運用制御の拡張
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1231-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.23.1 - 検出時間帯判定と状態表示の修正
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1180-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.18.0 - 一括削除機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1170-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.17.0 - カメラ監視機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1160-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.16.0 - 画面端ノイズ除外
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1140-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.14.0 - 録画マージン設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1130-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.13.0 - 全カメラ設定UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1100-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.10.0 - 検出ラベル機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dashboardpy-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard.py API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="dashboard.py API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エンドポイント一覧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-cameras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /cameras
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_embedindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_embed/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-go2rtc_assetname" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /go2rtc_asset/{name}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-detection_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /detection_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-detections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /detections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-detections_mtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /detections_mtime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_statsindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_stats/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-imagecamerafilename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /image/{camera}/{filename}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_snapshotindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_snapshot/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-camera_restartindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /camera_restart/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_settingscurrent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_settings/current
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-camera_settingsapply_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /camera_settings/apply_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-detectioncameratimestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /detection/{camera}/{timestamp}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-bulk_delete_non_meteorcamera_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /bulk_delete_non_meteor/{camera_name}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-detection_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /detection_label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /changelog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meteor_detector_rtsp_webpy-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meteor_detector_rtsp_web.py API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="meteor_detector_rtsp_web.py API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エンドポイント一覧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-update_mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /update_mask
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apply_settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /apply_settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通仕様
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="共通仕様">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#corscross-origin-resource-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS（Cross-Origin Resource Sharing）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        レート制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムアウト
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境変数">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v1170" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ監視機能（v1.17.0）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーコード
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="エラーコード">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTPステータスコード
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーレスポンス例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="使用例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#javascript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JavaScript（ブラウザ）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node.js
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bash
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#powershell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PowerShell
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#webhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Webhook連携例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Webhook連携例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出時にSlackに通知
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出時にメール送信
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APIクライアントライブラリ例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="APIクライアントライブラリ例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python用シンプルクライアント
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ドキュメント
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTION_TUNING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出感度チューニング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セキュリティ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アーキテクチャ
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    アーキテクチャ
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    全体構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOCKER_ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker 構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTOR_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出コンポーネント
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ASTRO_UTILS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    天文計算モジュール
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目次
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        バージョン履歴
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="バージョン履歴">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v311-webrtc-candidate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v3.1.1 - WebRTC candidate 自動検出と生成安定化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v310-webrtc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v3.1.0 - WebRTC ライブ表示の正式対応
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v300-mp4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v3.0.0 - 旧互換 MP4 正規化設定の削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1241-flask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.24.1 - ダッシュボードの Flask アプリ運用整備
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1240-id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.24.0 - 検出 ID 管理と運用制御の拡張
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1231-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.23.1 - 検出時間帯判定と状態表示の修正
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1180-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.18.0 - 一括削除機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1170-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.17.0 - カメラ監視機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1160-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.16.0 - 画面端ノイズ除外
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1140-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.14.0 - 録画マージン設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1130-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.13.0 - 全カメラ設定UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1100-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.10.0 - 検出ラベル機能
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dashboardpy-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard.py API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="dashboard.py API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エンドポイント一覧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-cameras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /cameras
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_embedindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_embed/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-go2rtc_assetname" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /go2rtc_asset/{name}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-detection_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /detection_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-detections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /detections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-detections_mtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /detections_mtime
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_statsindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_stats/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-imagecamerafilename" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /image/{camera}/{filename}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_snapshotindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_snapshot/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-camera_restartindex" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /camera_restart/{index}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-camera_settingscurrent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /camera_settings/current
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-camera_settingsapply_all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /camera_settings/apply_all
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-detectioncameratimestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /detection/{camera}/{timestamp}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-bulk_delete_non_meteorcamera_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /bulk_delete_non_meteor/{camera_name}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-detection_label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /detection_label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-changelog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /changelog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meteor_detector_rtsp_webpy-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meteor_detector_rtsp_web.py API
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="meteor_detector_rtsp_web.py API">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エンドポイント一覧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-update_mask" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /update_mask
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apply_settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /apply_settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /restart
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共通仕様
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="共通仕様">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#corscross-origin-resource-sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS（Cross-Origin Resource Sharing）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        レート制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムアウト
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境変数">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v1170" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ監視機能（v1.17.0）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーコード
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="エラーコード">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTPステータスコード
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーレスポンス例
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="使用例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#javascript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JavaScript（ブラウザ）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node.js
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bash" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bash
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#powershell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PowerShell
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#webhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Webhook連携例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Webhook連携例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#slack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出時にSlackに通知
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出時にメール送信
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APIクライアントライブラリ例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="APIクライアントライブラリ例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python用シンプルクライアント
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ドキュメント
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="api-api-reference">API リファレンス (API Reference)</h1>
+<hr />
+<p><strong>Copyright (c) 2026 Masanori Sakai</strong></p>
+<p>Licensed under the MIT License</p>
+<hr />
+<h2 id="_1">概要</h2>
+<p>流星検出システムが提供するHTTP APIの完全なリファレンスです。</p>
+<h2 id="_2">目次</h2>
+<ul>
+<li><a href="#バージョン履歴">バージョン履歴</a></li>
+<li><a href="#dashboardpy-api">dashboard.py API</a></li>
+<li><a href="#meteor_detector_rtsp_webpy-api">meteor_detector_rtsp_web.py API</a></li>
+<li><a href="#環境変数">環境変数</a></li>
+<li><a href="#共通仕様">共通仕様</a></li>
+<li><a href="#エラーコード">エラーコード</a></li>
+<li><a href="#使用例">使用例</a></li>
+</ul>
+<hr />
+<h2 id="_3">バージョン履歴</h2>
+<h3 id="v311-webrtc-candidate">v3.1.1 - WebRTC candidate 自動検出と生成安定化</h3>
+<ul>
+<li><strong>変更</strong>: <code>generate_compose.py</code> が <code>go2rtc</code> の candidate host を既定でローカル IP から自動検出するよう改善</li>
+<li><strong>修正</strong>: OpenCV 未導入時でも <code>docker-compose.yml</code> / <code>go2rtc.yaml</code> の生成を継続し、マスク生成のみスキップするよう改善</li>
+<li><strong>変更</strong>: ダッシュボードおよび Docker / WebRTC 構成の関連ドキュメントを現行仕様へ改版</li>
+</ul>
+<h3 id="v310-webrtc">v3.1.0 - WebRTC ライブ表示の正式対応</h3>
+<ul>
+<li><strong>追加</strong>: Docker 構成で <code>go2rtc</code> を利用する WebRTC ライブ表示設定を正式サポート</li>
+<li><strong>変更</strong>: ダッシュボードのライブ表示設定に <code>CAMERA*_STREAM_KIND=webrtc</code> / <code>CAMERA*_STREAM_URL</code> を追加</li>
+<li><strong>変更</strong>: ダッシュボードのヘルスチェック例の <code>version</code> 表示を <code>3.1.1</code> に更新</li>
+</ul>
+<h3 id="v300-mp4">v3.0.0 - 旧互換 MP4 正規化設定の削除</h3>
+<ul>
+<li><strong>削除</strong>: <code>GET /stats</code> の <code>settings</code> から <code>fb_normalize</code> / <code>fb_delete_mov</code> を削除</li>
+<li><strong>削除</strong>: カメラ設定 API の起動時依存設定から <code>fb_normalize</code> / <code>fb_delete_mov</code> を削除</li>
+<li><strong>変更</strong>: ダッシュボードのヘルスチェック例の <code>version</code> 表示を <code>3.0.0</code> に更新</li>
+</ul>
+<h3 id="v1241-flask">v1.24.1 - ダッシュボードの Flask アプリ運用整備</h3>
+<ul>
+<li><strong>新規エンドポイント</strong>: <code>GET /health</code></li>
+<li>ダッシュボードのヘルスチェックを返却</li>
+<li>レスポンス例: <code>{ "status": "ok", "version": "3.1.1", "camera_count": 3 }</code></li>
+<li><strong>変更</strong>: <code>dashboard.py</code> を Flask のアプリファクトリ構成へ整理し、WSGI 配備やコンテナ運用時でも監視スレッドが初回リクエストで起動するよう改善</li>
+</ul>
+<h3 id="v1240-id">v1.24.0 - 検出 ID 管理と運用制御の拡張</h3>
+<ul>
+<li><strong>機能追加</strong>: <code>/camera_settings/current</code> および <code>/camera_settings/apply_all</code> で <code>detection_enabled</code> を扱えるようにし、全カメラの検出停止・再開を一括制御可能化</li>
+<li><strong>変更</strong>: 検出レコードの <code>id</code> を、<code>timestamp</code> に加えて <code>start_time</code> / <code>end_time</code> / <code>start_point</code> / <code>end_point</code> を含む現行ルールへ統一</li>
+<li><strong>運用改善</strong>: 検出データの移行・孤立ファイル救済・ディレクトリ統合を補助するメンテナンススクリプトを追加</li>
+</ul>
+<h3 id="v1231-">v1.23.1 - 検出時間帯判定と状態表示の修正</h3>
+<ul>
+<li><strong>修正</strong>: 検出時間帯の計算を「当日日没から翌日の日出まで」に是正</li>
+<li><strong>機能追加</strong>: <code>GET /stats</code> レスポンスに検出状態詳細フィールドを追加</li>
+<li><code>detection_status</code>: <code>DETECTING</code> / <code>OUT_OF_WINDOW</code> / <code>WAITING_FRAME</code> / <code>STREAM_LOST</code></li>
+<li><code>detection_window_enabled</code>: 検出時間帯制限の有効/無効</li>
+<li><code>detection_window_active</code>: 現在が検出時間帯内か</li>
+<li><code>detection_window_start</code>: 現在参照中の検出開始時刻</li>
+<li><code>detection_window_end</code>: 現在参照中の検出終了時刻</li>
+</ul>
+<h3 id="v1180-">v1.18.0 - 一括削除機能</h3>
+<ul>
+<li><strong>新規エンドポイント</strong>: <code>POST /bulk_delete_non_meteor/{camera_name}</code></li>
+<li>カメラごとに非流星検出（<code>label="non-meteor"</code>）を一括削除</li>
+<li>削除件数とファイルリストを返却</li>
+</ul>
+<h3 id="v1170-">v1.17.0 - カメラ監視機能</h3>
+<ul>
+<li><strong>機能追加</strong>: <code>/camera_stats/{index}</code> レスポンスに監視関連フィールドを追加</li>
+<li><code>monitor_enabled</code>: 監視機能の有効/無効</li>
+<li><code>monitor_checked_at</code>: 最終監視確認時刻</li>
+<li><code>monitor_error</code>: 監視エラーメッセージ</li>
+<li><code>monitor_stop_reason</code>: 監視停止理由</li>
+<li><code>monitor_last_restart_at</code>: 最終再起動時刻</li>
+<li><code>monitor_restart_count</code>: 再起動回数</li>
+<li><code>monitor_restart_triggered</code>: 再起動トリガー発動中か</li>
+<li><strong>環境変数</strong>: カメラ監視設定（<code>CAMERA_MONITOR_*</code>, <code>CAMERA_RESTART_*</code>）</li>
+</ul>
+<h3 id="v1160-">v1.16.0 - 画面端ノイズ除外</h3>
+<ul>
+<li><strong>パラメータ追加</strong>: <code>exclude_edge_ratio</code></li>
+<li><code>/stats</code> レスポンスの <code>settings.exclude_edge_ratio</code></li>
+<li><code>/apply_settings</code> リクエストボディ</li>
+<li>画面四辺の指定割合をノイズ除外エリアとして設定</li>
+</ul>
+<h3 id="v1140-">v1.14.0 - 録画マージン設定</h3>
+<ul>
+<li><strong>パラメータ追加</strong>: 録画前後マージン</li>
+<li><code>/stats</code> レスポンスの <code>settings.clip_margin_before</code>, <code>settings.clip_margin_after</code></li>
+<li><code>/apply_settings</code> リクエストボディ</li>
+<li>検出前後に録画する追加秒数を設定可能</li>
+</ul>
+<h3 id="v1130-ui">v1.13.0 - 全カメラ設定UI</h3>
+<ul>
+<li><strong>新規エンドポイント</strong>: <code>GET /settings</code> - 全カメラ設定ページ</li>
+<li><strong>新規エンドポイント</strong>: <code>GET /camera_settings/current</code> - 各カメラの現在設定取得</li>
+<li><strong>新規エンドポイント</strong>: <code>POST /camera_settings/apply_all</code> - 全カメラへ設定一括適用</li>
+</ul>
+<h3 id="v1100-">v1.10.0 - 検出ラベル機能</h3>
+<ul>
+<li><strong>新規エンドポイント</strong>: <code>POST /detection_label</code></li>
+<li>検出に任意ラベル（<code>meteor</code>, <code>non-meteor</code> など）を設定</li>
+<li><strong>機能追加</strong>: <code>/detections</code> レスポンスに <code>label</code> フィールド追加</li>
+<li><strong>機能追加</strong>: <code>/detections_mtime</code> がラベルファイル（<code>detection_labels.json</code>）も監視対象に</li>
+</ul>
+<hr />
+<h2 id="dashboardpy-api">dashboard.py API</h2>
+<p>ダッシュボードが提供するエンドポイント（デフォルトポート: 8080）</p>
+<h3 id="_4">エンドポイント一覧</h3>
+<table>
+<thead>
+<tr>
+<th>エンドポイント</th>
+<th>メソッド</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/health</code></td>
+<td>GET</td>
+<td>ダッシュボードヘルスチェック</td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td>GET</td>
+<td>ダッシュボードHTML</td>
+</tr>
+<tr>
+<td><code>/cameras</code></td>
+<td>GET</td>
+<td>カメラライブ画面HTML</td>
+</tr>
+<tr>
+<td><code>/settings</code></td>
+<td>GET</td>
+<td>全カメラ設定ページ</td>
+</tr>
+<tr>
+<td><code>/detection_window</code></td>
+<td>GET</td>
+<td>検出時間帯取得</td>
+</tr>
+<tr>
+<td><code>/detections</code></td>
+<td>GET</td>
+<td>検出一覧取得</td>
+</tr>
+<tr>
+<td><code>/detections_mtime</code></td>
+<td>GET</td>
+<td>検出ログ更新時刻取得</td>
+</tr>
+<tr>
+<td><code>/camera_embed/{index}</code></td>
+<td>GET</td>
+<td>WebRTC 埋め込みページ</td>
+</tr>
+<tr>
+<td><code>/go2rtc_asset/{name}</code></td>
+<td>GET</td>
+<td>go2rtc フロント資産プロキシ</td>
+</tr>
+<tr>
+<td><code>/camera_settings/current</code></td>
+<td>GET</td>
+<td>カメラ設定の現在値取得</td>
+</tr>
+<tr>
+<td><code>/camera_settings/apply_all</code></td>
+<td>POST</td>
+<td>設定を全カメラへ一括適用</td>
+</tr>
+<tr>
+<td><code>/camera_snapshot/{index}</code></td>
+<td>GET</td>
+<td>カメラスナップショット取得（<code>?download=1</code> でDL）</td>
+</tr>
+<tr>
+<td><code>/camera_restart/{index}</code></td>
+<td>POST</td>
+<td>カメラ再起動要求</td>
+</tr>
+<tr>
+<td><code>/camera_stats/{index}</code></td>
+<td>GET</td>
+<td>カメラ統計情報取得</td>
+</tr>
+<tr>
+<td><code>/image/{camera}/{filename}</code></td>
+<td>GET</td>
+<td>画像ファイル取得</td>
+</tr>
+<tr>
+<td><code>/detection/{camera}/{timestamp}</code></td>
+<td>DELETE</td>
+<td>検出結果削除</td>
+</tr>
+<tr>
+<td><code>/bulk_delete_non_meteor/{camera_name}</code></td>
+<td>POST</td>
+<td>カメラの非流星検出を一括削除</td>
+</tr>
+<tr>
+<td><code>/detection_label</code></td>
+<td>POST</td>
+<td>検出にラベルを設定</td>
+</tr>
+<tr>
+<td><code>/changelog</code></td>
+<td>GET</td>
+<td>CHANGELOG表示</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="get-health">GET /health</h3>
+<p><strong>説明</strong>: ダッシュボードのプロセス状態と構成情報を返す</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;ok&quot;,
+  &quot;version&quot;: &quot;3.1.1&quot;,
+  &quot;camera_count&quot;: 3
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:8080/health
+</code></pre>
+<hr />
+<h3 id="get">GET /</h3>
+<p><strong>説明</strong>: ダッシュボードのHTMLページを返す</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>text/html; charset=utf-8</code>
+- Status: 200 OK</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:8080/
+</code></pre>
+<hr />
+<h3 id="get-cameras">GET /cameras</h3>
+<p><strong>説明</strong>: カメラライブ表示用のHTMLページを返す</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>text/html; charset=utf-8</code>
+- Status: 200 OK</p>
+<p><strong>補足</strong>:
+- <code>CAMERA*_STREAM_KIND=mjpeg</code> の場合は各カメラの <code>/stream</code> を直接参照
+- <code>CAMERA*_STREAM_KIND=webrtc</code> の場合は <code>/camera_embed/{index}</code> を iframe で埋め込み</p>
+<hr />
+<h3 id="get-settings">GET /settings</h3>
+<p><strong>説明</strong>: 全カメラ設定UIページを返す</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>text/html; charset=utf-8</code>
+- Status: 200 OK</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:8080/settings
+</code></pre>
+<hr />
+<h3 id="get-camera_embedindex">GET /camera_embed/{index}</h3>
+<p><strong>説明</strong>: WebRTC ライブ表示用の埋め込みHTMLを返す</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>text/html; charset=utf-8</code>
+- Status: 200 OK</p>
+<p><strong>補足</strong>:
+- <code>CAMERA*_STREAM_KIND=webrtc</code> のカメラのみ有効
+- 埋め込みページ内で <code>/go2rtc_asset/video-stream.js</code> を読み込み、<code>go2rtc</code> の <code>/api/ws?src=...</code> へ接続
+- 表示モードは <code>webrtc,mse,hls,mjpeg</code> の優先順で自動選択</p>
+<hr />
+<h3 id="get-go2rtc_assetname">GET /go2rtc_asset/{name}</h3>
+<p><strong>説明</strong>: <code>go2rtc</code> の <code>video-stream.js</code> / <code>video-rtc.js</code> をダッシュボード経由で配信</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/javascript; charset=utf-8</code>
+- Status: 200 OK</p>
+<p><strong>補足</strong>:
+- WebRTC 埋め込みページからのみ利用
+- Docker 内では <code>go2rtc</code> コンテナを名前解決し、ホスト側公開アドレスと分離して取得</p>
+<hr />
+<h3 id="get-detection_window">GET /detection_window</h3>
+<p><strong>説明</strong>: 天文薄暮期間（検出時間帯）を取得</p>
+<p><strong>クエリパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>必須</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lat</code></td>
+<td>float</td>
+<td>No</td>
+<td>緯度</td>
+<td><code>35.6762</code></td>
+</tr>
+<tr>
+<td><code>lon</code></td>
+<td>float</td>
+<td>No</td>
+<td>経度</td>
+<td><code>139.6503</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;start&quot;: &quot;2026-02-01 16:45:23&quot;,
+  &quot;end&quot;: &quot;2026-02-02 06:12:45&quot;,
+  &quot;enabled&quot;: true,
+  &quot;latitude&quot;: 35.6762,
+  &quot;longitude&quot;: 139.6503
+}
+</code></pre>
+<p><strong>フィールド説明</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>フィールド</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>start</code></td>
+<td>string</td>
+<td>検出開始時刻（YYYY-MM-DD HH:MM:SS）</td>
+</tr>
+<tr>
+<td><code>end</code></td>
+<td>string</td>
+<td>検出終了時刻（YYYY-MM-DD HH:MM:SS）</td>
+</tr>
+<tr>
+<td><code>enabled</code></td>
+<td>boolean</td>
+<td>時間帯制限の有効/無効</td>
+</tr>
+<tr>
+<td><code>latitude</code></td>
+<td>float</td>
+<td>使用された緯度</td>
+</tr>
+<tr>
+<td><code>longitude</code></td>
+<td>float</td>
+<td>使用された経度</td>
+</tr>
+</tbody>
+</table>
+<p><strong>エラーレスポンス</strong>:</p>
+<pre><code class="language-json">{
+  &quot;start&quot;: &quot;&quot;,
+  &quot;end&quot;: &quot;&quot;,
+  &quot;enabled&quot;: false,
+  &quot;error&quot;: &quot;meteor_detector module not available&quot;
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># デフォルト座標で取得
+curl &quot;http://localhost:8080/detection_window&quot; | jq
+
+# 座標を指定
+curl &quot;http://localhost:8080/detection_window?lat=35.6762&amp;lon=139.6503&quot; | jq
+
+# JavaScriptから取得
+fetch('/detection_window?lat=35.6762&amp;lon=139.6503')
+  .then(r =&gt; r.json())
+  .then(data =&gt; console.log(data));
+</code></pre>
+<hr />
+<h3 id="get-detections">GET /detections</h3>
+<p><strong>説明</strong>: 全カメラの検出結果一覧を取得</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;total&quot;: 15,
+  &quot;recent&quot;: [
+    {
+      &quot;time&quot;: &quot;2026-02-02 06:55:33&quot;,
+      &quot;camera&quot;: &quot;camera1_10_0_1_25&quot;,
+      &quot;confidence&quot;: &quot;87%&quot;,
+      &quot;image&quot;: &quot;camera1_10_0_1_25/meteor_20260202_065533_composite.jpg&quot;,
+      &quot;mp4&quot;: &quot;camera1_10_0_1_25/meteor_20260202_065533.mp4&quot;,
+      &quot;composite_original&quot;: &quot;camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg&quot;
+    },
+    {
+      &quot;time&quot;: &quot;2026-02-02 05:32:18&quot;,
+      &quot;camera&quot;: &quot;camera2_10_0_1_3&quot;,
+      &quot;confidence&quot;: &quot;92%&quot;,
+      &quot;image&quot;: &quot;camera2_10_0_1_3/meteor_20260202_053218_composite.jpg&quot;,
+      &quot;mp4&quot;: &quot;camera2_10_0_1_3/meteor_20260202_053218.mp4&quot;,
+      &quot;composite_original&quot;: &quot;camera2_10_0_1_3/meteor_20260202_053218_composite_original.jpg&quot;
+    }
+  ]
+}
+</code></pre>
+<p><strong>フィールド説明</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>フィールド</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>total</code></td>
+<td>integer</td>
+<td>総検出数</td>
+</tr>
+<tr>
+<td><code>recent</code></td>
+<td>array</td>
+<td>検出リスト（時刻降順）</td>
+</tr>
+<tr>
+<td><code>recent[].time</code></td>
+<td>string</td>
+<td>検出時刻</td>
+</tr>
+<tr>
+<td><code>recent[].camera</code></td>
+<td>string</td>
+<td>カメラ名</td>
+</tr>
+<tr>
+<td><code>recent[].confidence</code></td>
+<td>string</td>
+<td>信頼度（パーセント表示）</td>
+</tr>
+<tr>
+<td><code>recent[].image</code></td>
+<td>string</td>
+<td>画像パス</td>
+</tr>
+<tr>
+<td><code>recent[].mp4</code></td>
+<td>string</td>
+<td>動画パス（通常は <code>.mp4</code>）</td>
+</tr>
+<tr>
+<td><code>recent[].composite_original</code></td>
+<td>string</td>
+<td>元画像の比較明合成パス</td>
+</tr>
+<tr>
+<td><code>recent[].label</code></td>
+<td>string</td>
+<td>検出ラベル（v1.10.0以降、未設定時は空文字）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># curlで取得
+curl http://localhost:8080/detections | jq
+
+# 総検出数のみ取得
+curl -s http://localhost:8080/detections | jq '.total'
+
+# 最新の検出のみ取得
+curl -s http://localhost:8080/detections | jq '.recent[0]'
+
+# JavaScriptから取得
+fetch('/detections')
+  .then(r =&gt; r.json())
+  .then(data =&gt; {
+    console.log('Total:', data.total);
+    data.recent.forEach(d =&gt; console.log(d.time, d.camera));
+  });
+</code></pre>
+<hr />
+<h3 id="get-detections_mtime">GET /detections_mtime</h3>
+<p><strong>説明</strong>: 各カメラの <code>detections.jsonl</code> および <code>detection_labels.json</code> の更新時刻（UNIXエポック秒）を取得（v1.10.0以降、ラベルファイルも監視対象）</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;mtime&quot;: 1751461442.123
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:8080/detections_mtime | jq
+</code></pre>
+<pre><code class="language-javascript">fetch('/detections_mtime')
+  .then(r =&gt; r.json())
+  .then(data =&gt; console.log('mtime:', data.mtime));
+</code></pre>
+<hr />
+<h3 id="get-camera_statsindex">GET /camera_stats/{index}</h3>
+<p><strong>説明</strong>: 指定カメラの統計情報を取得（v1.17.0で監視機能を追加）</p>
+<p><strong>URLパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td>integer</td>
+<td>カメラインデックス（0始まり）</td>
+<td><code>0</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;detections&quot;: 5,
+  &quot;elapsed&quot;: 3600.5,
+  &quot;camera&quot;: &quot;camera1_10_0_1_25&quot;,
+  &quot;stream_alive&quot;: true,
+  &quot;time_since_last_frame&quot;: 0.03,
+  &quot;is_detecting&quot;: true,
+  &quot;monitor_enabled&quot;: true,
+  &quot;monitor_checked_at&quot;: &quot;2026-02-24 12:34:56&quot;,
+  &quot;monitor_error&quot;: null,
+  &quot;monitor_stop_reason&quot;: null,
+  &quot;monitor_last_restart_at&quot;: &quot;2026-02-24 10:00:00&quot;,
+  &quot;monitor_restart_count&quot;: 2,
+  &quot;monitor_restart_triggered&quot;: false
+}
+</code></pre>
+<p><strong>フィールド説明</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>フィールド</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detections</code></td>
+<td>integer</td>
+<td>検出数</td>
+</tr>
+<tr>
+<td><code>elapsed</code></td>
+<td>float</td>
+<td>稼働時間（秒）</td>
+</tr>
+<tr>
+<td><code>camera</code></td>
+<td>string</td>
+<td>カメラ名</td>
+</tr>
+<tr>
+<td><code>stream_alive</code></td>
+<td>boolean</td>
+<td>ストリーム生存確認</td>
+</tr>
+<tr>
+<td><code>time_since_last_frame</code></td>
+<td>float</td>
+<td>最終フレームからの経過時間（秒）</td>
+</tr>
+<tr>
+<td><code>is_detecting</code></td>
+<td>boolean</td>
+<td>現在検出処理中か</td>
+</tr>
+<tr>
+<td><code>monitor_enabled</code></td>
+<td>boolean</td>
+<td>カメラ監視機能の有効/無効</td>
+</tr>
+<tr>
+<td><code>monitor_checked_at</code></td>
+<td>string/null</td>
+<td>最終監視確認時刻</td>
+</tr>
+<tr>
+<td><code>monitor_error</code></td>
+<td>string/null</td>
+<td>監視エラーメッセージ</td>
+</tr>
+<tr>
+<td><code>monitor_stop_reason</code></td>
+<td>string/null</td>
+<td>監視停止理由</td>
+</tr>
+<tr>
+<td><code>monitor_last_restart_at</code></td>
+<td>string/null</td>
+<td>最終再起動時刻</td>
+</tr>
+<tr>
+<td><code>monitor_restart_count</code></td>
+<td>integer</td>
+<td>再起動回数</td>
+</tr>
+<tr>
+<td><code>monitor_restart_triggered</code></td>
+<td>boolean</td>
+<td>再起動トリガー発動中か</td>
+</tr>
+</tbody>
+</table>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># curlで取得
+curl http://localhost:8080/camera_stats/0 | jq
+
+# JavaScriptから定期取得
+setInterval(() =&gt; {
+  fetch('/camera_stats/0')
+    .then(r =&gt; r.json())
+    .then(data =&gt; {
+      console.log('Stream alive:', data.stream_alive);
+      console.log('Monitor enabled:', data.monitor_enabled);
+      console.log('Restart count:', data.monitor_restart_count);
+    });
+}, 5000);
+</code></pre>
+<hr />
+<h3 id="get-imagecamerafilename">GET /image/{camera}/{filename}</h3>
+<p><strong>説明</strong>: 検出画像ファイルを取得</p>
+<p><strong>URLパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>camera</code></td>
+<td>string</td>
+<td>カメラディレクトリ名</td>
+<td><code>camera1_10_0_1_25</code></td>
+</tr>
+<tr>
+<td><code>filename</code></td>
+<td>string</td>
+<td>ファイル名</td>
+<td><code>meteor_20260202_065533_composite.jpg</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>image/jpeg</code> または <code>image/png</code>
+- Status: 200 OK
+- Body: バイナリ画像データ</p>
+<p><strong>エラーレスポンス</strong>:
+- Status: 404 Not Found</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># 画像をダウンロード
+curl -O &quot;http://localhost:8080/image/camera1_10_0_1_25/meteor_20260202_065533_composite.jpg&quot;
+
+# HTMLから表示
+&lt;img src=&quot;/image/camera1_10_0_1_25/meteor_20260202_065533_composite.jpg&quot; alt=&quot;Meteor&quot;&gt;
+
+# ダウンロードリンク
+&lt;a href=&quot;/image/camera1_10_0_1_25/meteor_20260202_065533_composite.jpg&quot; download&gt;
+  Download Image
+&lt;/a&gt;
+</code></pre>
+<hr />
+<h3 id="get-camera_snapshotindex">GET /camera_snapshot/{index}</h3>
+<p><strong>説明</strong>: 指定カメラの現在フレームをJPEGで取得</p>
+<p><strong>URLパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td>integer</td>
+<td>カメラインデックス（0始まり）</td>
+<td><code>0</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>クエリパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>必須</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>download</code></td>
+<td>string</td>
+<td>No</td>
+<td><code>1/true/yes</code> で <code>Content-Disposition: attachment</code> を付与</td>
+<td><code>1</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>image/jpeg</code>
+- Status: 200 OK</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># 画像を直接表示
+curl &quot;http://localhost:8080/camera_snapshot/0&quot; --output snapshot.jpg
+
+# ダウンロード用途（attachmentヘッダ付き）
+curl -OJ &quot;http://localhost:8080/camera_snapshot/0?download=1&quot;
+</code></pre>
+<hr />
+<h3 id="post-camera_restartindex">POST /camera_restart/{index}</h3>
+<p><strong>説明</strong>: 指定カメラに再起動を要求（非同期）</p>
+<p><strong>URLパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td>integer</td>
+<td>カメラインデックス（0始まり）</td>
+<td><code>1</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 202 Accepted</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;message&quot;: &quot;restart requested&quot;
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl -X POST &quot;http://localhost:8080/camera_restart/1&quot; | jq
+</code></pre>
+<hr />
+<h3 id="get-camera_settingscurrent">GET /camera_settings/current</h3>
+<p><strong>説明</strong>: 各カメラの <code>/stats.settings</code> を取得し、設定ページ表示用に返す</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ（例）</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;settings&quot;: {
+    &quot;diff_threshold&quot;: 20,
+    &quot;nuisance_overlap_threshold&quot;: 0.6
+  },
+  &quot;results&quot;: [
+    {
+      &quot;camera&quot;: &quot;camera1&quot;,
+      &quot;success&quot;: true,
+      &quot;settings&quot;: {
+        &quot;diff_threshold&quot;: 20
+      }
+    }
+  ],
+  &quot;ok_count&quot;: 1,
+  &quot;total&quot;: 1
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl -s http://localhost:8080/camera_settings/current | jq
+</code></pre>
+<hr />
+<h3 id="post-camera_settingsapply_all">POST /camera_settings/apply_all</h3>
+<p><strong>説明</strong>: 指定した設定値を全カメラへ一括適用（各カメラの <code>POST /apply_settings</code> を呼び出し）</p>
+<p><strong>リクエストボディ（例）</strong>:</p>
+<pre><code class="language-json">{
+  &quot;diff_threshold&quot;: 20,
+  &quot;min_brightness&quot;: 180,
+  &quot;nuisance_overlap_threshold&quot;: 0.60,
+  &quot;nuisance_path_overlap_threshold&quot;: 0.70,
+  &quot;min_track_points&quot;: 4,
+  &quot;max_stationary_ratio&quot;: 0.40
+}
+</code></pre>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ（例）</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;applied_count&quot;: 3,
+  &quot;total&quot;: 3,
+  &quot;results&quot;: [
+    {
+      &quot;camera&quot;: &quot;camera1&quot;,
+      &quot;success&quot;: true,
+      &quot;response&quot;: {
+        &quot;success&quot;: true,
+        &quot;restart_required&quot;: true,
+        &quot;restart_requested&quot;: true,
+        &quot;restart_triggers&quot;: [&quot;sensitivity&quot;, &quot;scale&quot;]
+      }
+    },
+    { &quot;camera&quot;: &quot;camera2&quot;, &quot;success&quot;: true, &quot;response&quot;: { &quot;success&quot;: true } },
+    { &quot;camera&quot;: &quot;camera3&quot;, &quot;success&quot;: false, &quot;error&quot;: &quot;timeout&quot; }
+  ]
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl -X POST &quot;http://localhost:8080/camera_settings/apply_all&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;diff_threshold&quot;:20,&quot;nuisance_overlap_threshold&quot;:0.60}' | jq
+</code></pre>
+<hr />
+<h3 id="delete-detectioncameratimestamp">DELETE /detection/{camera}/{timestamp}</h3>
+<p><strong>説明</strong>: 検出結果を削除（動画、画像、JSONLエントリ）</p>
+<p><strong>URLパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>camera</code></td>
+<td>string</td>
+<td>カメラディレクトリ名</td>
+<td><code>camera1_10_0_1_25</code></td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>string</td>
+<td>検出時刻（URL encoded）</td>
+<td><code>2026-02-02 06:55:33</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>成功レスポンス</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;deleted_files&quot;: [
+    &quot;meteor_20260202_065533.mp4&quot;,
+    &quot;meteor_20260202_065533_composite.jpg&quot;,
+    &quot;meteor_20260202_065533_composite_original.jpg&quot;
+  ],
+  &quot;message&quot;: &quot;3個のファイルを削除しました&quot;
+}
+</code></pre>
+<p><strong>エラーレスポンス</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: false,
+  &quot;error&quot;: &quot;File not found&quot;
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># curlで削除
+curl -X DELETE &quot;http://localhost:8080/detection/camera1_10_0_1_25/2026-02-02%2006:55:33&quot;
+
+# JavaScriptから削除
+fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
+  method: 'DELETE'
+})
+.then(r =&gt; r.json())
+.then(data =&gt; {
+  if (data.success) {
+    alert(data.message);
+  } else {
+    alert('削除失敗: ' + data.error);
+  }
+});
+</code></pre>
+<hr />
+<h3 id="post-bulk_delete_non_meteorcamera_name">POST /bulk_delete_non_meteor/{camera_name}</h3>
+<p><strong>説明</strong>: 指定カメラの非流星検出（ラベルが "non-meteor" の検出）を一括削除（v1.18.0）</p>
+<p><strong>URLパラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>camera_name</code></td>
+<td>string</td>
+<td>カメラディレクトリ名</td>
+<td><code>camera1_10_0_1_25</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>成功レスポンス</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;deleted_count&quot;: 5,
+  &quot;deleted_detections&quot;: [
+    {
+      &quot;time&quot;: &quot;2026-02-02 06:55:33&quot;,
+      &quot;deleted_files&quot;: [
+        &quot;meteor_20260202_065533.mp4&quot;,
+        &quot;meteor_20260202_065533_composite.jpg&quot;,
+        &quot;meteor_20260202_065533_composite_original.jpg&quot;
+      ]
+    },
+    {
+      &quot;time&quot;: &quot;2026-02-02 05:32:18&quot;,
+      &quot;deleted_files&quot;: [
+        &quot;meteor_20260202_053218.mp4&quot;,
+        &quot;meteor_20260202_053218_composite.jpg&quot;,
+        &quot;meteor_20260202_053218_composite_original.jpg&quot;
+      ]
+    }
+  ],
+  &quot;message&quot;: &quot;5件の非流星検出を削除しました（合計15ファイル）&quot;
+}
+</code></pre>
+<p><strong>エラーレスポンス</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: false,
+  &quot;error&quot;: &quot;No non-meteor detections found&quot;
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># curlで一括削除
+curl -X POST &quot;http://localhost:8080/bulk_delete_non_meteor/camera1_10_0_1_25&quot; | jq
+
+# JavaScriptから一括削除
+fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
+  method: 'POST'
+})
+.then(r =&gt; r.json())
+.then(data =&gt; {
+  if (data.success) {
+    alert(`${data.deleted_count}件の非流星検出を削除しました`);
+  } else {
+    alert('削除失敗: ' + data.error);
+  }
+});
+</code></pre>
+<hr />
+<h3 id="post-detection_label">POST /detection_label</h3>
+<p><strong>説明</strong>: 検出にラベルを設定（v1.10.0）</p>
+<p><strong>リクエストボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;camera&quot;: &quot;camera1_10_0_1_25&quot;,
+  &quot;timestamp&quot;: &quot;2026-02-02 06:55:33&quot;,
+  &quot;label&quot;: &quot;meteor&quot;
+}
+</code></pre>
+<p><strong>パラメータ説明</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>型</th>
+<th>必須</th>
+<th>説明</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>camera</code></td>
+<td>string</td>
+<td>Yes</td>
+<td>カメラディレクトリ名</td>
+<td><code>camera1_10_0_1_25</code></td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td>string</td>
+<td>Yes</td>
+<td>検出時刻</td>
+<td><code>2026-02-02 06:55:33</code></td>
+</tr>
+<tr>
+<td><code>label</code></td>
+<td>string</td>
+<td>Yes</td>
+<td>ラベル（<code>meteor</code>, <code>non-meteor</code>, 空文字など）</td>
+<td><code>meteor</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>成功レスポンス</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;message&quot;: &quot;Label updated&quot;
+}
+</code></pre>
+<p><strong>エラーレスポンス</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: false,
+  &quot;error&quot;: &quot;Detection not found&quot;
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># curlでラベル設定
+curl -X POST &quot;http://localhost:8080/detection_label&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{
+    &quot;camera&quot;: &quot;camera1_10_0_1_25&quot;,
+    &quot;timestamp&quot;: &quot;2026-02-02 06:55:33&quot;,
+    &quot;label&quot;: &quot;meteor&quot;
+  }' | jq
+
+# JavaScriptからラベル設定
+fetch('/detection_label', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    camera: 'camera1_10_0_1_25',
+    timestamp: '2026-02-02 06:55:33',
+    label: 'meteor'
+  })
+})
+.then(r =&gt; r.json())
+.then(data =&gt; {
+  if (data.success) {
+    alert('ラベル設定完了');
+  } else {
+    alert('エラー: ' + data.error);
+  }
+});
+</code></pre>
+<p><strong>ラベルの活用</strong>:
+- <code>meteor</code>: 流星として確認済み
+- <code>non-meteor</code>: 非流星（誤検出）
+- 空文字: 未確認
+- カスタムラベル: 任意の文字列（例: <code>satellite</code>, <code>aircraft</code>, <code>noise</code>）</p>
+<hr />
+<h3 id="get-changelog">GET /changelog</h3>
+<p><strong>説明</strong>: CHANGELOG.mdの内容を取得</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>text/plain; charset=utf-8</code>
+- Status: 200 OK
+- Body: CHANGELOG.mdの内容（テキスト）</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl http://localhost:8080/changelog
+</code></pre>
+<hr />
+<h2 id="meteor_detector_rtsp_webpy-api">meteor_detector_rtsp_web.py API</h2>
+<p>各カメラコンテナが提供するエンドポイント（デフォルトポート: 8080）</p>
+<h3 id="_5">エンドポイント一覧</h3>
+<table>
+<thead>
+<tr>
+<th>エンドポイント</th>
+<th>メソッド</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td>GET</td>
+<td>プレビューHTML</td>
+</tr>
+<tr>
+<td><code>/stream</code></td>
+<td>GET</td>
+<td>MJPEGストリーム</td>
+</tr>
+<tr>
+<td><code>/snapshot</code></td>
+<td>GET</td>
+<td>現在フレームJPEG</td>
+</tr>
+<tr>
+<td><code>/stats</code></td>
+<td>GET</td>
+<td>統計情報</td>
+</tr>
+<tr>
+<td><code>/update_mask</code></td>
+<td>POST</td>
+<td>現在フレームからマスク再生成</td>
+</tr>
+<tr>
+<td><code>/apply_settings</code></td>
+<td>POST</td>
+<td>設定値をランタイム反映</td>
+</tr>
+<tr>
+<td><code>/restart</code></td>
+<td>POST</td>
+<td>プロセス再起動要求</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="get_1">GET /</h3>
+<p><strong>説明</strong>: カメラプレビューのHTMLページを返す</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>text/html; charset=utf-8</code>
+- Status: 200 OK</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># camera1のプレビュー
+curl http://localhost:8081/
+
+# ブラウザで開く
+open http://localhost:8081/
+</code></pre>
+<hr />
+<h3 id="get-stream">GET /stream</h3>
+<p><strong>説明</strong>: MJPEGストリーム（Motion JPEG）を返す</p>
+<p><strong>補足</strong>:
+- 各カメラコンテナ (<code>meteor_detector_rtsp_web.py</code>) が提供するライブ表示用エンドポイント
+- ダッシュボードが <code>mjpeg</code> 構成のときはブラウザがこのURLを直接参照
+- ダッシュボードが <code>webrtc</code> 構成のときは、ライブ表示の主経路は <code>go2rtc</code> 経由になり、この <code>/stream</code> は主表示には使われません</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>multipart/x-mixed-replace; boundary=frame</code>
+- Status: 200 OK
+- Body: 連続的なJPEGフレーム（約30fps）</p>
+<p><strong>ストリームフォーマット</strong>:</p>
+<pre><code>--frame\r\n
+Content-Type: image/jpeg\r\n\r\n
+&lt;JPEG binary data&gt;
+\r\n
+--frame\r\n
+Content-Type: image/jpeg\r\n\r\n
+&lt;JPEG binary data&gt;
+\r\n
+...
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># HTMLで表示
+&lt;img src=&quot;http://localhost:8081/stream&quot; alt=&quot;Live Stream&quot;&gt;
+
+# VLCで再生
+vlc http://localhost:8081/stream
+
+# ffmpegで録画
+ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
+</code></pre>
+<p><strong>特徴</strong>:
+- リアルタイムプレビュー
+- 検出中の物体が緑丸で表示
+- 追跡中の軌跡が黄線で表示
+- 流星検出時に赤で表示
+- フレームレート: 約30fps
+- 画質: JPEG品質70%</p>
+<hr />
+<h3 id="get-stats">GET /stats</h3>
+<p><strong>説明</strong>: カメラの統計情報を取得</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;detections&quot;: 5,
+  &quot;elapsed&quot;: 3600.5,
+  &quot;camera&quot;: &quot;camera1_10_0_1_25&quot;,
+  &quot;settings&quot;: {
+    &quot;sensitivity&quot;: &quot;medium&quot;,
+    &quot;scale&quot;: 0.5,
+    &quot;buffer&quot;: 15.0,
+    &quot;extract_clips&quot;: true,
+    &quot;source_fps&quot;: 20.0,
+    &quot;exclude_bottom&quot;: 0.0625,
+    &quot;exclude_bottom_ratio&quot;: 0.0625,
+    &quot;mask_image&quot;: &quot;/app/mask_image.png&quot;,
+    &quot;mask_from_day&quot;: &quot;&quot;,
+    &quot;mask_dilate&quot;: 5,
+    &quot;nuisance_mask_image&quot;: &quot;&quot;,
+    &quot;nuisance_from_night&quot;: &quot;&quot;,
+    &quot;nuisance_dilate&quot;: 3,
+    &quot;nuisance_overlap_threshold&quot;: 0.6
+  },
+  &quot;runtime_fps&quot;: 19.83,
+  &quot;stream_alive&quot;: true,
+  &quot;time_since_last_frame&quot;: 0.03,
+  &quot;is_detecting&quot;: true,
+  &quot;detection_status&quot;: &quot;DETECTING&quot;,
+  &quot;detection_window_enabled&quot;: true,
+  &quot;detection_window_active&quot;: true,
+  &quot;detection_window_start&quot;: &quot;2026-03-09 17:46:53&quot;,
+  &quot;detection_window_end&quot;: &quot;2026-03-10 06:03:38&quot;
+}
+</code></pre>
+<p><strong>フィールド説明</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>フィールド</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detections</code></td>
+<td>integer</td>
+<td>検出数</td>
+</tr>
+<tr>
+<td><code>elapsed</code></td>
+<td>float</td>
+<td>稼働時間（秒）</td>
+</tr>
+<tr>
+<td><code>camera</code></td>
+<td>string</td>
+<td>カメラ名</td>
+</tr>
+<tr>
+<td><code>settings</code></td>
+<td>object</td>
+<td>設定情報</td>
+</tr>
+<tr>
+<td><code>settings.sensitivity</code></td>
+<td>string</td>
+<td>感度プリセット</td>
+</tr>
+<tr>
+<td><code>settings.scale</code></td>
+<td>float</td>
+<td>処理スケール</td>
+</tr>
+<tr>
+<td><code>settings.buffer</code></td>
+<td>float</td>
+<td>バッファ秒数</td>
+</tr>
+<tr>
+<td><code>settings.extract_clips</code></td>
+<td>boolean</td>
+<td>動画保存の有効/無効</td>
+</tr>
+<tr>
+<td><code>settings.source_fps</code></td>
+<td>float</td>
+<td>接続時に取得した入力ストリームFPS</td>
+</tr>
+<tr>
+<td><code>settings.exclude_bottom</code></td>
+<td>float</td>
+<td>画面下部除外率</td>
+</tr>
+<tr>
+<td><code>settings.exclude_bottom_ratio</code></td>
+<td>float</td>
+<td>画面下部除外率（内部キー）</td>
+</tr>
+<tr>
+<td><code>settings.exclude_edge_ratio</code></td>
+<td>float</td>
+<td>画面端ノイズ除外率（v1.16.0、デフォルト0.0）</td>
+</tr>
+<tr>
+<td><code>settings.clip_margin_before</code></td>
+<td>float</td>
+<td>録画前マージン秒数（v1.14.0、デフォルト0.5）</td>
+</tr>
+<tr>
+<td><code>settings.clip_margin_after</code></td>
+<td>float</td>
+<td>録画後マージン秒数（v1.14.0、デフォルト0.5）</td>
+</tr>
+<tr>
+<td><code>settings.mask_image</code></td>
+<td>string</td>
+<td>マスク画像（優先）</td>
+</tr>
+<tr>
+<td><code>settings.mask_from_day</code></td>
+<td>string</td>
+<td>昼間画像から生成するマスク</td>
+</tr>
+<tr>
+<td><code>settings.mask_dilate</code></td>
+<td>integer</td>
+<td>マスク拡張ピクセル数</td>
+</tr>
+<tr>
+<td><code>settings.nuisance_overlap_threshold</code></td>
+<td>float</td>
+<td>ノイズ帯重なり閾値</td>
+</tr>
+<tr>
+<td><code>settings.nuisance_path_overlap_threshold</code></td>
+<td>float</td>
+<td>ノイズ帯経路重なり閾値</td>
+</tr>
+<tr>
+<td><code>settings.min_track_points</code></td>
+<td>integer</td>
+<td>最小追跡点数</td>
+</tr>
+<tr>
+<td><code>settings.max_stationary_ratio</code></td>
+<td>float</td>
+<td>静止率上限</td>
+</tr>
+<tr>
+<td><code>settings.small_area_threshold</code></td>
+<td>integer</td>
+<td>小領域判定閾値</td>
+</tr>
+<tr>
+<td><code>settings.nuisance_mask_image</code></td>
+<td>string</td>
+<td>ノイズ帯マスク画像</td>
+</tr>
+<tr>
+<td><code>settings.nuisance_from_night</code></td>
+<td>string</td>
+<td>夜間画像からのノイズ帯生成元</td>
+</tr>
+<tr>
+<td><code>settings.nuisance_dilate</code></td>
+<td>integer</td>
+<td>ノイズ帯マスク拡張ピクセル数</td>
+</tr>
+<tr>
+<td><code>runtime_fps</code></td>
+<td>float</td>
+<td>直近フレームから算出した実効FPS</td>
+</tr>
+<tr>
+<td><code>stream_alive</code></td>
+<td>boolean</td>
+<td>ストリーム生存確認</td>
+</tr>
+<tr>
+<td><code>time_since_last_frame</code></td>
+<td>float</td>
+<td>最終フレームからの経過時間（秒）</td>
+</tr>
+<tr>
+<td><code>is_detecting</code></td>
+<td>boolean</td>
+<td>現在検出処理中か</td>
+</tr>
+<tr>
+<td><code>detection_status</code></td>
+<td>string</td>
+<td>検出状態詳細。<code>DETECTING</code> / <code>OUT_OF_WINDOW</code> / <code>WAITING_FRAME</code> / <code>STREAM_LOST</code></td>
+</tr>
+<tr>
+<td><code>detection_window_enabled</code></td>
+<td>boolean</td>
+<td>検出時間帯制限が有効か</td>
+</tr>
+<tr>
+<td><code>detection_window_active</code></td>
+<td>boolean</td>
+<td>現在が検出時間帯内か</td>
+</tr>
+<tr>
+<td><code>detection_window_start</code></td>
+<td>string</td>
+<td>現在参照中の検出開始時刻</td>
+</tr>
+<tr>
+<td><code>detection_window_end</code></td>
+<td>string</td>
+<td>現在参照中の検出終了時刻</td>
+</tr>
+</tbody>
+</table>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># curlで取得
+curl http://localhost:8081/stats | jq
+
+# 検出数のみ取得
+curl -s http://localhost:8081/stats | jq '.detections'
+
+# ストリーム状態を確認
+curl -s http://localhost:8081/stats | jq '.stream_alive'
+
+# 全カメラの統計を一括取得
+for port in 8081 8082 8083; do
+  echo &quot;Port $port:&quot;
+  curl -s &quot;http://localhost:$port/stats&quot; | jq '{camera, detections, stream_alive}'
+done
+
+# JavaScriptから定期取得
+setInterval(() =&gt; {
+  fetch('http://localhost:8081/stats')
+    .then(r =&gt; r.json())
+    .then(data =&gt; {
+      console.log('Detections:', data.detections);
+      console.log('Stream alive:', data.stream_alive);
+      console.log('Is detecting:', data.is_detecting);
+    });
+}, 2000);  // 2秒ごと
+</code></pre>
+<hr />
+<h3 id="get-snapshot">GET /snapshot</h3>
+<p><strong>説明</strong>: 現在フレームをJPEGで取得</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>image/jpeg</code>
+- Status: 200 OK</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl &quot;http://localhost:8081/snapshot&quot; --output camera1_snapshot.jpg
+</code></pre>
+<hr />
+<h3 id="post-update_mask">POST /update_mask</h3>
+<p><strong>説明</strong>: 現在フレームから除外マスクを再生成して即時反映（固定カメラ向け）</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 200 OK</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;message&quot;: &quot;mask updated&quot;,
+  &quot;saved&quot;: &quot;/output/masks/camera1_10_0_1_25_mask.png&quot;
+}
+</code></pre>
+<p><strong>フィールド説明</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>フィールド</th>
+<th>型</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>success</code></td>
+<td>boolean</td>
+<td>更新成功/失敗</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>string</td>
+<td>結果メッセージ</td>
+</tr>
+<tr>
+<td><code>saved</code></td>
+<td>string</td>
+<td>保存先（永続化ファイル）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash"># マスク更新
+curl -X POST http://localhost:8081/update_mask | jq
+</code></pre>
+<hr />
+<h3 id="post-apply_settings">POST /apply_settings</h3>
+<p><strong>説明</strong>: 設定をランタイム反映。起動時依存の項目は設定保存後に自動再起動を要求</p>
+<p><strong>リクエストボディ（例）</strong>:</p>
+<pre><code class="language-json">{
+  &quot;sensitivity&quot;: &quot;medium&quot;,
+  &quot;scale&quot;: 0.5,
+  &quot;buffer&quot;: 15,
+  &quot;extract_clips&quot;: true,
+  &quot;diff_threshold&quot;: 20,
+  &quot;min_brightness&quot;: 180,
+  &quot;min_linearity&quot;: 0.7,
+  &quot;nuisance_overlap_threshold&quot;: 0.6,
+  &quot;nuisance_path_overlap_threshold&quot;: 0.7,
+  &quot;min_track_points&quot;: 4,
+  &quot;max_stationary_ratio&quot;: 0.4,
+  &quot;small_area_threshold&quot;: 40,
+  &quot;mask_dilate&quot;: 20,
+  &quot;nuisance_dilate&quot;: 3,
+  &quot;exclude_edge_ratio&quot;: 0.0,
+  &quot;clip_margin_before&quot;: 0.5,
+  &quot;clip_margin_after&quot;: 0.5
+}
+</code></pre>
+<p><strong>レスポンスボディ（例）</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;applied&quot;: {
+    &quot;sensitivity&quot;: &quot;medium&quot;,
+    &quot;scale&quot;: 0.5,
+    &quot;diff_threshold&quot;: 20
+  },
+  &quot;errors&quot;: [],
+  &quot;restart_required&quot;: true,
+  &quot;restart_requested&quot;: true,
+  &quot;restart_triggers&quot;: [&quot;sensitivity&quot;, &quot;scale&quot;]
+}
+</code></pre>
+<p><strong>反映ルール</strong>:
+- 再起動不要: <code>diff_threshold</code> など検出ロジック/誤検出抑制の閾値群
+- 自動再起動で反映: <code>sensitivity</code> / <code>scale</code> / <code>buffer</code> / <code>extract_clips</code>
+- 設定は <code>output/runtime_settings/&lt;camera&gt;.json</code> に永続化され、再起動後も維持</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8081/apply_settings \
+  -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;diff_threshold&quot;:20,&quot;nuisance_overlap_threshold&quot;:0.60}' | jq
+</code></pre>
+<hr />
+<h3 id="post-restart">POST /restart</h3>
+<p><strong>説明</strong>: カメラプロセスへ再起動を要求（Dockerの <code>restart: unless-stopped</code> 運用を想定）</p>
+<p><strong>レスポンス</strong>:
+- Content-Type: <code>application/json</code>
+- Status: 202 Accepted</p>
+<p><strong>レスポンスボディ</strong>:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: true,
+  &quot;message&quot;: &quot;restart requested&quot;
+}
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">curl -X POST http://localhost:8081/restart | jq
+</code></pre>
+<hr />
+<h2 id="_6">共通仕様</h2>
+<h3 id="corscross-origin-resource-sharing">CORS（Cross-Origin Resource Sharing）</h3>
+<p><strong>現在の設定</strong>:</p>
+<pre><code class="language-python"># /stats /update_mask /apply_settings /restart はCORS許可
+self.send_header('Access-Control-Allow-Origin', '*')
+</code></pre>
+<p><strong>制限事項</strong>:
+- 他のエンドポイントはCORS未対応
+- 外部ドメインからのアクセスは制限される</p>
+<p><strong>カスタマイズ例</strong>:</p>
+<pre><code class="language-python"># すべてのエンドポイントでCORS許可（セキュリティ注意）
+def end_headers(self):
+    self.send_header('Access-Control-Allow-Origin', '*')
+    self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE')
+    self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+    BaseHTTPRequestHandler.end_headers(self)
+</code></pre>
+<hr />
+<h3 id="_7">レート制限</h3>
+<p><strong>現在の制限</strong>: なし</p>
+<p><strong>推奨実装</strong> (Nginxリバースプロキシ):</p>
+<pre><code class="language-nginx"># /etc/nginx/sites-available/meteor
+limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+server {
+    location /api/ {
+        limit_req zone=api burst=20;
+        proxy_pass http://localhost:8080/;
+    }
+}
+</code></pre>
+<hr />
+<h3 id="_8">タイムアウト</h3>
+<table>
+<thead>
+<tr>
+<th>エンドポイント</th>
+<th>タイムアウト</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/stream</code></td>
+<td>なし</td>
+<td>ストリーミング</td>
+</tr>
+<tr>
+<td>その他</td>
+<td>30秒</td>
+<td>ブラウザデフォルト</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_9">環境変数</h2>
+<h3 id="v1170">カメラ監視機能（v1.17.0）</h3>
+<p>カメラの自動監視と再起動を制御する環境変数です。</p>
+<table>
+<thead>
+<tr>
+<th>環境変数</th>
+<th>デフォルト</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CAMERA_MONITOR_ENABLED</code></td>
+<td><code>true</code></td>
+<td>カメラ監視機能の有効/無効</td>
+</tr>
+<tr>
+<td><code>CAMERA_MONITOR_INTERVAL</code></td>
+<td><code>60</code></td>
+<td>監視チェック間隔（秒）</td>
+</tr>
+<tr>
+<td><code>CAMERA_MONITOR_TIMEOUT</code></td>
+<td><code>120</code></td>
+<td>フレーム未受信タイムアウト（秒）</td>
+</tr>
+<tr>
+<td><code>CAMERA_RESTART_ENABLED</code></td>
+<td><code>true</code></td>
+<td>自動再起動の有効/無効</td>
+</tr>
+<tr>
+<td><code>CAMERA_RESTART_DELAY</code></td>
+<td><code>5</code></td>
+<td>再起動実行までの遅延（秒）</td>
+</tr>
+<tr>
+<td><code>CAMERA_RESTART_MAX_COUNT</code></td>
+<td><code>10</code></td>
+<td>最大再起動回数（この回数を超えると監視停止）</td>
+</tr>
+<tr>
+<td><code>CAMERA_RESTART_COOLDOWN</code></td>
+<td><code>300</code></td>
+<td>再起動後のクールダウン時間（秒）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>使用例（docker-compose.yml）</strong>:</p>
+<pre><code class="language-yaml">version: '3.8'
+services:
+  dashboard:
+    image: meteor-dashboard:latest
+    environment:
+      - CAMERA_MONITOR_ENABLED=true
+      - CAMERA_MONITOR_INTERVAL=60
+      - CAMERA_MONITOR_TIMEOUT=120
+      - CAMERA_RESTART_ENABLED=true
+      - CAMERA_RESTART_DELAY=5
+      - CAMERA_RESTART_MAX_COUNT=10
+      - CAMERA_RESTART_COOLDOWN=300
+    ports:
+      - &quot;8080:8080&quot;
+</code></pre>
+<p><strong>監視機能の動作</strong>:
+1. 各カメラの <code>/stats</code> エンドポイントを定期的に確認
+2. <code>time_since_last_frame</code> が <code>CAMERA_MONITOR_TIMEOUT</code> を超えた場合、フレーム停止と判定
+3. <code>CAMERA_RESTART_ENABLED=true</code> の場合、自動的に <code>/restart</code> を呼び出し
+4. 再起動回数が <code>CAMERA_RESTART_MAX_COUNT</code> を超えると監視を停止
+5. 監視状態は <code>/camera_stats/{index}</code> で確認可能</p>
+<p><strong>監視を無効化する場合</strong>:</p>
+<pre><code class="language-yaml">environment:
+  - CAMERA_MONITOR_ENABLED=false
+</code></pre>
+<hr />
+<h2 id="_10">エラーコード</h2>
+<h3 id="http">HTTPステータスコード</h3>
+<table>
+<thead>
+<tr>
+<th>コード</th>
+<th>説明</th>
+<th>発生条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>200</td>
+<td>OK</td>
+<td>成功</td>
+</tr>
+<tr>
+<td>404</td>
+<td>Not Found</td>
+<td>ファイルまたはエンドポイントが存在しない</td>
+</tr>
+<tr>
+<td>500</td>
+<td>Internal Server Error</td>
+<td>サーバー内部エラー</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_11">エラーレスポンス例</h3>
+<pre><code class="language-json">{
+  &quot;success&quot;: false,
+  &quot;error&quot;: &quot;File not found&quot;
+}
+</code></pre>
+<hr />
+<h2 id="_12">使用例</h2>
+<h3 id="python">Python</h3>
+<pre><code class="language-python">import requests
+
+# 検出一覧を取得
+response = requests.get('http://localhost:8080/detections')
+data = response.json()
+print(f&quot;Total detections: {data['total']}&quot;)
+
+# 統計情報を取得
+stats = requests.get('http://localhost:8081/stats').json()
+print(f&quot;Camera: {stats['camera']}, Detections: {stats['detections']}&quot;)
+
+# 検出結果を削除
+delete_response = requests.delete(
+    'http://localhost:8080/detection/camera1_10_0_1_25/2026-02-02 06:55:33'
+)
+print(delete_response.json())
+</code></pre>
+<hr />
+<h3 id="javascript">JavaScript（ブラウザ）</h3>
+<pre><code class="language-javascript">// 検出一覧を取得して表示
+async function loadDetections() {
+  const response = await fetch('/detections');
+  const data = await response.json();
+
+  console.log(`Total: ${data.total}`);
+  data.recent.forEach(detection =&gt; {
+    console.log(`${detection.time} - ${detection.camera} (${detection.confidence})`);
+  });
+}
+
+// 統計情報を定期取得
+setInterval(async () =&gt; {
+  const stats = await fetch('http://localhost:8081/stats').then(r =&gt; r.json());
+  document.getElementById('detections').textContent = stats.detections;
+  document.getElementById('status').textContent = stats.stream_alive ? 'Online' : 'Offline';
+}, 2000);
+
+// 検出結果を削除
+async function deleteDetection(camera, timestamp) {
+  const response = await fetch(`/detection/${camera}/${timestamp}`, {
+    method: 'DELETE'
+  });
+  const result = await response.json();
+
+  if (result.success) {
+    alert(result.message);
+    loadDetections();  // リストを更新
+  } else {
+    alert(`Error: ${result.error}`);
+  }
+}
+
+// 非流星検出を一括削除
+async function bulkDeleteNonMeteor(camera) {
+  const response = await fetch(`/bulk_delete_non_meteor/${camera}`, {
+    method: 'POST'
+  });
+  const result = await response.json();
+
+  if (result.success) {
+    alert(`${result.deleted_count}件の非流星検出を削除しました`);
+    loadDetections();  // リストを更新
+  } else {
+    alert(`Error: ${result.error}`);
+  }
+}
+
+// 検出にラベルを設定
+async function setDetectionLabel(camera, timestamp, label) {
+  const response = await fetch('/detection_label', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({camera, timestamp, label})
+  });
+  const result = await response.json();
+
+  if (result.success) {
+    alert('ラベル設定完了');
+    loadDetections();  // リストを更新
+  } else {
+    alert(`Error: ${result.error}`);
+  }
+}
+</code></pre>
+<hr />
+<h3 id="nodejs">Node.js</h3>
+<pre><code class="language-javascript">const axios = require('axios');
+
+// 全カメラの統計を取得
+async function getAllStats() {
+  const cameras = [8081, 8082, 8083];
+  const promises = cameras.map(port =&gt;
+    axios.get(`http://localhost:${port}/stats`)
+  );
+
+  const results = await Promise.all(promises);
+  results.forEach((res, i) =&gt; {
+    console.log(`Camera ${i+1}:`, res.data.detections, 'detections');
+  });
+}
+
+getAllStats();
+</code></pre>
+<hr />
+<h3 id="bash">Bash</h3>
+<pre><code class="language-bash">#!/bin/bash
+# 全カメラの統計を表示
+
+echo &quot;=== Meteor Detection Stats ===&quot;
+for port in 8081 8082 8083; do
+  stats=$(curl -s &quot;http://localhost:$port/stats&quot;)
+  camera=$(echo &quot;$stats&quot; | jq -r '.camera')
+  detections=$(echo &quot;$stats&quot; | jq -r '.detections')
+  alive=$(echo &quot;$stats&quot; | jq -r '.stream_alive')
+
+  echo &quot;$camera: $detections detections (stream: $alive)&quot;
+done
+
+# 検出一覧を取得
+echo &quot;&quot;
+echo &quot;=== Recent Detections ===&quot;
+curl -s &quot;http://localhost:8080/detections&quot; | \
+  jq -r '.recent[] | &quot;\(.time) - \(.camera) (\(.confidence))&quot;'
+</code></pre>
+<hr />
+<h3 id="powershell">PowerShell</h3>
+<pre><code class="language-powershell"># 検出一覧を取得
+$detections = Invoke-RestMethod -Uri &quot;http://localhost:8080/detections&quot;
+Write-Host &quot;Total detections: $($detections.total)&quot;
+
+# 統計情報を取得
+$stats = Invoke-RestMethod -Uri &quot;http://localhost:8081/stats&quot;
+Write-Host &quot;Camera: $($stats.camera), Detections: $($stats.detections)&quot;
+
+# 検出結果を削除
+$deleteResult = Invoke-RestMethod `
+  -Uri &quot;http://localhost:8080/detection/camera1_10_0_1_25/2026-02-02%2006:55:33&quot; `
+  -Method Delete
+Write-Host $deleteResult.message
+</code></pre>
+<hr />
+<h2 id="webhook">Webhook連携例</h2>
+<h3 id="slack">検出時にSlackに通知</h3>
+<pre><code class="language-python"># webhook_notifier.py
+import requests
+import time
+import json
+
+SLACK_WEBHOOK_URL = &quot;https://hooks.slack.com/services/YOUR/WEBHOOK/URL&quot;
+last_count = {}
+
+def check_detections():
+    for port in [8081, 8082, 8083]:
+        stats = requests.get(f'http://localhost:{port}/stats').json()
+        camera = stats['camera']
+        count = stats['detections']
+
+        if camera not in last_count:
+            last_count[camera] = count
+
+        if count &gt; last_count[camera]:
+            # 新しい検出があった
+            message = {
+                &quot;text&quot;: f&quot;🌠 流星検出！\nカメラ: {camera}\n検出数: {count}&quot;
+            }
+            requests.post(SLACK_WEBHOOK_URL, json=message)
+            last_count[camera] = count
+
+# 10秒ごとに確認
+while True:
+    check_detections()
+    time.sleep(10)
+</code></pre>
+<hr />
+<h3 id="_13">検出時にメール送信</h3>
+<pre><code class="language-python"># email_notifier.py
+import requests
+import smtplib
+from email.mime.text import MIMEText
+
+def send_email(subject, body):
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = 'meteor@example.com'
+    msg['To'] = 'admin@example.com'
+
+    with smtplib.SMTP('smtp.example.com', 587) as server:
+        server.starttls()
+        server.login('user', 'password')
+        server.send_message(msg)
+
+def monitor():
+    last_count = {}
+    while True:
+        detections = requests.get('http://localhost:8080/detections').json()
+
+        for detection in detections['recent']:
+            key = f&quot;{detection['camera']}_{detection['time']}&quot;
+            if key not in last_count:
+                send_email(
+                    f&quot;流星検出: {detection['camera']}&quot;,
+                    f&quot;時刻: {detection['time']}\n信頼度: {detection['confidence']}&quot;
+                )
+                last_count[key] = True
+
+        time.sleep(30)
+
+monitor()
+</code></pre>
+<hr />
+<h2 id="api">APIクライアントライブラリ例</h2>
+<h3 id="python_1">Python用シンプルクライアント</h3>
+<pre><code class="language-python"># meteor_client.py
+import requests
+from typing import List, Dict, Optional
+
+class MeteorDetectionClient:
+    def __init__(self, dashboard_url: str = &quot;http://localhost:8080&quot;):
+        self.dashboard_url = dashboard_url
+
+    def get_detections(self) -&gt; Dict:
+        &quot;&quot;&quot;検出一覧を取得&quot;&quot;&quot;
+        response = requests.get(f&quot;{self.dashboard_url}/detections&quot;)
+        return response.json()
+
+    def get_detection_window(self, lat: float = None, lon: float = None) -&gt; Dict:
+        &quot;&quot;&quot;検出時間帯を取得&quot;&quot;&quot;
+        params = {}
+        if lat: params['lat'] = lat
+        if lon: params['lon'] = lon
+
+        response = requests.get(
+            f&quot;{self.dashboard_url}/detection_window&quot;,
+            params=params
+        )
+        return response.json()
+
+    def delete_detection(self, camera: str, timestamp: str) -&gt; Dict:
+        &quot;&quot;&quot;検出結果を削除&quot;&quot;&quot;
+        response = requests.delete(
+            f&quot;{self.dashboard_url}/detection/{camera}/{timestamp}&quot;
+        )
+        return response.json()
+
+    def bulk_delete_non_meteor(self, camera: str) -&gt; Dict:
+        &quot;&quot;&quot;非流星検出を一括削除&quot;&quot;&quot;
+        response = requests.post(
+            f&quot;{self.dashboard_url}/bulk_delete_non_meteor/{camera}&quot;
+        )
+        return response.json()
+
+    def set_detection_label(self, camera: str, timestamp: str, label: str) -&gt; Dict:
+        &quot;&quot;&quot;検出にラベルを設定&quot;&quot;&quot;
+        response = requests.post(
+            f&quot;{self.dashboard_url}/detection_label&quot;,
+            json={&quot;camera&quot;: camera, &quot;timestamp&quot;: timestamp, &quot;label&quot;: label}
+        )
+        return response.json()
+
+    def get_camera_stats(self, port: int) -&gt; Dict:
+        &quot;&quot;&quot;カメラの統計情報を取得&quot;&quot;&quot;
+        response = requests.get(f&quot;http://localhost:{port}/stats&quot;)
+        return response.json()
+
+    def get_camera_stats_from_dashboard(self, index: int) -&gt; Dict:
+        &quot;&quot;&quot;ダッシュボード経由でカメラ統計を取得（監視情報含む）&quot;&quot;&quot;
+        response = requests.get(f&quot;{self.dashboard_url}/camera_stats/{index}&quot;)
+        return response.json()
+
+# 使用例
+if __name__ == &quot;__main__&quot;:
+    client = MeteorDetectionClient()
+
+    # 検出一覧を取得
+    detections = client.get_detections()
+    print(f&quot;Total: {detections['total']}&quot;)
+
+    # カメラ統計を取得
+    stats = client.get_camera_stats(8081)
+    print(f&quot;Camera: {stats['camera']}, Detections: {stats['detections']}&quot;)
+
+    # ダッシュボード経由でカメラ統計取得（監視情報含む）
+    dashboard_stats = client.get_camera_stats_from_dashboard(0)
+    print(f&quot;Monitor enabled: {dashboard_stats['monitor_enabled']}&quot;)
+    print(f&quot;Restart count: {dashboard_stats['monitor_restart_count']}&quot;)
+
+    # 検出にラベルを設定
+    result = client.set_detection_label(
+        camera=&quot;camera1_10_0_1_25&quot;,
+        timestamp=&quot;2026-02-02 06:55:33&quot;,
+        label=&quot;meteor&quot;
+    )
+    print(result)
+
+    # 非流星検出を一括削除
+    delete_result = client.bulk_delete_non_meteor(&quot;camera1_10_0_1_25&quot;)
+    print(f&quot;Deleted {delete_result['deleted_count']} non-meteor detections&quot;)
+</code></pre>
+<hr />
+<h2 id="_14">関連ドキュメント</h2>
+<ul>
+<li><a href="../OPERATIONS_GUIDE/">OPERATIONS_GUIDE.md</a> - 運用ガイド</li>
+<li><a href="../ARCHITECTURE/">ARCHITECTURE.md</a> - システムアーキテクチャ</li>
+<li><a href="../DETECTOR_COMPONENTS/">DETECTOR_COMPONENTS.md</a> - 検出コンポーネント詳細</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  ページトップへ戻る
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f", "clipboard.copy": "\u30af\u30ea\u30c3\u30d7\u30dc\u30fc\u30c9\u3078\u30b3\u30d4\u30fc", "search.result.more.one": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3082\u30461\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.more.other": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3042\u3068#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.none": "\u4f55\u3082\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f", "search.result.one": "1\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.other": "#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.placeholder": "\u691c\u7d22\u30ad\u30fc\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "search.result.term.missing": "\u691c\u7d22\u306b\u542b\u307e\u308c\u306a\u3044", "select.version": "\u30d0\u30fc\u30b8\u30e7\u30f3\u5207\u308a\u66ff\u3048"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

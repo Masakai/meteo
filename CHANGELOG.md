@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
@@ -202,7 +202,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 検出アイテムの時刻表示にカメラ名を追加（例: `2026-02-25 05:30:00 | camera1_10_0_1_25`）し、時系列表示でもどのカメラの検出かが即座に判別可能に。
 - カメラ別の「それ以外を一括削除」ボタンを日付ヘッダーに移動し、時系列表示でもカメラごとの一括削除が可能。
 
-### Improved
+### Changed
 - すべてのUIボーダー（カメラカード、日付グループ、検出グループタイトル等）を統一スタイル（3px solid #4a6f9f）に変更し、視認性を向上。
 
 ## [1.18.0] - 2026-02-24
@@ -289,7 +289,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - トラック確定時に、追跡点数不足・高静止率・ノイズ帯経路重なりを除外する判定を追加。
 - 誤検出抑制のデバッグログ（`rejected_by=...`）を出力するよう変更。
 
-### Documentation
+### Changed
 - `documents/DETECTION_TUNING.md` に、電線・部分照明の誤検出を減らすための新オプション説明と推奨チューニング手順を追記。
 
 ## [1.11.18] - 2026-02-10
@@ -381,7 +381,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ダッシュボードの検出時間帯計算で、ブラウザ位置情報の取得を廃止し、サーバー設定（`LATITUDE` / `LONGITUDE`）を常時使用するよう変更。
 
-### Documentation
+### Changed
 - README の検出時間帯説明を、ブラウザ位置情報ではなくサーバー設定座標を使用する内容へ更新。
 
 ## [1.11.4] - 2026-02-08
@@ -389,7 +389,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ダッシュボード「最近の検出」の分類ラジオボタン文言を、`流星` / `それ以外` に変更し、判定意図が直感的に分かるよう改善。
 
 ## [1.11.3] - 2026-02-08
-### Documentation
+### Changed
 - README 冒頭に、ATOM Cam 2（水平画角120度）前提での流星検出しきい値の直感的な換算目安（km / km/s）を追加。
 - `documents/CONFIGURATION_GUIDE.md` に、`min_length=20px` / `min_speed=50px/s` を距離別（100/200/300km）で読み替える表を追加。
 
@@ -430,7 +430,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - クリップ保存FPSを固定値ではなく、フレーム時刻差から推定した実効FPSに変更。
 - Facebook正規化時の30fps固定を廃止し、入力クリップFPSに追従するよう変更。
 
-### Documentation
+### Changed
 - API/アーキテクチャ資料の `/stats` 仕様を `runtime_fps` / `settings.source_fps` に対応。
 
 ## [1.8.0] - 2026-02-07
@@ -442,7 +442,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - ダッシュボードHTTPサーバーに `do_POST` を追加し、カメラ操作系API（マスク更新/再起動）を正式サポート。
 
-### Documentation
+### Changed
 - API/アーキテクチャ/運用/READMEを新エンドポイントとUI操作に合わせて改版。
 
 ## [1.7.0] - 2026-02-06
@@ -500,7 +500,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `generate_compose.py` の引数伝播を `$@` で修正
 - `cv2.VideoWriter` の初期化で複数のFourCCを試行し、失敗時に警告を出力
 
-### Documentation
+### Changed
 - README にデプロイ手順を追加（サーバー展開、ファイアウォール、自動起動、リバースプロキシ、移行手順）
 
 ## [1.2.0] - 2026-02-03
@@ -519,7 +519,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `generate_compose.py`がマスク自動生成・同梱を行うよう拡張
 - ダッシュボードのカメラカード右上に2つのインディケータを配置（ストリーム接続状態と検出処理状態）
 
-### Documentation
+### Changed
 - マスク機能とstreamersの拡張形式、API/設定/運用手順を追加
 
 ## [1.1.0] - 2026-02-02
@@ -533,7 +533,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.gitignore` にユーザー固有設定（`streamers`）を追加
 - サンプルストリーマー設定ファイル（`streamers.sample`）を作成
 
-### Documentation
+### Changed
 - READMEの改善（`meteor-docker.sh`の安全性に関する詳細を追記）
 - `cleanup`コマンドの動作説明を改善
 
@@ -559,6 +559,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - 未使用の constellation_drawer.py と constellation_drawer_astrometry.py を削除
+
+[Unreleased]: https://github.com/Masakai/meteo/compare/v3.2.5...HEAD
+[3.2.5]: https://github.com/Masakai/meteo/compare/v3.2.4...v3.2.5
+[3.2.4]: https://github.com/Masakai/meteo/compare/v3.2.3...v3.2.4
+[3.2.3]: https://github.com/Masakai/meteo/compare/v3.2.2...v3.2.3
+[3.2.2]: https://github.com/Masakai/meteo/compare/v3.2.1...v3.2.2
+[3.2.1]: https://github.com/Masakai/meteo/compare/v3.2.0...v3.2.1
+[3.2.0]: https://github.com/Masakai/meteo/compare/v3.1.1...v3.2.0
+[3.1.1]: https://github.com/Masakai/meteo/compare/v3.1.0...v3.1.1
+[3.1.0]: https://github.com/Masakai/meteo/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/Masakai/meteo/compare/v2.0.0...v3.0.0
+[2.0.0]: https://github.com/Masakai/meteo/compare/v1.24.1...v2.0.0
+[1.24.1]: https://github.com/Masakai/meteo/compare/v1.24.0...v1.24.1
+[1.24.0]: https://github.com/Masakai/meteo/compare/v1.23.1...v1.24.0
+[1.23.1]: https://github.com/Masakai/meteo/compare/v1.23.0...v1.23.1
+[1.23.0]: https://github.com/Masakai/meteo/compare/v1.22.0...v1.23.0
+[1.22.0]: https://github.com/Masakai/meteo/compare/v1.20.4...v1.22.0
+[1.20.4]: https://github.com/Masakai/meteo/compare/v1.20.3...v1.20.4
+[1.20.3]: https://github.com/Masakai/meteo/compare/v1.20.2...v1.20.3
+[1.20.2]: https://github.com/Masakai/meteo/compare/v1.20.1...v1.20.2
+[1.20.1]: https://github.com/Masakai/meteo/compare/v1.20.0...v1.20.1
+[1.20.0]: https://github.com/Masakai/meteo/compare/v1.19.0...v1.20.0
+[1.19.0]: https://github.com/Masakai/meteo/compare/v1.18.0...v1.19.0
+[1.18.0]: https://github.com/Masakai/meteo/compare/v1.17.0...v1.18.0
+[1.17.0]: https://github.com/Masakai/meteo/compare/v1.16.0...v1.17.0
+[1.16.0]: https://github.com/Masakai/meteo/compare/v1.15.0...v1.16.0
+[1.15.0]: https://github.com/Masakai/meteo/compare/v1.14.0...v1.15.0
+[1.14.0]: https://github.com/Masakai/meteo/compare/v1.13.0...v1.14.0
+[1.13.0]: https://github.com/Masakai/meteo/compare/v1.12.0...v1.13.0
+[1.12.0]: https://github.com/Masakai/meteo/compare/v1.11.18...v1.12.0
+[1.11.18]: https://github.com/Masakai/meteo/compare/v1.11.17...v1.11.18
+[1.11.17]: https://github.com/Masakai/meteo/compare/v1.11.16...v1.11.17
+[1.11.16]: https://github.com/Masakai/meteo/compare/v1.11.15...v1.11.16
+[1.11.15]: https://github.com/Masakai/meteo/compare/v1.11.14...v1.11.15
+[1.11.14]: https://github.com/Masakai/meteo/compare/v1.11.13...v1.11.14
+[1.11.13]: https://github.com/Masakai/meteo/compare/v1.11.12...v1.11.13
+[1.11.12]: https://github.com/Masakai/meteo/compare/v1.11.11...v1.11.12
+[1.11.11]: https://github.com/Masakai/meteo/compare/v1.11.10...v1.11.11
+[1.11.10]: https://github.com/Masakai/meteo/compare/v1.11.9...v1.11.10
+[1.11.9]: https://github.com/Masakai/meteo/compare/v1.11.8...v1.11.9
+[1.11.8]: https://github.com/Masakai/meteo/compare/v1.11.7...v1.11.8
+[1.11.7]: https://github.com/Masakai/meteo/compare/v1.11.6...v1.11.7
+[1.11.6]: https://github.com/Masakai/meteo/compare/v1.11.5...v1.11.6
+[1.11.5]: https://github.com/Masakai/meteo/compare/v1.11.4...v1.11.5
+[1.11.4]: https://github.com/Masakai/meteo/compare/v1.11.3...v1.11.4
+[1.11.3]: https://github.com/Masakai/meteo/compare/v1.11.2...v1.11.3
+[1.11.2]: https://github.com/Masakai/meteo/compare/v1.11.1...v1.11.2
+[1.11.1]: https://github.com/Masakai/meteo/compare/v1.11.0...v1.11.1
+[1.11.0]: https://github.com/Masakai/meteo/compare/v1.10.0...v1.11.0
+[1.10.0]: https://github.com/Masakai/meteo/compare/v1.9.0...v1.10.0
+[1.9.0]: https://github.com/Masakai/meteo/compare/v1.8.0...v1.9.0
+[1.8.0]: https://github.com/Masakai/meteo/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/Masakai/meteo/compare/v1.6.0...v1.7.0
+[1.6.0]: https://github.com/Masakai/meteo/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/Masakai/meteo/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/Masakai/meteo/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/Masakai/meteo/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/Masakai/meteo/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/Masakai/meteo/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/Masakai/meteo/releases/tag/v1.0.0
 
 ## Project Information
 

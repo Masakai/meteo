@@ -1,0 +1,3651 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="流星・雲検出システム Meteo の公式ドキュメント">
+      
+      
+      
+        <link rel="canonical" href="https://masakai.github.io/meteo/DOCKER_ARCHITECTURE/">
+      
+      
+        <link rel="prev" href="../ARCHITECTURE/">
+      
+      
+        <link rel="next" href="../DETECTOR_COMPONENTS/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/mascot-meteo-cam.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Docker 構成 - Meteo Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Zen+Kaku+Gothic+New:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Zen Kaku Gothic New";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  <meta property="og:site_name" content="Meteo Documentation">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Docker 構成 | Meteo Documentation">
+  <meta property="og:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta property="og:url" content="https://masakai.github.io/meteo/DOCKER_ARCHITECTURE/">
+  <meta property="og:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:secure_url" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Docker 構成 | Meteo Documentation">
+  <meta name="twitter:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta name="twitter:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <script>
+    document$.subscribe(function() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e2ecff",
+          primaryTextColor: "#111111",
+          primaryBorderColor: "#7a92bf",
+          secondaryColor: "#dff3e2",
+          secondaryTextColor: "#111111",
+          secondaryBorderColor: "#6f9a79",
+          tertiaryColor: "#ffe8cc",
+          tertiaryTextColor: "#111111",
+          tertiaryBorderColor: "#c28a4a",
+          lineColor: "#7b8794",
+          textColor: "#111111",
+          mainBkg: "#e2ecff",
+          nodeBkg: "#e2ecff",
+          nodeBorder: "#7a92bf",
+          clusterBkg: "#f7f4ff",
+          clusterBorder: "#b8abd9",
+          defaultLinkColor: "#7b8794",
+          titleColor: "#111111",
+          edgeLabelBackground: "#ffffff",
+          actorBkg: "#e2ecff",
+          actorBorder: "#7a92bf",
+          actorTextColor: "#111111",
+          actorLineColor: "#7b8794",
+          signalColor: "#111111",
+          signalTextColor: "#111111",
+          labelBoxBkgColor: "#fff7e8",
+          labelBoxBorderColor: "#c28a4a",
+          labelTextColor: "#111111",
+          loopTextColor: "#111111",
+          noteBkgColor: "#fff7e8",
+          noteBorderColor: "#d1b27c",
+          noteTextColor: "#111111",
+          activationBkgColor: "#efe6ff",
+          activationBorderColor: "#ab92cf",
+          sectionBkgColor: "#f8fbff",
+          altSectionBkgColor: "#fef6ea",
+          gridColor: "#d6deea",
+          cScale0: "#f8d7da",
+          cScale1: "#ffe3c4",
+          cScale2: "#fff1bf",
+          cScale3: "#dff3e2",
+          cScale4: "#e2ecff",
+          cScale5: "#efe6ff",
+          cScale6: "#f7dff0",
+          cScale7: "#dff2f6"
+        }
+      });
+    });
+  </script>
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#docker" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href=".." title="Meteo Documentation" class="md-header__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Meteo Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Docker 構成
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-label="ダークモードに切り替え"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切り替え" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="検索" placeholder="検索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="検索">
+        
+        <button type="reset" class="md-search__icon md-icon" title="クリア" aria-label="クリア" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            検索を初期化
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="タブ" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  ホーム
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SETUP_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セットアップ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  設定ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  運用ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../API_REFERENCE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API リファレンス
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../DETECTION_TUNING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  検出感度チューニング
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SECURITY/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セキュリティ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../ARCHITECTURE/" class="md-tabs__link">
+          
+  
+  
+  アーキテクチャ
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Meteo Documentation" class="md-nav__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    Meteo Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セットアップ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設定ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTION_TUNING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出感度チューニング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セキュリティ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アーキテクチャ
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    アーキテクチャ
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    全体構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker 構成
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker 構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        システム概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ構成図
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ詳細
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="コンテナ詳細">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Dashboard コンテナ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Dashboard コンテナ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ情報
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dockerfiledashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dockerfile.dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-camera-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Camera コンテナ (×3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Camera コンテナ (×3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#camera1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ情報（camera1の例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#camera1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数（camera1の例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-go2rtc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. go2rtc コンテナ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. go2rtc コンテナ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ情報
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#go2rtcyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        go2rtc.yaml の役割
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ネットワーク構成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ネットワーク構成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meteor-net-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meteor-net (bridge)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="meteor-net (bridge)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ポートマッピング
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ボリューム構成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ボリューム構成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#detections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共有ボリューム: ./detections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディレクトリ構造
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ディレクトリ構造">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ボリューム使用パターン
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#go2rtcyaml_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定ファイル: ./go2rtc.yaml
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ロギング設定
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動シーケンス
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        依存関係グラフ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        リソース要件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="リソース要件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        メモリ使用量（推定値）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディスク使用量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU使用率
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker-compose.yml コマンド
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="docker-compose.yml コマンド">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        基本操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        イメージ管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラブルシューティング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="トラブルシューティング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナが起動しない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RTSP接続エラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディスク容量不足
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ポート競合
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        セキュリティ考慮事項
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="セキュリティ考慮事項">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rtsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RTSP認証情報
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. ネットワークアクセス制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. ファイルシステムパーミッション
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラの追加・削除（スケーリング）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カメラの追加・削除（スケーリング）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_composepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_compose.py による自動生成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="generate_compose.py による自動生成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        処理フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ追加手順
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カメラ追加手順">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-streamers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. streamers ファイルを編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. docker-compose.yml を再生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. コンテナを再起動
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generate_composepy_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_compose.py のオプション
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自動生成される構成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        生成例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ削除手順
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カメラ削除手順">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-streamers_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. streamers から該当行を削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-composeyml_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. docker-compose.yml を再生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 古いコンテナを停止して再起動
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ数の制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ファイル
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTOR_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出コンポーネント
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ASTRO_UTILS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    天文計算モジュール
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        システム概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ構成図
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ詳細
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="コンテナ詳細">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Dashboard コンテナ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Dashboard コンテナ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ情報
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dockerfiledashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dockerfile.dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-camera-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Camera コンテナ (×3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Camera コンテナ (×3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#camera1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ情報（camera1の例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#camera1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数（camera1の例）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dockerfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dockerfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-go2rtc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. go2rtc コンテナ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. go2rtc コンテナ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ情報
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#go2rtcyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        go2rtc.yaml の役割
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ネットワーク構成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ネットワーク構成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meteor-net-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meteor-net (bridge)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="meteor-net (bridge)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ポートマッピング
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ボリューム構成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ボリューム構成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#detections" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共有ボリューム: ./detections
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディレクトリ構造
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ディレクトリ構造">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ボリューム使用パターン
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#go2rtcyaml_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定ファイル: ./go2rtc.yaml
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ロギング設定
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        起動シーケンス
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        依存関係グラフ
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        リソース要件
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="リソース要件">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        メモリ使用量（推定値）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディスク使用量
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU使用率
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        docker-compose.yml コマンド
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="docker-compose.yml コマンド">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        基本操作
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        イメージ管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナ管理
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラブルシューティング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="トラブルシューティング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コンテナが起動しない
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RTSP接続エラー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディスク容量不足
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ポート競合
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        セキュリティ考慮事項
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="セキュリティ考慮事項">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-rtsp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. RTSP認証情報
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. ネットワークアクセス制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. ファイルシステムパーミッション
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラの追加・削除（スケーリング）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カメラの追加・削除（スケーリング）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_composepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_compose.py による自動生成
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="generate_compose.py による自動生成">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        処理フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ追加手順
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カメラ追加手順">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-streamers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. streamers ファイルを編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. docker-compose.yml を再生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. コンテナを再起動
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generate_composepy_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_compose.py のオプション
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        自動生成される構成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        生成例
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ削除手順
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="カメラ削除手順">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-streamers_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. streamers から該当行を削除
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-composeyml_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. docker-compose.yml を再生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. 古いコンテナを停止して再起動
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラ数の制限
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ファイル
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="docker">Docker コンテナ構成ドキュメント</h1>
+<hr />
+<p><strong>Copyright (c) 2026 Masanori Sakai</strong></p>
+<p>Licensed under the MIT License</p>
+<hr />
+<h2 id="_1">システム概要</h2>
+<p>流星検出システムは、Docker Compose で管理される複数コンテナで構成されます。現行の WebRTC ライブ表示構成では <code>dashboard + camera1..N + go2rtc</code> の組み合わせが基本です。Docker 内の <code>go2rtc</code> で WebRTC を安定動作させるには、<code>webrtc.candidates</code> へホスト側の到達可能アドレスを明示する必要があります。<code>generate_compose.py</code> は既定でこの候補アドレスを自動検出し、必要に応じて <code>--go2rtc-candidate-host</code> で上書きできます。</p>
+<ul>
+<li><strong>1つのダッシュボードコンテナ</strong>: 全カメラの統合管理画面と go2rtc 埋め込みページ配信</li>
+<li><strong>複数の検出コンテナ</strong>: 各カメラごとの流星検出エンジンと MJPEG / ステータス提供</li>
+<li><strong>1つの WebRTC 中継コンテナ</strong>: <code>go2rtc</code> による WebRTC / MSE / HLS 配信</li>
+</ul>
+<h2 id="_2">コンテナ構成図</h2>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;ホストマシン&quot;
+        Detections[&quot;./detections/&lt;br/&gt;共有ボリューム&quot;]
+        Go2RTCConf[&quot;./go2rtc.yaml&lt;br/&gt;設定ファイル&quot;]
+
+        subgraph &quot;Docker Network: meteor-net (bridge)&quot;
+            Dashboard[&quot;dashboard&lt;br/&gt;meteor-dashboard&lt;br/&gt;:8080→8080&quot;]
+            Go2RTC[&quot;go2rtc&lt;br/&gt;meteor-go2rtc&lt;br/&gt;:1984→1984&lt;br/&gt;:8555→8555&quot;]
+            Camera1[&quot;camera1&lt;br/&gt;meteor-camera1&lt;br/&gt;:8081→8080&quot;]
+            Camera2[&quot;camera2&lt;br/&gt;meteor-camera2&lt;br/&gt;:8082→8080&quot;]
+            Camera3[&quot;camera3&lt;br/&gt;meteor-camera3&lt;br/&gt;:8083→8080&quot;]
+        end
+
+        Browser[&quot;ブラウザ&lt;br/&gt;localhost:8080&quot;]
+    end
+
+    subgraph &quot;外部ネットワーク&quot;
+        RTSP1[&quot;RTSP Camera&lt;br/&gt;10.0.1.25:554&quot;]
+        RTSP2[&quot;RTSP Camera&lt;br/&gt;10.0.1.3:554&quot;]
+        RTSP3[&quot;RTSP Camera&lt;br/&gt;10.0.1.11:554&quot;]
+    end
+
+    Browser --&gt;|&quot;HTTP UI&quot;| Dashboard
+    Browser --&gt;|&quot;WebRTC / MSE&quot;| Go2RTC
+    Dashboard --&gt;|&quot;HTTP&quot;| Camera1
+    Dashboard --&gt;|&quot;HTTP&quot;| Camera2
+    Dashboard --&gt;|&quot;HTTP&quot;| Camera3
+    Dashboard --&gt;|&quot;埋め込みHTML / asset取得&quot;| Go2RTC
+
+    Camera1 --&gt;|&quot;RTSP&quot;| RTSP1
+    Camera2 --&gt;|&quot;RTSP&quot;| RTSP2
+    Camera3 --&gt;|&quot;RTSP&quot;| RTSP3
+    Go2RTC --&gt;|&quot;RTSP&quot;| RTSP1
+    Go2RTC --&gt;|&quot;RTSP&quot;| RTSP2
+    Go2RTC --&gt;|&quot;RTSP&quot;| RTSP3
+
+    Dashboard --&gt;|&quot;読み込み&quot;| Detections
+    Camera1 --&gt;|&quot;書き込み&quot;| Detections
+    Camera2 --&gt;|&quot;書き込み&quot;| Detections
+    Camera3 --&gt;|&quot;書き込み&quot;| Detections
+    Go2RTCConf --&gt;|&quot;読み込み&quot;| Go2RTC
+
+    style Dashboard fill:#dbe7f6
+    style Go2RTC fill:#d7eef2
+    style Camera1 fill:#e2eafc
+    style Camera2 fill:#e2eafc
+    style Camera3 fill:#e2eafc
+    style Detections fill:#dce6ff
+</code></pre>
+<h2 id="_3">コンテナ詳細</h2>
+<h3 id="1-dashboard">1. Dashboard コンテナ</h3>
+<p><strong>役割</strong>: 全カメラの統合ダッシュボードを提供</p>
+<pre><code class="language-mermaid">graph LR
+    subgraph &quot;meteor-dashboard コンテナ&quot;
+        Dashboard[&quot;dashboard.py&lt;br/&gt;HTTPサーバー&quot;]
+        Embed[&quot;/camera_embed/*&lt;br/&gt;埋め込みHTML生成&quot;]
+        Proxy[&quot;/go2rtc_asset/*&lt;br/&gt;go2rtc asset プロキシ&quot;]
+        AstroUtils[&quot;astro_utils.py&lt;br/&gt;天文計算&quot;]
+        Files[&quot;/output/&lt;br/&gt;マウント&quot;]
+    end
+
+    Dashboard --&gt; AstroUtils
+    Dashboard --&gt; Files
+    Dashboard --&gt; Embed
+    Dashboard --&gt; Proxy
+
+    style Dashboard fill:#dbe7f6
+</code></pre>
+<h4 id="_4">コンテナ情報</h4>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>イメージ</strong></td>
+<td><code>Dockerfile.dashboard</code> (python:3.11-slim ベース)</td>
+</tr>
+<tr>
+<td><strong>コンテナ名</strong></td>
+<td><code>meteor-dashboard</code></td>
+</tr>
+<tr>
+<td><strong>ポートマッピング</strong></td>
+<td><code>8080:8080</code> (ホスト:コンテナ)</td>
+</tr>
+<tr>
+<td><strong>再起動ポリシー</strong></td>
+<td><code>unless-stopped</code></td>
+</tr>
+<tr>
+<td><strong>依存関係</strong></td>
+<td>camera1, camera2, camera3, go2rtc（WebRTC構成時）</td>
+</tr>
+<tr>
+<td><strong>ボリューム</strong></td>
+<td><code>./detections:/output</code> (読み込み専用的使用)</td>
+</tr>
+<tr>
+<td><strong>ネットワーク</strong></td>
+<td><code>meteor-net</code> (bridge)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="_5">環境変数</h4>
+<table>
+<thead>
+<tr>
+<th>変数名</th>
+<th>デフォルト値</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TZ</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8080</code></td>
+<td>HTTPサーバーポート</td>
+</tr>
+<tr>
+<td><code>LATITUDE</code></td>
+<td><code>35.6762</code></td>
+<td>観測地の緯度（東京）</td>
+</tr>
+<tr>
+<td><code>LONGITUDE</code></td>
+<td><code>139.6503</code></td>
+<td>観測地の経度（東京）</td>
+</tr>
+<tr>
+<td><code>TIMEZONE</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン名</td>
+</tr>
+<tr>
+<td><code>ENABLE_TIME_WINDOW</code></td>
+<td><code>true</code></td>
+<td>天文薄暮時間帯制限</td>
+</tr>
+<tr>
+<td><code>CAMERA1_NAME</code></td>
+<td><code>camera1_10_0_1_25</code></td>
+<td>カメラ1の内部名（ディレクトリ名・識別子）</td>
+</tr>
+<tr>
+<td><code>CAMERA1_NAME_DISPLAY</code></td>
+<td><code>東側</code></td>
+<td>カメラ1のWeb表示名</td>
+</tr>
+<tr>
+<td><code>CAMERA1_URL</code></td>
+<td><code>http://localhost:8081</code></td>
+<td>カメラ1のURL</td>
+</tr>
+<tr>
+<td><code>CAMERA1_STREAM_KIND</code></td>
+<td><code>webrtc</code></td>
+<td>ライブ表示方式 (<code>mjpeg</code> / <code>webrtc</code>)</td>
+</tr>
+<tr>
+<td><code>CAMERA1_STREAM_URL</code></td>
+<td><code>http://localhost:1984/stream.html?src=camera1&amp;mode=webrtc&amp;mode=mse&amp;mode=hls&amp;mode=mjpeg&amp;background=false</code></td>
+<td>ライブ表示用URL</td>
+</tr>
+<tr>
+<td><code>CAMERA2_NAME</code></td>
+<td><code>camera2_10_0_1_3</code></td>
+<td>カメラ2の内部名（ディレクトリ名・識別子）</td>
+</tr>
+<tr>
+<td><code>CAMERA2_NAME_DISPLAY</code></td>
+<td><code>南側</code></td>
+<td>カメラ2のWeb表示名</td>
+</tr>
+<tr>
+<td><code>CAMERA2_URL</code></td>
+<td><code>http://localhost:8082</code></td>
+<td>カメラ2のURL</td>
+</tr>
+<tr>
+<td><code>CAMERA2_STREAM_KIND</code></td>
+<td><code>webrtc</code></td>
+<td>ライブ表示方式 (<code>mjpeg</code> / <code>webrtc</code>)</td>
+</tr>
+<tr>
+<td><code>CAMERA2_STREAM_URL</code></td>
+<td><code>http://localhost:1984/stream.html?src=camera2&amp;mode=webrtc&amp;mode=mse&amp;mode=hls&amp;mode=mjpeg&amp;background=false</code></td>
+<td>ライブ表示用URL</td>
+</tr>
+<tr>
+<td><code>CAMERA3_NAME</code></td>
+<td><code>camera3_10_0_1_11</code></td>
+<td>カメラ3の内部名（ディレクトリ名・識別子）</td>
+</tr>
+<tr>
+<td><code>CAMERA3_NAME_DISPLAY</code></td>
+<td><code>西側</code></td>
+<td>カメラ3のWeb表示名</td>
+</tr>
+<tr>
+<td><code>CAMERA3_URL</code></td>
+<td><code>http://localhost:8083</code></td>
+<td>カメラ3のURL</td>
+</tr>
+<tr>
+<td><code>CAMERA3_STREAM_KIND</code></td>
+<td><code>webrtc</code></td>
+<td>ライブ表示方式 (<code>mjpeg</code> / <code>webrtc</code>)</td>
+</tr>
+<tr>
+<td><code>CAMERA3_STREAM_URL</code></td>
+<td><code>http://localhost:1984/stream.html?src=camera3&amp;mode=webrtc&amp;mode=mse&amp;mode=hls&amp;mode=mjpeg&amp;background=false</code></td>
+<td>ライブ表示用URL</td>
+</tr>
+</tbody>
+</table>
+<h4 id="dockerfiledashboard">Dockerfile.dashboard</h4>
+<pre><code class="language-dockerfile">FROM python:3.11-slim
+WORKDIR /app
+COPY dashboard*.py .
+COPY astro_utils.py .
+COPY documents/assets/meteo-logotype.svg ./documents/assets/meteo-logotype.svg
+RUN pip install --no-cache-dir astral
+ENV TZ=Asia/Tokyo
+EXPOSE 8080
+CMD [&quot;python&quot;, &quot;dashboard.py&quot;]
+</code></pre>
+<hr />
+<h3 id="2-camera-3">2. Camera コンテナ (×3)</h3>
+<p><strong>役割</strong>: 個別カメラの流星検出とWebプレビュー提供</p>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;meteor-camera1 コンテナ&quot;
+        Detector[&quot;meteor_detector_rtsp_web.py&quot;]
+        Astro[&quot;astro_utils.py&quot;]
+        Output[&quot;/output/camera1_10_0_1_25/&quot;]
+
+        subgraph &quot;内部スレッド&quot;
+            RTSP[&quot;RTSPReader&quot;]
+            Detection[&quot;detection_thread_worker&quot;]
+            Web[&quot;MJPEGHandler&quot;]
+        end
+
+        Detector --&gt; RTSP
+        Detector --&gt; Detection
+        Detector --&gt; Web
+        Detector --&gt; Astro
+        Detection --&gt; Output
+    end
+
+    style Detector fill:#e2eafc
+    style Output fill:#dce6ff
+</code></pre>
+<h4 id="camera1">コンテナ情報（camera1の例）</h4>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>イメージ</strong></td>
+<td><code>Dockerfile</code> (python:3.11-slim + OpenCV)</td>
+</tr>
+<tr>
+<td><strong>コンテナ名</strong></td>
+<td><code>meteor-camera1</code> / <code>meteor-camera2</code> / <code>meteor-camera3</code></td>
+</tr>
+<tr>
+<td><strong>ポートマッピング</strong></td>
+<td><code>8081:8080</code> / <code>8082:8080</code> / <code>8083:8080</code></td>
+</tr>
+<tr>
+<td><strong>再起動ポリシー</strong></td>
+<td><code>unless-stopped</code></td>
+</tr>
+<tr>
+<td><strong>ボリューム</strong></td>
+<td><code>./detections:/output</code> (読み書き)</td>
+</tr>
+<tr>
+<td><strong>ネットワーク</strong></td>
+<td><code>meteor-net</code> (bridge)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="camera1_1">環境変数（camera1の例）</h4>
+<table>
+<thead>
+<tr>
+<th>変数名</th>
+<th>値</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TZ</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン</td>
+</tr>
+<tr>
+<td><code>RTSP_URL</code></td>
+<td><code>rtsp://6199:4003@10.0.1.25/live</code></td>
+<td>RTSPストリームURL</td>
+</tr>
+<tr>
+<td><code>CAMERA_NAME</code></td>
+<td><code>camera1_10_0_1_25</code></td>
+<td>カメラ識別名（ディレクトリ名）</td>
+</tr>
+<tr>
+<td><code>SENSITIVITY</code></td>
+<td><code>medium</code></td>
+<td>感度 (low/medium/high/faint/fireball)</td>
+</tr>
+<tr>
+<td><code>SCALE</code></td>
+<td><code>0.5</code></td>
+<td>処理スケール (0.0-1.0)</td>
+</tr>
+<tr>
+<td><code>BUFFER</code></td>
+<td><code>15</code></td>
+<td>リングバッファ秒数</td>
+</tr>
+<tr>
+<td><code>EXCLUDE_BOTTOM</code></td>
+<td><code>0.0625</code></td>
+<td>画面下部除外率 (1/16)</td>
+</tr>
+<tr>
+<td><code>EXTRACT_CLIPS</code></td>
+<td><code>true</code></td>
+<td>クリップ動画保存の有効化</td>
+</tr>
+<tr>
+<td><code>LATITUDE</code></td>
+<td><code>35.6762</code></td>
+<td>観測地の緯度</td>
+</tr>
+<tr>
+<td><code>LONGITUDE</code></td>
+<td><code>139.6503</code></td>
+<td>観測地の経度</td>
+</tr>
+<tr>
+<td><code>TIMEZONE</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン名</td>
+</tr>
+<tr>
+<td><code>ENABLE_TIME_WINDOW</code></td>
+<td><code>true</code></td>
+<td>天文薄暮時間帯制限</td>
+</tr>
+<tr>
+<td><code>WEB_PORT</code></td>
+<td><code>8080</code></td>
+<td>内部HTTPポート</td>
+</tr>
+</tbody>
+</table>
+<h4 id="dockerfile">Dockerfile</h4>
+<pre><code class="language-dockerfile">FROM python:3.11-slim
+WORKDIR /app
+
+# Python依存ライブラリ
+COPY requirements-docker.txt .
+RUN pip install --no-cache-dir -r requirements-docker.txt
+
+# OpenCV用システムライブラリ
+RUN mkdir -p /dev/shm/apt-cache &amp;&amp; \
+    apt-get update --allow-releaseinfo-change &amp;&amp; \
+    apt-get install -y --no-install-recommends \
+        -o APT::Keep-Downloaded-Packages=false \
+        -o Dir::Cache::archives=/dev/shm/apt-cache \
+        libxcb1 libglib2.0-0 libgomp1 &amp;&amp; \
+    rm -rf /var/lib/apt/lists/* /dev/shm/apt-cache
+
+# アプリケーションコード
+COPY meteor_detector_rtsp_web.py .
+COPY meteor_detector_realtime.py .
+COPY meteor_detector_common.py .
+COPY astro_utils.py .
+
+# 出力ディレクトリ
+RUN mkdir -p /output
+
+# タイムゾーン設定
+ENV TZ=Asia/Tokyo
+
+EXPOSE 8080
+
+CMD python meteor_detector_rtsp_web.py \
+    &quot;${RTSP_URL}&quot; \
+    -o &quot;/output/${CAMERA_NAME}&quot; \
+    --sensitivity &quot;${SENSITIVITY}&quot; \
+    --scale &quot;${SCALE}&quot; \
+    --buffer &quot;${BUFFER}&quot; \
+    --exclude-bottom &quot;${EXCLUDE_BOTTOM}&quot; \
+    --web-port &quot;${WEB_PORT}&quot; \
+    --camera-name &quot;${CAMERA_NAME}&quot;
+</code></pre>
+<hr />
+<h3 id="3-go2rtc">3. go2rtc コンテナ</h3>
+<p><strong>役割</strong>: ブラウザ向けの WebRTC / MSE / HLS ライブ配信</p>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;meteor-go2rtc コンテナ&quot;
+        Config[&quot;/config/go2rtc.yaml&quot;]
+        API[&quot;1984/tcp&lt;br/&gt;HTTP / WS API&quot;]
+        Media[&quot;8555/tcp,udp&lt;br/&gt;WebRTC メディア&quot;]
+        Streams[&quot;camera1 / camera2 / camera3&lt;br/&gt;RTSP source&quot;]
+    end
+
+    Config --&gt; API
+    API --&gt; Streams
+    Streams --&gt; Media
+
+    style Config fill:#ffe7cc
+    style API fill:#d7eef2
+    style Media fill:#dff3e2
+</code></pre>
+<h4 id="_6">コンテナ情報</h4>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>イメージ</strong></td>
+<td><code>alexxit/go2rtc:latest</code></td>
+</tr>
+<tr>
+<td><strong>コンテナ名</strong></td>
+<td><code>meteor-go2rtc</code></td>
+</tr>
+<tr>
+<td><strong>ポートマッピング</strong></td>
+<td><code>1984:1984</code>, <code>8555:8555/tcp</code>, <code>8555:8555/udp</code></td>
+</tr>
+<tr>
+<td><strong>再起動ポリシー</strong></td>
+<td><code>unless-stopped</code></td>
+</tr>
+<tr>
+<td><strong>ボリューム</strong></td>
+<td><code>./go2rtc.yaml:/config/go2rtc.yaml:ro</code></td>
+</tr>
+<tr>
+<td><strong>ネットワーク</strong></td>
+<td><code>meteor-net</code> (bridge)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="go2rtcyaml">go2rtc.yaml の役割</h4>
+<pre><code class="language-yaml">api:
+  origin: &quot;*&quot;
+
+webrtc:
+  candidates:
+    - 10.0.1.59:8555
+
+streams:
+  camera1:
+    - rtsp://...
+  camera2:
+    - rtsp://...
+  camera3:
+    - rtsp://...
+</code></pre>
+<ul>
+<li><code>api.origin</code> はダッシュボードからの埋め込みアクセスを許可します。</li>
+<li><code>webrtc.candidates</code> はブラウザが接続するホスト側候補アドレスです。</li>
+<li><code>streams.*</code> は各カメラの RTSP ソース定義です。</li>
+</ul>
+<hr />
+<h2 id="_7">ネットワーク構成</h2>
+<h3 id="meteor-net-bridge">meteor-net (bridge)</h3>
+<p>Docker Composeで自動作成されるブリッジネットワーク</p>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;Docker Network: meteor-net&quot;
+        subgraph &quot;IPアドレス自動割り当て&quot;
+            Dashboard[&quot;dashboard&lt;br/&gt;172.x.x.2&quot;]
+            Go2RTC[&quot;go2rtc&lt;br/&gt;172.x.x.3&quot;]
+            Camera1[&quot;camera1&lt;br/&gt;172.x.x.4&quot;]
+            Camera2[&quot;camera2&lt;br/&gt;172.x.x.5&quot;]
+            Camera3[&quot;camera3&lt;br/&gt;172.x.x.6&quot;]
+        end
+    end
+
+    Host[&quot;ホストマシン&lt;br/&gt;docker0インターフェース&quot;]
+
+    Dashboard -.-&gt;|&quot;内部通信&quot;| Camera1
+    Dashboard -.-&gt;|&quot;内部通信&quot;| Camera2
+    Dashboard -.-&gt;|&quot;内部通信&quot;| Camera3
+    Dashboard -.-&gt;|&quot;内部通信&quot;| Go2RTC
+
+    Host --&gt;|&quot;ポート転送&quot;| Dashboard
+    Host --&gt;|&quot;ポート転送&quot;| Go2RTC
+    Host --&gt;|&quot;ポート転送&quot;| Camera1
+    Host --&gt;|&quot;ポート転送&quot;| Camera2
+    Host --&gt;|&quot;ポート転送&quot;| Camera3
+
+    style Dashboard fill:#dbe7f6
+    style Go2RTC fill:#d7eef2
+    style Camera1 fill:#e2eafc
+    style Camera2 fill:#e2eafc
+    style Camera3 fill:#e2eafc
+</code></pre>
+<h4 id="_8">ポートマッピング</h4>
+<table>
+<thead>
+<tr>
+<th>コンテナ</th>
+<th>ホストポート</th>
+<th>コンテナポート</th>
+<th>プロトコル</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>dashboard</td>
+<td>8080</td>
+<td>8080</td>
+<td>HTTP</td>
+<td>ダッシュボードWeb UI</td>
+</tr>
+<tr>
+<td>go2rtc</td>
+<td>1984</td>
+<td>1984</td>
+<td>HTTP / WS</td>
+<td>WebRTC / MSE シグナリング、フロント資産</td>
+</tr>
+<tr>
+<td>go2rtc</td>
+<td>8555</td>
+<td>8555</td>
+<td>TCP / UDP</td>
+<td>WebRTC メディア転送</td>
+</tr>
+<tr>
+<td>camera1</td>
+<td>8081</td>
+<td>8080</td>
+<td>HTTP</td>
+<td>カメラ1プレビュー</td>
+</tr>
+<tr>
+<td>camera2</td>
+<td>8082</td>
+<td>8080</td>
+<td>HTTP</td>
+<td>カメラ2プレビュー</td>
+</tr>
+<tr>
+<td>camera3</td>
+<td>8083</td>
+<td>8080</td>
+<td>HTTP</td>
+<td>カメラ3プレビュー</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_9">ボリューム構成</h2>
+<h3 id="detections">共有ボリューム: ./detections</h3>
+<pre><code class="language-mermaid">graph TB
+    Host[&quot;ホストマシン&lt;br/&gt;./detections/&quot;]
+
+    subgraph &quot;マウント (読み書き)&quot;
+        Camera1[&quot;/output/ in camera1&quot;]
+        Camera2[&quot;/output/ in camera2&quot;]
+        Camera3[&quot;/output/ in camera3&quot;]
+    end
+
+    subgraph &quot;マウント (読み込み)&quot;
+        Dashboard[&quot;/output/ in dashboard&quot;]
+    end
+
+    Host --&gt; Camera1
+    Host --&gt; Camera2
+    Host --&gt; Camera3
+    Host --&gt; Dashboard
+
+    style Host fill:#dce6ff
+    style Camera1 fill:#e2eafc
+    style Camera2 fill:#e2eafc
+    style Camera3 fill:#e2eafc
+    style Dashboard fill:#dbe7f6
+</code></pre>
+<h3 id="_10">ディレクトリ構造</h3>
+<pre><code>./detections/
+  ├── camera1_10_0_1_25/
+  │   ├── detections.jsonl
+  │   ├── meteor_20260202_065533.mp4
+  │   ├── meteor_20260202_065533_composite.jpg
+  │   └── meteor_20260202_065533_composite_original.jpg
+  ├── camera2_10_0_1_3/
+  │   └── ...
+  └── camera3_10_0_1_11/
+      └── ...
+</code></pre>
+<h4 id="_11">ボリューム使用パターン</h4>
+<table>
+<thead>
+<tr>
+<th>コンテナ</th>
+<th>パス</th>
+<th>モード</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>camera1</td>
+<td><code>/output</code></td>
+<td>rw</td>
+<td>検出結果の書き込み</td>
+</tr>
+<tr>
+<td>camera2</td>
+<td><code>/output</code></td>
+<td>rw</td>
+<td>検出結果の書き込み</td>
+</tr>
+<tr>
+<td>camera3</td>
+<td><code>/output</code></td>
+<td>rw</td>
+<td>検出結果の書き込み</td>
+</tr>
+<tr>
+<td>dashboard</td>
+<td><code>/output</code></td>
+<td>rw</td>
+<td>検出結果の読み込み、削除</td>
+</tr>
+</tbody>
+</table>
+<h3 id="go2rtcyaml_1">設定ファイル: ./go2rtc.yaml</h3>
+<table>
+<thead>
+<tr>
+<th>コンテナ</th>
+<th>パス</th>
+<th>モード</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>go2rtc</td>
+<td><code>/config/go2rtc.yaml</code></td>
+<td>ro</td>
+<td>WebRTC candidate とストリーム定義の読み込み</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_12">ロギング設定</h2>
+<p>各カメラコンテナのログローテーション設定:</p>
+<pre><code class="language-yaml">logging:
+  driver: &quot;json-file&quot;
+  options:
+    max-size: &quot;10m&quot;     # ログファイル最大サイズ
+    max-file: &quot;3&quot;       # 保持するログファイル数
+</code></pre>
+<p><strong>合計ログ容量</strong>: 各カメラ 30MB (10MB × 3ファイル)</p>
+<hr />
+<h2 id="_13">起動シーケンス</h2>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant DockerCompose
+    participant Network
+    participant Camera1
+    participant Camera2
+    participant Camera3
+    participant Dashboard
+    participant Go2RTC
+
+    User-&gt;&gt;DockerCompose: docker compose up -d
+
+    DockerCompose-&gt;&gt;Network: meteor-netを作成
+
+    par コンテナ起動（並列）
+        DockerCompose-&gt;&gt;Go2RTC: コンテナ起動
+        Go2RTC-&gt;&gt;Go2RTC: go2rtc.yaml 読み込み
+        Go2RTC-&gt;&gt;Go2RTC: API待受開始 (1984/8555)
+
+        DockerCompose-&gt;&gt;Camera1: コンテナ起動
+        Camera1-&gt;&gt;Camera1: meteor_detector_rtsp_web.py起動
+        Camera1-&gt;&gt;Camera1: RTSP接続開始
+
+        DockerCompose-&gt;&gt;Camera2: コンテナ起動
+        Camera2-&gt;&gt;Camera2: meteor_detector_rtsp_web.py起動
+        Camera2-&gt;&gt;Camera2: RTSP接続開始
+
+        DockerCompose-&gt;&gt;Camera3: コンテナ起動
+        Camera3-&gt;&gt;Camera3: meteor_detector_rtsp_web.py起動
+        Camera3-&gt;&gt;Camera3: RTSP接続開始
+    end
+
+    Note over Go2RTC,Camera3: depends_on により dashboard は各依存サービス起動後に開始
+
+    DockerCompose-&gt;&gt;Dashboard: コンテナ起動
+    Dashboard-&gt;&gt;Dashboard: dashboard.py起動
+    Dashboard-&gt;&gt;Dashboard: HTTPサーバー起動 (0.0.0.0:8080)
+    Dashboard-&gt;&gt;Go2RTC: asset 取得先を解決
+    Dashboard-&gt;&gt;Camera1: /stats, /stream 参照準備
+
+    Dashboard--&gt;&gt;User: http://localhost:8080/ アクセス可能
+</code></pre>
+<hr />
+<h2 id="_14">依存関係グラフ</h2>
+<pre><code class="language-mermaid">graph TD
+    Compose[&quot;docker-compose.yml&quot;]
+
+    Compose --&gt; Dashboard
+    Compose --&gt; Go2RTC
+    Compose --&gt; Camera1
+    Compose --&gt; Camera2
+    Compose --&gt; Camera3
+
+    Dashboard -.-&gt;|&quot;depends_on&quot;| Go2RTC
+    Dashboard -.-&gt;|&quot;depends_on&quot;| Camera1
+    Dashboard -.-&gt;|&quot;depends_on&quot;| Camera2
+    Dashboard -.-&gt;|&quot;depends_on&quot;| Camera3
+
+    Go2RTC --&gt; Go2RTCConfig[&quot;go2rtc.yaml&quot;]
+    Camera1 --&gt; Dockerfile
+    Camera2 --&gt; Dockerfile
+    Camera3 --&gt; Dockerfile
+    Dashboard --&gt; DockerfileDashboard[&quot;Dockerfile.dashboard&quot;]
+
+    Dockerfile --&gt; Requirements[&quot;requirements-docker.txt&quot;]
+
+    style Compose fill:#dbe7f6
+    style Dashboard fill:#e2eafc
+    style Go2RTC fill:#d7eef2
+    style Camera1 fill:#dce6ff
+    style Camera2 fill:#dce6ff
+    style Camera3 fill:#dce6ff
+</code></pre>
+<hr />
+<h2 id="_15">リソース要件</h2>
+<h3 id="_16">メモリ使用量（推定値）</h3>
+<table>
+<thead>
+<tr>
+<th>コンテナ</th>
+<th>ベースイメージ</th>
+<th>アプリメモリ</th>
+<th>合計（推定）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>dashboard</td>
+<td>~50MB</td>
+<td>~30MB</td>
+<td><strong>~80MB</strong></td>
+</tr>
+<tr>
+<td>go2rtc</td>
+<td>~30MB</td>
+<td>~40MB</td>
+<td><strong>~70MB</strong></td>
+</tr>
+<tr>
+<td>camera1</td>
+<td>~120MB</td>
+<td>~200MB (リングバッファ含む)</td>
+<td><strong>~320MB</strong></td>
+</tr>
+<tr>
+<td>camera2</td>
+<td>~120MB</td>
+<td>~200MB</td>
+<td><strong>~320MB</strong></td>
+</tr>
+<tr>
+<td>camera3</td>
+<td>~120MB</td>
+<td>~200MB</td>
+<td><strong>~320MB</strong></td>
+</tr>
+<tr>
+<td><strong>合計</strong></td>
+<td></td>
+<td></td>
+<td><strong>~1110MB (約1.1GB)</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_17">ディスク使用量</h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>サイズ（推定）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dockerイメージ (dashboard)</td>
+<td>~200MB</td>
+</tr>
+<tr>
+<td>Dockerイメージ (go2rtc)</td>
+<td>~60MB</td>
+</tr>
+<tr>
+<td>Dockerイメージ (camera) × 3</td>
+<td>~600MB</td>
+</tr>
+<tr>
+<td>検出結果 (1時間あたり)</td>
+<td>~100MB-1GB (検出数依存)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cpu">CPU使用率</h3>
+<ul>
+<li><strong>camera1-3</strong>: 各コンテナ 30-50% (1コア)</li>
+<li><strong>go2rtc</strong>: 数% - 15% 程度（接続数と配信方式依存）</li>
+<li><strong>dashboard</strong>: 5-10% (1コア)</li>
+</ul>
+<hr />
+<h2 id="docker-composeyml">docker-compose.yml コマンド</h2>
+<h3 id="_18">基本操作</h3>
+<pre><code class="language-bash"># 起動（バックグラウンド）
+docker compose up -d
+
+# 停止
+docker compose down
+
+# 再起動
+docker compose restart
+
+# ログ確認（全コンテナ）
+docker compose logs -f
+
+# 特定コンテナのログ
+docker compose logs -f camera1
+docker compose logs -f go2rtc
+
+# 状態確認
+docker compose ps
+
+# リソース使用状況
+docker stats
+</code></pre>
+<h3 id="_19">イメージ管理</h3>
+<pre><code class="language-bash"># イメージのビルド
+docker compose build
+
+# キャッシュなしでビルド
+docker compose build --no-cache
+
+# イメージ削除
+docker compose down --rmi all
+
+# 未使用イメージの削除
+docker image prune -a
+</code></pre>
+<h3 id="_20">コンテナ管理</h3>
+<pre><code class="language-bash"># 特定コンテナの再起動
+docker compose restart camera1
+docker compose restart go2rtc
+
+# 特定コンテナに入る
+docker compose exec camera1 /bin/bash
+docker compose exec go2rtc sh
+
+# 特定コンテナを停止
+docker compose stop camera1
+
+# 特定コンテナを起動
+docker compose start camera1
+</code></pre>
+<hr />
+<h2 id="_21">トラブルシューティング</h2>
+<h3 id="_22">コンテナが起動しない</h3>
+<pre><code class="language-bash"># ログを確認
+docker compose logs camera1
+
+# コンテナの状態を確認
+docker compose ps
+
+# ネットワークを確認
+docker network ls
+docker network inspect meteor-net
+</code></pre>
+<h3 id="rtsp">RTSP接続エラー</h3>
+<pre><code class="language-bash"># カメラコンテナ内でRTSP接続をテスト
+docker compose exec camera1 /bin/bash
+# コンテナ内で
+apt-get update &amp;&amp; apt-get install -y ffmpeg
+ffmpeg -i &quot;${RTSP_URL}&quot; -frames:v 1 test.jpg
+</code></pre>
+<h3 id="_23">ディスク容量不足</h3>
+<pre><code class="language-bash"># 検出結果のクリーンアップ
+rm -rf ./detections/*/meteor_*.mp4  # 動画のみ削除
+
+# Dockerのクリーンアップ
+docker system prune -a --volumes
+</code></pre>
+<h3 id="_24">ポート競合</h3>
+<pre><code class="language-bash"># ポート使用状況を確認
+lsof -i :8080
+lsof -i :8081
+
+# docker-compose.ymlのポート番号を変更
+# ports:
+#   - &quot;18080:8080&quot;  # ホストポートを変更
+</code></pre>
+<hr />
+<h2 id="_25">セキュリティ考慮事項</h2>
+<h3 id="1-rtsp">1. RTSP認証情報</h3>
+<p>⚠️ <strong>注意</strong>: docker-compose.ymlにRTSP URLの認証情報が平文で含まれています</p>
+<p><strong>推奨対策</strong>:</p>
+<pre><code class="language-bash"># .envファイルを使用
+echo 'RTSP_URL_CAMERA1=rtsp://user:pass@10.0.1.25/live' &gt; .env
+chmod 600 .env
+</code></pre>
+<p>docker-compose.ymlで参照:</p>
+<pre><code class="language-yaml">environment:
+  - RTSP_URL=${RTSP_URL_CAMERA1}
+</code></pre>
+<h3 id="2">2. ネットワークアクセス制限</h3>
+<pre><code class="language-yaml"># 内部ネットワークのみ許可（外部アクセス不要な場合）
+services:
+  camera1:
+    networks:
+      meteor-net:
+        internal: true  # 外部アクセス遮断
+</code></pre>
+<h3 id="3">3. ファイルシステムパーミッション</h3>
+<pre><code class="language-bash"># 検出結果ディレクトリの権限設定
+chmod 755 ./detections
+chown -R 1000:1000 ./detections  # コンテナ内のユーザーIDに合わせる
+</code></pre>
+<hr />
+<h2 id="_26">カメラの追加・削除（スケーリング）</h2>
+<h3 id="generate_composepy">generate_compose.py による自動生成</h3>
+<p><code>docker-compose.yml</code>は<code>generate_compose.py</code>スクリプトで自動生成されます。</p>
+<h4 id="_27">処理フロー</h4>
+<pre><code class="language-mermaid">flowchart LR
+    Streamers[&quot;streamers ファイル&lt;br/&gt;RTSP URLリスト&quot;]
+    Script[&quot;generate_compose.py&quot;]
+    Compose[&quot;docker-compose.yml&quot;]
+
+    Streamers --&gt;|&quot;読み込み&quot;| Script
+    Script --&gt;|&quot;生成&quot;| Compose
+
+    style Script fill:#dce6ff
+    style Compose fill:#e2eafc
+</code></pre>
+<h3 id="_28">カメラ追加手順</h3>
+<h4 id="1-streamers">1. streamers ファイルを編集</h4>
+<pre><code class="language-bash"># streamers ファイルに新しいカメラのRTSP URLを追加
+echo &quot;rtsp://user:pass@10.0.1.20/live&quot; &gt;&gt; streamers
+</code></pre>
+<p>streamers ファイル形式:</p>
+<pre><code>rtsp://username:password@192.168.1.100/live
+rtsp://username:password@192.168.1.101/live
+rtsp://username:password@192.168.1.102/live
+# コメント行は無視されます
+rtsp://192.168.1.103:554/stream  # 認証なしも可能
+</code></pre>
+<p>昼間画像を指定してマスクを自動生成する場合:</p>
+<pre><code>rtsp://username:password@192.168.1.100/live | camera1.jpg
+rtsp://username:password@192.168.1.101/live | camera2.jpg
+rtsp://192.168.1.103:554/stream
+</code></pre>
+<ul>
+<li><code>|</code> 右側は昼間画像パス（相対パス可）</li>
+<li>マスク生成には OpenCV が必要</li>
+</ul>
+<h4 id="2-docker-composeyml">2. docker-compose.yml を再生成</h4>
+<pre><code class="language-bash"># 基本的な使い方
+python generate_compose.py
+
+# オプション指定
+python generate_compose.py \
+  --streamers streamers \
+  --output docker-compose.yml \
+  --sensitivity medium \
+  --scale 0.5 \
+  --buffer 15 \
+  --base-port 8080 \
+  --latitude 35.6762 \
+  --longitude 139.6503 \
+  --enable-time-window true \
+  --mask-output-dir masks
+</code></pre>
+<h4 id="3_1">3. コンテナを再起動</h4>
+<pre><code class="language-bash"># イメージをビルド（初回のみ）
+docker compose build
+
+# コンテナを起動
+docker compose up -d
+
+# 新しいカメラが追加されたことを確認
+docker compose ps
+</code></pre>
+<h3 id="generate_composepy_1">generate_compose.py のオプション</h3>
+<table>
+<thead>
+<tr>
+<th>オプション</th>
+<th>デフォルト値</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>-s, --streamers</code></td>
+<td><code>streamers</code></td>
+<td>RTSP URLリストファイル</td>
+</tr>
+<tr>
+<td><code>-o, --output</code></td>
+<td><code>docker-compose.yml</code></td>
+<td>出力ファイル名</td>
+</tr>
+<tr>
+<td><code>--sensitivity</code></td>
+<td><code>medium</code></td>
+<td>検出感度 (low/medium/high/faint/fireball)</td>
+</tr>
+<tr>
+<td><code>--scale</code></td>
+<td><code>0.5</code></td>
+<td>処理スケール (0.0-1.0)</td>
+</tr>
+<tr>
+<td><code>--buffer</code></td>
+<td><code>15</code></td>
+<td>リングバッファ秒数</td>
+</tr>
+<tr>
+<td><code>--exclude-bottom</code></td>
+<td><code>0.0625</code></td>
+<td>画面下部除外率 (1/16)</td>
+</tr>
+<tr>
+<td><code>--extract-clips</code></td>
+<td><code>true</code></td>
+<td>クリップ動画保存</td>
+</tr>
+<tr>
+<td><code>--base-port</code></td>
+<td><code>8080</code></td>
+<td>ベースポート番号</td>
+</tr>
+<tr>
+<td><code>--latitude</code></td>
+<td><code>35.3606</code></td>
+<td>観測地の緯度（富士山頂）</td>
+</tr>
+<tr>
+<td><code>--longitude</code></td>
+<td><code>138.7274</code></td>
+<td>観測地の経度（富士山頂）</td>
+</tr>
+<tr>
+<td><code>--enable-time-window</code></td>
+<td><code>false</code></td>
+<td>天文薄暮時間帯制限</td>
+</tr>
+<tr>
+<td><code>--mask-output-dir</code></td>
+<td><code>masks</code></td>
+<td>生成マスクの保存先</td>
+</tr>
+<tr>
+<td><code>--mask-dilate</code></td>
+<td><code>20</code></td>
+<td>マスク拡張ピクセル数</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_29">自動生成される構成</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant Script as generate_compose.py
+    participant Streamers as streamers
+    participant Compose as docker-compose.yml
+
+    User-&gt;&gt;Script: python generate_compose.py
+    Script-&gt;&gt;Streamers: ファイル読み込み
+    Streamers--&gt;&gt;Script: RTSP URLリスト (N行)
+
+    loop 各RTSP URL
+        Script-&gt;&gt;Script: parse_rtsp_url()&lt;br/&gt;URL解析
+        Script-&gt;&gt;Script: generate_service()&lt;br/&gt;サービス定義生成
+    end
+
+    Script-&gt;&gt;Script: generate_dashboard()&lt;br/&gt;ダッシュボード生成
+    Script-&gt;&gt;Compose: docker-compose.yml出力
+
+    Compose--&gt;&gt;User: 生成完了&lt;br/&gt;カメラ数: N&lt;br/&gt;ポート: 8080-808N
+</code></pre>
+<h3 id="_30">生成例</h3>
+<p><strong>入力 (streamers)</strong>:</p>
+<pre><code>rtsp://6199:4003@10.0.1.25/live
+rtsp://6199:4003@10.0.1.3/live
+</code></pre>
+<p>※ 昼間画像を指定する場合は <code>| camera1.jpg</code> のように行末に追加します。</p>
+<p><strong>出力 (docker-compose.yml)</strong>:
+- ダッシュボード: <code>localhost:8080</code>
+- カメラ1 (10.0.1.25): <code>localhost:8081</code>
+- カメラ2 (10.0.1.3): <code>localhost:8082</code></p>
+<h3 id="_31">カメラ削除手順</h3>
+<h4 id="1-streamers_1">1. streamers から該当行を削除</h4>
+<pre><code class="language-bash"># 例: 2行目のカメラを削除
+sed -i '2d' streamers
+</code></pre>
+<h4 id="2-docker-composeyml_1">2. docker-compose.yml を再生成</h4>
+<pre><code class="language-bash">python generate_compose.py
+</code></pre>
+<h4 id="3_2">3. 古いコンテナを停止して再起動</h4>
+<pre><code class="language-bash"># 全コンテナを停止・削除
+docker compose down
+
+# 新しい構成で起動
+docker compose up -d
+</code></pre>
+<h3 id="_32">カメラ数の制限</h3>
+<p><strong>技術的制限</strong>: なし（ホストマシンのリソース次第）</p>
+<p><strong>推奨値</strong>:
+- <strong>メモリ</strong>: 1カメラあたり約320MB → 8GBメモリで約20カメラ
+- <strong>CPU</strong>: 1カメラあたり1コア30-50% → 4コアCPUで約8カメラ
+- <strong>ネットワーク</strong>: 1カメラあたり約5-10Mbps → 100Mbpsで約10カメラ</p>
+<hr />
+<h2 id="_33">関連ファイル</h2>
+<ul>
+<li><code>docker-compose.yml</code>: Docker Compose設定ファイル（自動生成）</li>
+<li><code>Dockerfile</code>: カメラコンテナ用Dockerイメージ定義</li>
+<li><code>Dockerfile.dashboard</code>: ダッシュボードコンテナ用Dockerイメージ定義</li>
+<li><code>requirements-docker.txt</code>: Python依存パッケージ</li>
+<li><code>generate_compose.py</code>: docker-compose.yml生成スクリプト</li>
+<li><code>streamers</code>: RTSP URLリスト（カメラ設定ファイル）</li>
+<li><code>streamers.sample</code>: streamersファイルのサンプル</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  ページトップへ戻る
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f", "clipboard.copy": "\u30af\u30ea\u30c3\u30d7\u30dc\u30fc\u30c9\u3078\u30b3\u30d4\u30fc", "search.result.more.one": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3082\u30461\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.more.other": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3042\u3068#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.none": "\u4f55\u3082\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f", "search.result.one": "1\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.other": "#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.placeholder": "\u691c\u7d22\u30ad\u30fc\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "search.result.term.missing": "\u691c\u7d22\u306b\u542b\u307e\u308c\u306a\u3044", "select.version": "\u30d0\u30fc\u30b8\u30e7\u30f3\u5207\u308a\u66ff\u3048"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

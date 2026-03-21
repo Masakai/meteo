@@ -1,0 +1,4426 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="流星・雲検出システム Meteo の公式ドキュメント">
+      
+      
+      
+        <link rel="canonical" href="https://masakai.github.io/meteo/CONFIGURATION_GUIDE/">
+      
+      
+        <link rel="prev" href="../SETUP_GUIDE/">
+      
+      
+        <link rel="next" href="../OPERATIONS_GUIDE/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/mascot-meteo-cam.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>設定ガイド - Meteo Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Zen+Kaku+Gothic+New:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Zen Kaku Gothic New";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  <meta property="og:site_name" content="Meteo Documentation">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="設定ガイド | Meteo Documentation">
+  <meta property="og:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta property="og:url" content="https://masakai.github.io/meteo/CONFIGURATION_GUIDE/">
+  <meta property="og:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:secure_url" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="設定ガイド | Meteo Documentation">
+  <meta name="twitter:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta name="twitter:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <script>
+    document$.subscribe(function() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e2ecff",
+          primaryTextColor: "#111111",
+          primaryBorderColor: "#7a92bf",
+          secondaryColor: "#dff3e2",
+          secondaryTextColor: "#111111",
+          secondaryBorderColor: "#6f9a79",
+          tertiaryColor: "#ffe8cc",
+          tertiaryTextColor: "#111111",
+          tertiaryBorderColor: "#c28a4a",
+          lineColor: "#7b8794",
+          textColor: "#111111",
+          mainBkg: "#e2ecff",
+          nodeBkg: "#e2ecff",
+          nodeBorder: "#7a92bf",
+          clusterBkg: "#f7f4ff",
+          clusterBorder: "#b8abd9",
+          defaultLinkColor: "#7b8794",
+          titleColor: "#111111",
+          edgeLabelBackground: "#ffffff",
+          actorBkg: "#e2ecff",
+          actorBorder: "#7a92bf",
+          actorTextColor: "#111111",
+          actorLineColor: "#7b8794",
+          signalColor: "#111111",
+          signalTextColor: "#111111",
+          labelBoxBkgColor: "#fff7e8",
+          labelBoxBorderColor: "#c28a4a",
+          labelTextColor: "#111111",
+          loopTextColor: "#111111",
+          noteBkgColor: "#fff7e8",
+          noteBorderColor: "#d1b27c",
+          noteTextColor: "#111111",
+          activationBkgColor: "#efe6ff",
+          activationBorderColor: "#ab92cf",
+          sectionBkgColor: "#f8fbff",
+          altSectionBkgColor: "#fef6ea",
+          gridColor: "#d6deea",
+          cScale0: "#f8d7da",
+          cScale1: "#ffe3c4",
+          cScale2: "#fff1bf",
+          cScale3: "#dff3e2",
+          cScale4: "#e2ecff",
+          cScale5: "#efe6ff",
+          cScale6: "#f7dff0",
+          cScale7: "#dff2f6"
+        }
+      });
+    });
+  </script>
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration-guide" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href=".." title="Meteo Documentation" class="md-header__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Meteo Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              設定ガイド
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-label="ダークモードに切り替え"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切り替え" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="検索" placeholder="検索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="検索">
+        
+        <button type="reset" class="md-search__icon md-icon" title="クリア" aria-label="クリア" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            検索を初期化
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="タブ" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  ホーム
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SETUP_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セットアップ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  設定ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  運用ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../API_REFERENCE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API リファレンス
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../DETECTION_TUNING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  検出感度チューニング
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SECURITY/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セキュリティ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../ARCHITECTURE/" class="md-tabs__link">
+          
+  
+  
+  アーキテクチャ
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Meteo Documentation" class="md-nav__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    Meteo Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セットアップ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設定ガイド
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設定ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サンプル画面
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目次
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境変数">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラコンテナの環境変数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ダッシュボードの環境変数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数の設定方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境変数の設定方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-generate_composepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法1: generate_compose.pyで一括設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法2: docker-compose.ymlを直接編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-env" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法3: .envファイルを使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1130" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ダッシュボード一括設定（再ビルド不要） v1.13.0+
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ダッシュボード一括設定（再ビルド不要） v1.13.0+">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反映タイミング
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        永続化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定変更の推奨手順
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        マスク設定（固定カメラ向け）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="マスク設定（固定カメラ向け）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        streamers に昼間画像を指定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        その場でマスクを更新（永続化）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v1120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ノイズ帯マスク設定（v1.12.0+）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ノイズ帯マスク設定（v1.12.0+）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定パラメータ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="設定方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法1: 夜間画像から自動生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法2: 環境変数で直接指定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-v1130" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法3: ダッシュボードから設定（v1.13.0+）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例：電線対策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注意事項
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出パラメータ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="検出パラメータ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        物理量に読み替える目安（天文観測者向け）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detectionparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DetectionParams クラス
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        パラメータの詳細説明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="パラメータの詳細説明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diff_threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        diff_threshold（差分閾値）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_brightness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_brightness（最小輝度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_length-max_length" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_length / max_length（軌跡長）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_duration-max_duration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_duration / max_duration（継続時間）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_speed（最小速度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_linearity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_linearity（最小直線性）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exclude_bottom_ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_bottom_ratio（画面下部除外率）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exclude_edge_ratio-v1160" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_edge_ratio（画面四辺除外率） v1.16.0+
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip_margin_before-clip_margin_after-v1140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clip_margin_before / clip_margin_after（録画マージン設定） v1.14.0+
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        感度プリセット
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="感度プリセット">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセット一覧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセットの適用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセット別の特徴
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="プリセット別の特徴">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#low" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        low（低感度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        medium（中感度）★推奨
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        high（高感度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fireball" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fireball（火球専用）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        処理スケール設定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="処理スケール設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE パラメータ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推奨設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        スケール別の特徴
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="スケール別の特徴">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scale10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE=1.0（等倍処理）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scale05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE=0.5（推奨）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scale025" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE=0.25（省リソース）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        天文薄暮時間帯設定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="天文薄暮時間帯設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enable_time_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ENABLE_TIME_WINDOW の仕組み
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定方法
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        座標の取得方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="座標の取得方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-google-maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法1: Google Mapsで取得
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法2: コマンドラインで取得
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主要都市の座標
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        時間帯の確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ハードウェア別推奨設定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ハードウェア別推奨設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pc24gb-ram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        低スペックPC（2コア、4GB RAM）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pc48gb-ram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        標準PC（4コア、8GB RAM）★推奨
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pc816gb-ram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        高性能PC（8コア以上、16GB RAM以上）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raspberry-pi-44gb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raspberry Pi 4（4GB）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        チューニング方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="チューニング方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ1: ベースライン設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ2: 誤検出の確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ3: 感度調整
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ステップ3: 感度調整">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        誤検出が多い場合
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        見逃しが多い場合
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ4: パフォーマンス調整
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ5: 長期運用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境別チューニング例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境別チューニング例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        市街地（光害あり）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        郊外（標準環境）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        山間部（光害なし）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラブルシューティング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="トラブルシューティング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出数が少なすぎる
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        誤検出が多すぎる
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPUが高い
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディスク容量が足りない
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        バージョン別新機能
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="バージョン別新機能">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v1160-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.16.0 - 画面端ノイズ除外
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1140-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.14.0 - 録画マージン設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1130-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.13.0 - 全カメラ設定UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1120-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.12.0 - ノイズ帯マスク
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_46" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ドキュメント
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTION_TUNING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出感度チューニング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セキュリティ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アーキテクチャ
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    アーキテクチャ
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    全体構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOCKER_ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker 構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTOR_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出コンポーネント
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ASTRO_UTILS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    天文計算モジュール
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サンプル画面
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目次
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境変数">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        カメラコンテナの環境変数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ダッシュボードの環境変数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境変数の設定方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境変数の設定方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-generate_composepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法1: generate_compose.pyで一括設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-composeyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法2: docker-compose.ymlを直接編集
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-env" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法3: .envファイルを使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1130" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ダッシュボード一括設定（再ビルド不要） v1.13.0+
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ダッシュボード一括設定（再ビルド不要） v1.13.0+">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反映タイミング
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        永続化
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定変更の推奨手順
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        マスク設定（固定カメラ向け）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="マスク設定（固定カメラ向け）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        streamers に昼間画像を指定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        その場でマスクを更新（永続化）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v1120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ノイズ帯マスク設定（v1.12.0+）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ノイズ帯マスク設定（v1.12.0+）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定パラメータ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="設定方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法1: 夜間画像から自動生成
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法2: 環境変数で直接指定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-v1130" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法3: ダッシュボードから設定（v1.13.0+）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例：電線対策
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        注意事項
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出パラメータ
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="検出パラメータ">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        物理量に読み替える目安（天文観測者向け）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#detectionparams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DetectionParams クラス
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        パラメータの詳細説明
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="パラメータの詳細説明">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#diff_threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        diff_threshold（差分閾値）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_brightness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_brightness（最小輝度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_length-max_length" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_length / max_length（軌跡長）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_duration-max_duration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_duration / max_duration（継続時間）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_speed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_speed（最小速度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#min_linearity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        min_linearity（最小直線性）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exclude_bottom_ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_bottom_ratio（画面下部除外率）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exclude_edge_ratio-v1160" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        exclude_edge_ratio（画面四辺除外率） v1.16.0+
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip_margin_before-clip_margin_after-v1140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clip_margin_before / clip_margin_after（録画マージン設定） v1.14.0+
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        感度プリセット
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="感度プリセット">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセット一覧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセットの適用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        プリセット別の特徴
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="プリセット別の特徴">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#low" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        low（低感度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        medium（中感度）★推奨
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#high" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        high（高感度）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fireball" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fireball（火球専用）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        処理スケール設定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="処理スケール設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE パラメータ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        推奨設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        スケール別の特徴
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="スケール別の特徴">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scale10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE=1.0（等倍処理）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scale05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE=0.5（推奨）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scale025" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCALE=0.25（省リソース）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        天文薄暮時間帯設定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="天文薄暮時間帯設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enable_time_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ENABLE_TIME_WINDOW の仕組み
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_29" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設定方法
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        座標の取得方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="座標の取得方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-google-maps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法1: Google Mapsで取得
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方法2: コマンドラインで取得
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_31" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主要都市の座標
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_32" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        時間帯の確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_33" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ハードウェア別推奨設定
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ハードウェア別推奨設定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pc24gb-ram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        低スペックPC（2コア、4GB RAM）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pc48gb-ram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        標準PC（4コア、8GB RAM）★推奨
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pc816gb-ram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        高性能PC（8コア以上、16GB RAM以上）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raspberry-pi-44gb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raspberry Pi 4（4GB）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_34" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        チューニング方法
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="チューニング方法">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ1: ベースライン設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ2: 誤検出の確認
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ3: 感度調整
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ステップ3: 感度調整">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        誤検出が多い場合
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        見逃しが多い場合
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ4: パフォーマンス調整
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ5: 長期運用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        環境別チューニング例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="環境別チューニング例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        市街地（光害あり）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_39" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        郊外（標準環境）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        山間部（光害なし）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_41" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        トラブルシューティング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="トラブルシューティング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_42" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出数が少なすぎる
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_43" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        誤検出が多すぎる
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPUが高い
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_44" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ディスク容量が足りない
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_45" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        バージョン別新機能
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="バージョン別新機能">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#v1160-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.16.0 - 画面端ノイズ除外
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1140-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.14.0 - 録画マージン設定
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1130-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.13.0 - 全カメラ設定UI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v1120-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.12.0 - ノイズ帯マスク
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_46" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ドキュメント
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration-guide">設定ガイド (Configuration Guide)</h1>
+<hr />
+<p><strong>Copyright (c) 2026 Masanori Sakai</strong></p>
+<p>Licensed under the MIT License</p>
+<hr />
+<h2 id="_1">概要</h2>
+<p>このガイドでは、流星検出システムの各種設定方法とチューニング手法について説明します。</p>
+<h2 id="_2">サンプル画面</h2>
+<p>全カメラ設定ページの例です。</p>
+<p><img src="assets/dashboard-sample_3.png" alt="Meteo ダッシュボードの設定画面サンプル" width="920"></p>
+<h2 id="_3">目次</h2>
+<ul>
+<li><a href="#環境変数">環境変数</a></li>
+<li><a href="#マスク設定固定カメラ向け">マスク設定（固定カメラ向け）</a></li>
+<li><a href="#ノイズ帯マスク設定v1120">ノイズ帯マスク設定（v1.12.0+）</a></li>
+<li><a href="#検出パラメータ">検出パラメータ</a></li>
+<li><a href="#感度プリセット">感度プリセット</a></li>
+<li><a href="#処理スケール設定">処理スケール設定</a></li>
+<li><a href="#天文薄暮時間帯設定">天文薄暮時間帯設定</a></li>
+<li><a href="#ハードウェア別推奨設定">ハードウェア別推奨設定</a></li>
+<li><a href="#チューニング方法">チューニング方法</a></li>
+<li><a href="#バージョン別新機能">バージョン別新機能</a></li>
+</ul>
+<hr />
+<h2 id="_4">環境変数</h2>
+<h3 id="_5">カメラコンテナの環境変数</h3>
+<p>docker-compose.ymlで設定される環境変数:</p>
+<table>
+<thead>
+<tr>
+<th>変数名</th>
+<th>デフォルト値</th>
+<th>説明</th>
+<th>設定例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TZ</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン</td>
+<td><code>America/New_York</code></td>
+</tr>
+<tr>
+<td><code>RTSP_URL</code></td>
+<td>-</td>
+<td>RTSPストリームURL</td>
+<td><code>rtsp://user:pass@10.0.1.25/live</code></td>
+</tr>
+<tr>
+<td><code>CAMERA_NAME</code></td>
+<td><code>camera</code></td>
+<td>カメラ識別名</td>
+<td><code>camera1_10_0_1_25</code></td>
+</tr>
+<tr>
+<td><code>SENSITIVITY</code></td>
+<td><code>medium</code></td>
+<td>検出感度</td>
+<td><code>low</code> / <code>medium</code> / <code>high</code> / <code>fireball</code></td>
+</tr>
+<tr>
+<td><code>SCALE</code></td>
+<td><code>0.5</code></td>
+<td>処理スケール</td>
+<td><code>0.25</code> ~ <code>1.0</code></td>
+</tr>
+<tr>
+<td><code>BUFFER</code></td>
+<td><code>15</code></td>
+<td>リングバッファ秒数（RTSP Webは検出前後1秒+最大検出時間に上限調整）</td>
+<td><code>10</code> ~ <code>30</code></td>
+</tr>
+<tr>
+<td><code>EXCLUDE_BOTTOM</code></td>
+<td><code>0.0625</code></td>
+<td>画面下部除外率</td>
+<td><code>0.0</code> ~ <code>0.25</code></td>
+</tr>
+<tr>
+<td><code>EXTRACT_CLIPS</code></td>
+<td><code>true</code></td>
+<td>クリップ動画保存</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td><code>LATITUDE</code></td>
+<td><code>35.3606</code></td>
+<td>観測地の緯度</td>
+<td><code>35.6762</code>（東京）</td>
+</tr>
+<tr>
+<td><code>LONGITUDE</code></td>
+<td><code>138.7274</code></td>
+<td>観測地の経度</td>
+<td><code>139.6503</code>（東京）</td>
+</tr>
+<tr>
+<td><code>TIMEZONE</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン名</td>
+<td><code>UTC</code> / <code>Europe/London</code></td>
+</tr>
+<tr>
+<td><code>ENABLE_TIME_WINDOW</code></td>
+<td><code>false</code></td>
+<td>天文薄暮時間帯制限</td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td><code>WEB_PORT</code></td>
+<td><code>8080</code></td>
+<td>内部HTTPポート</td>
+<td>通常変更不要</td>
+</tr>
+<tr>
+<td><code>MASK_IMAGE</code></td>
+<td><code>""</code></td>
+<td>事前生成済みマスク画像（優先）</td>
+<td><code>/app/mask_image.png</code></td>
+</tr>
+<tr>
+<td><code>MASK_FROM_DAY</code></td>
+<td><code>""</code></td>
+<td>昼間画像からマスク生成</td>
+<td><code>/app/mask_from_day.jpg</code></td>
+</tr>
+<tr>
+<td><code>MASK_DILATE</code></td>
+<td><code>20</code></td>
+<td>マスク拡張ピクセル数</td>
+<td><code>10</code> / <code>30</code></td>
+</tr>
+<tr>
+<td><code>MASK_SAVE</code></td>
+<td><code>""</code></td>
+<td>マスク保存先</td>
+<td><code>/output/masks/camera1_mask.png</code></td>
+</tr>
+<tr>
+<td><code>NUISANCE_MASK_IMAGE</code></td>
+<td><code>""</code></td>
+<td>ノイズ帯マスク画像（v1.12.0+）</td>
+<td><code>/app/nuisance_mask.png</code></td>
+</tr>
+<tr>
+<td><code>NUISANCE_FROM_NIGHT</code></td>
+<td><code>""</code></td>
+<td>夜間画像からノイズ帯マスク生成（v1.12.0+）</td>
+<td><code>/app/nuisance_night.jpg</code></td>
+</tr>
+<tr>
+<td><code>NUISANCE_DILATE</code></td>
+<td><code>3</code></td>
+<td>ノイズ帯マスク拡張ピクセル数（v1.12.0+）</td>
+<td><code>2</code> / <code>5</code></td>
+</tr>
+<tr>
+<td><code>NUISANCE_OVERLAP_THRESHOLD</code></td>
+<td><code>0.3</code></td>
+<td>ノイズ帯重複率閾値（v1.12.0+）</td>
+<td><code>0.2</code> ~ <code>0.5</code></td>
+</tr>
+<tr>
+<td><code>EXCLUDE_EDGE_RATIO</code></td>
+<td><code>0.0</code></td>
+<td>画面四辺除外率（v1.16.0+）</td>
+<td><code>0.0</code> ~ <code>0.2</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">ダッシュボードの環境変数</h3>
+<table>
+<thead>
+<tr>
+<th>変数名</th>
+<th>デフォルト値</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8080</code></td>
+<td>HTTPサーバーポート</td>
+</tr>
+<tr>
+<td><code>LATITUDE</code></td>
+<td><code>35.3606</code></td>
+<td>観測地の緯度</td>
+</tr>
+<tr>
+<td><code>LONGITUDE</code></td>
+<td><code>138.7274</code></td>
+<td>観測地の経度</td>
+</tr>
+<tr>
+<td><code>TIMEZONE</code></td>
+<td><code>Asia/Tokyo</code></td>
+<td>タイムゾーン名</td>
+</tr>
+<tr>
+<td><code>ENABLE_TIME_WINDOW</code></td>
+<td><code>false</code></td>
+<td>天文薄暮時間帯制限</td>
+</tr>
+<tr>
+<td><code>CAMERA1_NAME</code></td>
+<td>-</td>
+<td>カメラ1の内部名（ディレクトリ名・識別子）</td>
+</tr>
+<tr>
+<td><code>CAMERA1_NAME_DISPLAY</code></td>
+<td>-</td>
+<td>カメラ1のWeb表示名（UI専用。保存先ディレクトリや <code>runtime_settings</code> のファイル名には使われない）</td>
+</tr>
+<tr>
+<td><code>CAMERA1_URL</code></td>
+<td>-</td>
+<td>カメラ1のURL</td>
+</tr>
+<tr>
+<td><code>CAMERA1_STREAM_KIND</code></td>
+<td><code>mjpeg</code></td>
+<td>ライブ表示方式 (<code>mjpeg</code> / <code>webrtc</code>)</td>
+</tr>
+<tr>
+<td><code>CAMERA1_STREAM_URL</code></td>
+<td><code>CAMERA1_URL</code></td>
+<td>ライブ表示用URL (<code>webrtc</code> 時は <code>http://localhost:1984/stream.html?src=camera1&amp;mode=webrtc&amp;mode=mse...</code> など。埋め込み時はダッシュボード表示中のホスト名を優先して接続)</td>
+</tr>
+<tr>
+<td><code>DETECTIONS_DIR</code></td>
+<td><code>/output</code></td>
+<td>検出結果ディレクトリ</td>
+</tr>
+<tr>
+<td><code>CAMERA_HEALTH_INTERVAL</code></td>
+<td><code>10</code></td>
+<td>カメラ生存確認間隔（秒）</td>
+</tr>
+<tr>
+<td><code>CAMERA_TIMEOUT</code></td>
+<td><code>5</code></td>
+<td>カメラ応答タイムアウト（秒）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_7">環境変数の設定方法</h3>
+<h4 id="1-generate_composepy">方法1: generate_compose.pyで一括設定</h4>
+<pre><code class="language-bash">python generate_compose.py \
+  --streamers streamers \
+  --sensitivity high \
+  --scale 0.5 \
+  --buffer 15 \
+  --streaming-mode webrtc \
+  --latitude 35.6762 \
+  --longitude 139.6503 \
+  --enable-time-window true \
+  --extract-clips true \
+  --mask-output-dir masks
+</code></pre>
+<h4 id="2-docker-composeyml">方法2: docker-compose.ymlを直接編集</h4>
+<pre><code class="language-yaml">services:
+  camera1:
+    environment:
+      - SENSITIVITY=high
+      - SCALE=0.5
+      - EXTRACT_CLIPS=false
+
+  dashboard:
+    environment:
+      - CAMERA1_STREAM_KIND=webrtc
+      - CAMERA1_STREAM_URL=http://localhost:1984/stream.html?src=camera1&amp;mode=webrtc&amp;mode=mse&amp;mode=hls&amp;mode=mjpeg&amp;background=false
+</code></pre>
+<p><code>webrtc</code> を Docker 内の <code>go2rtc</code> で使う場合は、<code>go2rtc.yaml</code> の <code>webrtc.candidates</code> にブラウザから到達可能なホスト側 IP/ポートを設定してください。<code>generate_compose.py</code> は既定でローカル IP を自動検出して設定し、必要な場合だけ <code>--go2rtc-candidate-host &lt;host-ip&gt;</code> で上書きできます。</p>
+<p><code>go2rtc</code> は <code>webrtc.candidates</code> で指定した <code>host</code> candidate に加えて、STUN 由来の <code>srflx</code> candidate を返すことがあります。<code>srflx</code> がログやブラウザ開発者ツールに見えても異常ではありません。重要なのは、同時に指定した <code>host</code> candidate も返っており、最終的な表示モードが <code>RTC</code> になっていることです。</p>
+<h4 id="3-env">方法3: .envファイルを使用</h4>
+<pre><code class="language-bash"># .env ファイルを作成
+cat &gt; .env &lt;&lt; 'EOF'
+# 全カメラ共通設定
+SENSITIVITY=medium
+SCALE=0.5
+BUFFER=15
+EXTRACT_CLIPS=true
+
+# 観測地点
+LATITUDE=35.6762
+LONGITUDE=139.6503
+ENABLE_TIME_WINDOW=true
+
+# RTSP認証情報（セキュリティ向上）
+RTSP_USER=username
+RTSP_PASS=password
+EOF
+
+chmod 600 .env  # パーミッション制限
+</code></pre>
+<p>docker-compose.ymlで参照:</p>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=${SENSITIVITY:-medium}
+  - RTSP_URL=rtsp://${RTSP_USER}:${RTSP_PASS}@10.0.1.25/live
+</code></pre>
+<h3 id="v1130">ダッシュボード一括設定（再ビルド不要） v1.13.0+</h3>
+<p><code>/settings</code> から全カメラへ設定を一括反映できます。</p>
+<ul>
+<li><code>GET /settings</code>: 設定UI</li>
+<li><code>GET /camera_settings/current</code>: 現在値取得</li>
+<li><code>POST /camera_settings/apply_all</code>: 全カメラ一括反映</li>
+</ul>
+<h4 id="_8">反映タイミング</h4>
+<p><strong>即時反映（再起動不要）:</strong>
+  - <strong>検出パラメータ</strong>: <code>diff_threshold</code>, <code>min_brightness</code>, <code>min_linearity</code>, <code>min_length</code>, <code>min_speed</code>, <code>min_duration</code>, <code>max_duration</code>, <code>min_area</code>, <code>max_area</code>
+  - <strong>ノイズ除外パラメータ</strong>: <code>nuisance_overlap_threshold</code>, <code>nuisance_path_overlap_threshold</code>, <code>min_track_points</code>, <code>max_stationary_ratio</code>, <code>small_area_threshold</code>
+  - <strong>録画マージン設定（v1.14.0+）</strong>: <code>clip_margin_before</code>, <code>clip_margin_after</code>
+  - <strong>マスク設定</strong>: <code>mask_dilate</code>, <code>nuisance_dilate</code>, <code>mask_*</code>, <code>nuisance_*</code> の画像パス
+  - <strong>画面端除外（v1.16.0+）</strong>: <code>exclude_edge_ratio</code></p>
+<p><strong>自動再起動で反映（再ビルド不要）:</strong>
+  - <strong>基本設定</strong>: <code>sensitivity</code>, <code>scale</code>, <code>buffer</code>, <code>extract_clips</code></p>
+<h4 id="_9">永続化</h4>
+<p>起動時依存の設定は <code>output/runtime_settings/&lt;camera&gt;.json</code> に保存されます。
+これにより、コンテナ再起動後も同じ設定が維持されます。
+<code>&lt;camera&gt;</code> には <code>CAMERA_NAME</code> の内部名が使われ、<code>CAMERA_NAME_DISPLAY</code> の表示名には切り替わりません。</p>
+<h4 id="_10">設定変更の推奨手順</h4>
+<ol>
+<li>ダッシュボードの <code>/settings</code> ページにアクセス</li>
+<li>変更したいパラメータを入力（差分のみハイライト表示）</li>
+<li>「全カメラに適用」ボタンで一括反映</li>
+<li>即時反映項目はリアルタイムで適用、再起動項目は自動で再起動</li>
+<li><code>output/runtime_settings/&lt;camera&gt;.json</code> に永続化され、次回起動時も有効</li>
+</ol>
+<hr />
+<h2 id="_11">マスク設定（固定カメラ向け）</h2>
+<h3 id="streamers">streamers に昼間画像を指定</h3>
+<p><code>streamers</code> で <code>RTSP URL | 昼間画像</code> の形式にすると、<code>generate_compose.py</code> 実行時に
+除外マスクを自動生成してコンテナに同梱します。</p>
+<pre><code>rtsp://user:pass@10.0.1.25/live | camera1.jpg
+rtsp://user:pass@10.0.1.3/live  | camera2.jpg
+rtsp://user:pass@10.0.1.11/live
+</code></pre>
+<ul>
+<li>画像パスは <code>streamers</code> と同じフォルダ基準（相対パス可）</li>
+<li>マスク生成には OpenCV が必要</li>
+</ul>
+<h3 id="_12">その場でマスクを更新（永続化）</h3>
+<p>ダッシュボードの「マスク更新」ボタンで、<strong>現在フレームからマスクを再生成</strong>できます。
+保存先は <code>/output/masks/&lt;camera&gt;_mask.png</code> です。</p>
+<hr />
+<h2 id="v1120">ノイズ帯マスク設定（v1.12.0+）</h2>
+<h3 id="_13">概要</h3>
+<p>ノイズ帯マスク機能は、電線や部分照明など、<strong>動かない明るい線状物体</strong>による誤検出を防ぎます。
+通常のマスクと異なり、ノイズ帯と軌跡が重複した場合のみ除外判定を行います。</p>
+<h3 id="_14">設定パラメータ</h3>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>デフォルト値</th>
+<th>説明</th>
+<th>推奨値</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nuisance_mask_image</code></td>
+<td><code>""</code></td>
+<td>事前生成済みノイズ帯マスク</td>
+<td><code>/app/nuisance_mask.png</code></td>
+</tr>
+<tr>
+<td><code>nuisance_from_night</code></td>
+<td><code>""</code></td>
+<td>夜間画像からマスク自動生成</td>
+<td><code>/app/nuisance_night.jpg</code></td>
+</tr>
+<tr>
+<td><code>nuisance_dilate</code></td>
+<td><code>3</code></td>
+<td>マスク拡張ピクセル数</td>
+<td><code>2</code> ~ <code>5</code></td>
+</tr>
+<tr>
+<td><code>nuisance_overlap_threshold</code></td>
+<td><code>0.3</code></td>
+<td>重複率閾値（軌跡の何％がノイズ帯に重なったら除外）</td>
+<td><code>0.2</code> ~ <code>0.5</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_15">設定方法</h3>
+<h4 id="1">方法1: 夜間画像から自動生成</h4>
+<pre><code class="language-bash"># streamers に夜間画像を指定
+python generate_compose.py \
+  --streamers streamers \
+  --nuisance-images nuisance_images
+</code></pre>
+<p><code>nuisance_images</code> ファイル例:</p>
+<pre><code>camera1_night.jpg
+camera2_night.jpg
+camera3_night.jpg
+</code></pre>
+<h4 id="2">方法2: 環境変数で直接指定</h4>
+<pre><code class="language-yaml">environment:
+  - NUISANCE_FROM_NIGHT=/app/nuisance_night.jpg
+  - NUISANCE_DILATE=3
+  - NUISANCE_OVERLAP_THRESHOLD=0.3
+</code></pre>
+<h4 id="3-v1130">方法3: ダッシュボードから設定（v1.13.0+）</h4>
+<ol>
+<li><code>/settings</code> ページにアクセス</li>
+<li><code>nuisance_overlap_threshold</code> を調整（0.2 = 20%重複で除外）</li>
+<li>「全カメラに適用」で即時反映</li>
+</ol>
+<h3 id="_16">使用例：電線対策</h3>
+<p>電線が画面中央を横切る場合:</p>
+<pre><code class="language-yaml">environment:
+  - NUISANCE_FROM_NIGHT=/app/night_with_wires.jpg
+  - NUISANCE_DILATE=5  # 電線を太めに認識
+  - NUISANCE_OVERLAP_THRESHOLD=0.25  # 軌跡の25%以上が電線に重なったら除外
+</code></pre>
+<h3 id="_17">注意事項</h3>
+<ul>
+<li><strong>夜間画像を使用</strong>: 電線や照明が明るく写っている夜間画像が必要</li>
+<li><strong>通常マスクとの併用</strong>: 建物など完全除外したい領域は通常マスクを使用</li>
+<li><strong>重複率の調整</strong>: 値を小さくすると除外が厳しく、大きくすると緩くなる</li>
+</ul>
+<hr />
+<h2 id="_18">検出パラメータ</h2>
+<h3 id="_19">物理量に読み替える目安（天文観測者向け）</h3>
+<p>検出しきい値はコード上 <code>px</code> / <code>px/s</code> ですが、観測上は「何km・何km/sか」が重要です。
+ここでは、ATOM Cam 2 の水平画角を 120度、解像度を 1920x1080 として読み替えます。</p>
+<p>前提:
+- 水平1pxあたり角度: <code>120 / 1920 = 0.0625度</code>（約 <code>0.0010908 rad</code>）
+- 距離 <code>R km</code> に対して
+  - 見かけ長さ <code>L ≈ R * 角度(rad)</code>
+  - 見かけ速度 <code>V ≈ R * 角速度(rad/s)</code></p>
+<p>現在の標準しきい値（<code>medium</code>）:
+- <code>min_length = 20 px</code>
+- <code>min_speed = 50 px/s</code></p>
+<p>距離別の換算目安:</p>
+<table>
+<thead>
+<tr>
+<th>想定距離 R</th>
+<th>最小検出長（20px）</th>
+<th>最小見かけ速度（50px/s）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100 km</td>
+<td>約 2.18 km</td>
+<td>約 5.45 km/s</td>
+</tr>
+<tr>
+<td>200 km</td>
+<td>約 4.36 km</td>
+<td>約 10.91 km/s</td>
+</tr>
+<tr>
+<td>300 km</td>
+<td>約 6.55 km</td>
+<td>約 16.36 km/s</td>
+</tr>
+</tbody>
+</table>
+<p>読み方:
+- 距離が遠いほど、同じ <code>px</code> でも実距離・実速度は大きくなります
+- 低空（低仰角）で見える流星は距離が伸びやすく、300km前後になることがあります
+- 運用上は「この設定で拾える最低ライン」を km/km/s で把握しておくと調整しやすくなります</p>
+<h3 id="detectionparams">DetectionParams クラス</h3>
+<p>meteor_detector_rtsp_web.py内で定義されるパラメータ:</p>
+<pre><code class="language-python">@dataclass
+class DetectionParams:
+    diff_threshold: int = 30          # 差分閾値
+    min_brightness: int = 200         # 最小輝度
+    min_length: int = 20              # 最小軌跡長 (px)
+    max_length: int = 5000            # 最大軌跡長 (px)
+    min_duration: float = 0.1         # 最小継続時間 (秒)
+    max_duration: float = 10.0        # 最大継続時間 (秒)
+    min_speed: float = 50.0           # 最小速度 (px/s)
+    min_linearity: float = 0.7        # 最小直線性 (0-1)
+    min_area: int = 5                 # 最小面積 (px²)
+    max_area: int = 10000             # 最大面積 (px²)
+    max_gap_time: float = 0.2         # 最大トラッキング間隔 (秒)
+    max_distance: float = 80          # 最大移動距離 (px)
+    exclude_bottom_ratio: float = 1/16 # 画面下部除外率
+</code></pre>
+<h3 id="_20">パラメータの詳細説明</h3>
+<h4 id="diff_threshold">diff_threshold（差分閾値）</h4>
+<p><strong>説明</strong>: フレーム間差分の閾値。この値を超える変化を検出対象とする</p>
+<p><strong>影響</strong>:
+- <strong>低い値（15-20）</strong>: 小さな変化も検出 → 感度高、誤検出も増加
+- <strong>高い値（40-50）</strong>: 大きな変化のみ検出 → 感度低、誤検出減少</p>
+<p><strong>推奨値</strong>:
+- 明るい環境: 40
+- 通常環境: 30
+- 暗い環境: 20</p>
+<p><strong>調整例</strong>:</p>
+<pre><code class="language-python"># コード内で直接変更する場合
+params = DetectionParams()
+params.diff_threshold = 25  # より敏感に
+</code></pre>
+<hr />
+<h4 id="min_brightness">min_brightness（最小輝度）</h4>
+<p><strong>説明</strong>: 検出対象とする最小の明るさ（0-255）</p>
+<p><strong>影響</strong>:
+- <strong>低い値（150-180）</strong>: 暗い流星も検出
+- <strong>高い値（220-255）</strong>: 明るい流星のみ検出</p>
+<p><strong>推奨値</strong>:
+- 市街地（光害あり）: 220
+- 郊外: 200
+- 山間部（光害なし）: 180</p>
+<hr />
+<h4 id="min_length-max_length">min_length / max_length（軌跡長）</h4>
+<p><strong>説明</strong>: 検出する軌跡の長さ範囲（ピクセル）</p>
+<p><strong>min_length の影響</strong>:
+- <strong>短い（10-15px）</strong>: 短い軌跡も検出 → 誤検出増加
+- <strong>長い（30-50px）</strong>: 長い軌跡のみ → 見逃し増加</p>
+<p><strong>推奨値</strong>:
+- 1920x1080: min=20, max=5000
+- 1280x720: min=15, max=3000
+- 640x480: min=10, max=2000</p>
+<hr />
+<h4 id="min_duration-max_duration">min_duration / max_duration（継続時間）</h4>
+<p><strong>説明</strong>: 検出する軌跡の時間範囲（秒）</p>
+<p><strong>推奨値</strong>:
+- 通常の流星: min=0.1, max=10.0
+- 火球専用: min=0.5, max=20.0</p>
+<hr />
+<h4 id="min_speed">min_speed（最小速度）</h4>
+<p><strong>説明</strong>: 検出する最小移動速度（ピクセル/秒）</p>
+<p><strong>影響</strong>:
+- <strong>低い値（20-30）</strong>: ゆっくり動く物体も検出 → 航空機を誤検出
+- <strong>高い値（70-100）</strong>: 速い物体のみ → 流星の見逃しが増える</p>
+<p><strong>推奨値</strong>: 50 px/s</p>
+<p><strong>参考</strong>: 流星の典型的な速度は100-500 px/s</p>
+<hr />
+<h4 id="min_linearity">min_linearity（最小直線性）</h4>
+<p><strong>説明</strong>: 軌跡の直線度合い（0.0-1.0）。1.0が完全な直線</p>
+<p><strong>影響</strong>:
+- <strong>低い値（0.5-0.6）</strong>: 曲がった軌跡も検出
+- <strong>高い値（0.8-0.9）</strong>: ほぼ直線のみ検出</p>
+<p><strong>推奨値</strong>: 0.7</p>
+<p><strong>計算方法</strong>: 主成分分析（PCA）による固有値比</p>
+<hr />
+<h4 id="exclude_bottom_ratio">exclude_bottom_ratio（画面下部除外率）</h4>
+<p><strong>説明</strong>: 画面下部の除外範囲（0.0-1.0）</p>
+<p><strong>用途</strong>: 地上の建物や木などの誤検出を防ぐ</p>
+<p><strong>推奨値</strong>:
+- 空のみ撮影: 0.0
+- 地平線が写る: 0.0625（1/16）
+- 建物が多い: 0.125（1/8）</p>
+<p><strong>例</strong>:</p>
+<pre><code>画面高さ 1080px × 0.0625 = 下から67.5px を除外
+</code></pre>
+<hr />
+<h4 id="exclude_edge_ratio-v1160">exclude_edge_ratio（画面四辺除外率） v1.16.0+</h4>
+<p><strong>説明</strong>: 画面四辺（上下左右）からの除外割合（0.0-0.2）</p>
+<p><strong>用途</strong>: 画面端のノイズや歪みによる誤検出を防ぐ</p>
+<p><strong>影響</strong>:
+- <strong>0.0（デフォルト）</strong>: 除外なし
+- <strong>0.05</strong>: 各辺から5%を除外
+- <strong>0.1</strong>: 各辺から10%を除外
+- <strong>0.2（最大）</strong>: 各辺から20%を除外</p>
+<p><strong>推奨値</strong>:
+- 通常運用: 0.0
+- 画面端ノイズあり: 0.05
+- 魚眼レンズ（歪み大）: 0.1</p>
+<p><strong>設定方法</strong>:</p>
+<pre><code class="language-bash"># generate_compose.pyで設定
+python generate_compose.py --exclude-edge-ratio 0.05
+
+# docker-compose.ymlで設定
+environment:
+  - EXCLUDE_EDGE_RATIO=0.05
+
+# ダッシュボードから即時反映
+# /settings ページで exclude_edge_ratio を設定
+</code></pre>
+<p><strong>例</strong>:</p>
+<pre><code>画面サイズ 1920x1080、EXCLUDE_EDGE_RATIO=0.05 の場合:
+- 左右: 1920 × 0.05 = 96px ずつ除外
+- 上下: 1080 × 0.05 = 54px ずつ除外
+- 有効領域: 1728 × 972px
+</code></pre>
+<p><strong>注意事項</strong>:
+- <code>exclude_bottom_ratio</code> と併用可能（下部のみさらに除外）
+- 値を大きくしすぎると検出範囲が狭まる</p>
+<hr />
+<h4 id="clip_margin_before-clip_margin_after-v1140">clip_margin_before / clip_margin_after（録画マージン設定） v1.14.0+</h4>
+<p><strong>説明</strong>: 検出イベント前後に追加で録画する時間（秒）</p>
+<p><strong>用途</strong>: 流星の出現直前・直後の状況も記録</p>
+<p><strong>デフォルト値</strong>:
+- <code>clip_margin_before</code>: 0.0秒
+- <code>clip_margin_after</code>: 0.0秒</p>
+<p><strong>推奨値</strong>:
+- 標準運用: <code>before=0.5</code>, <code>after=0.5</code>
+- 詳細記録: <code>before=1.0</code>, <code>after=1.0</code>
+- ディスク節約: <code>before=0.0</code>, <code>after=0.0</code></p>
+<p><strong>設定方法</strong>:</p>
+<pre><code class="language-yaml"># docker-compose.ymlで設定（v1.14.0以降）
+environment:
+  - CLIP_MARGIN_BEFORE=0.5
+  - CLIP_MARGIN_AFTER=0.5
+</code></pre>
+<pre><code class="language-bash"># ダッシュボードから即時反映（v1.14.0+）
+# /settings ページで clip_margin_before, clip_margin_after を設定
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<p>検出時間 10:00:05.0 ～ 10:00:07.0（2秒間）の場合:
+- <code>margin_before=0.5</code>, <code>margin_after=0.5</code> 設定時
+- 録画範囲: 10:00:04.5 ～ 10:00:07.5（3秒間）</p>
+<p><strong>メリット</strong>:
+- 流星の出現前の空の状態を確認可能
+- 複数の流星が連続した場合も記録
+- 検出漏れの前後フレームも保存</p>
+<p><strong>注意事項</strong>:
+- BUFFER設定より大きい値は無効
+- 値を大きくするとファイルサイズが増加</p>
+<hr />
+<h2 id="_21">感度プリセット</h2>
+<h3 id="_22">プリセット一覧</h3>
+<table>
+<thead>
+<tr>
+<th>プリセット</th>
+<th>diff_threshold</th>
+<th>min_brightness</th>
+<th>用途</th>
+<th>誤検出率</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>low</code></td>
+<td>40</td>
+<td>220</td>
+<td>明るい流星のみ</td>
+<td>低</td>
+</tr>
+<tr>
+<td><code>medium</code></td>
+<td>30</td>
+<td>200</td>
+<td>バランス型（推奨）</td>
+<td>中</td>
+</tr>
+<tr>
+<td><code>high</code></td>
+<td>20</td>
+<td>180</td>
+<td>暗い流星も検出</td>
+<td>やや高</td>
+</tr>
+<tr>
+<td><code>faint</code></td>
+<td>16</td>
+<td>150</td>
+<td>短く暗い流星の取りこぼし低減</td>
+<td>高</td>
+</tr>
+<tr>
+<td><code>fireball</code></td>
+<td>15</td>
+<td>150</td>
+<td>火球専用</td>
+<td>高</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_23">プリセットの適用</h3>
+<pre><code class="language-bash"># generate_compose.pyで設定
+python generate_compose.py --sensitivity high
+
+# または docker-compose.ymlで直接設定
+environment:
+  - SENSITIVITY=high
+</code></pre>
+<h3 id="_24">プリセット別の特徴</h3>
+<h4 id="low">low（低感度）</h4>
+<p><strong>特徴</strong>:
+- 明るい流星のみ検出
+- 誤検出が最も少ない
+- 暗い流星は見逃す</p>
+<p><strong>推奨環境</strong>:
+- 市街地（光害が多い）
+- 満月期
+- テスト運用時</p>
+<p><strong>検出例</strong>:
+- -3等級以上の明るい流星
+- 火球</p>
+<hr />
+<h4 id="medium">medium（中感度）★推奨</h4>
+<p><strong>特徴</strong>:
+- バランスの取れた設定
+- 多くの環境で良好な結果
+- 誤検出と見逃しのバランスが良い</p>
+<p><strong>推奨環境</strong>:
+- 郊外
+- 標準的な観測環境
+- 長期運用</p>
+<p><strong>検出例</strong>:
+- 0等級～-3等級の流星
+- 一般的な散在流星
+- 流星群の流星</p>
+<hr />
+<h4 id="high">high（高感度）</h4>
+<p><strong>特徴</strong>:
+- 暗い流星も検出
+- 誤検出がやや増える
+- 見逃しが少ない</p>
+<p><strong>推奨環境</strong>:
+- 山間部（光害が少ない）
+- 新月期
+- 流星群極大期</p>
+<p><strong>検出例</strong>:
+- +2等級～-5等級の流星
+- 微光流星</p>
+<p><strong>注意点</strong>:
+- 航空機を誤検出する可能性
+- ログ確認が必要</p>
+<hr />
+<h4 id="fireball">fireball（火球専用）</h4>
+<p><strong>特徴</strong>:
+- 最も敏感な設定
+- 長時間・大きな物体を検出
+- 誤検出が多い</p>
+<p><strong>推奨環境</strong>:
+- 火球専用観測
+- 短期集中観測</p>
+<p><strong>検出例</strong>:
+- -4等級以上の火球
+- 長時間光る流星</p>
+<p><strong>追加設定</strong>:</p>
+<pre><code class="language-python">max_duration = 20.0  # 長時間OK
+min_speed = 20.0     # ゆっくりでもOK
+min_linearity = 0.6  # 多少曲がってもOK
+</code></pre>
+<hr />
+<h2 id="_25">処理スケール設定</h2>
+<h3 id="scale">SCALE パラメータ</h3>
+<p><strong>説明</strong>: フレームを縮小して処理する比率（0.0-1.0）</p>
+<p><strong>影響</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>SCALE</th>
+<th>処理サイズ（1920x1080の場合）</th>
+<th>CPU使用率</th>
+<th>メモリ使用量</th>
+<th>検出精度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0</td>
+<td>1920x1080（等倍）</td>
+<td>100%</td>
+<td>400MB</td>
+<td>最高</td>
+</tr>
+<tr>
+<td>0.5</td>
+<td>960x540（推奨）</td>
+<td>30%</td>
+<td>200MB</td>
+<td>高</td>
+</tr>
+<tr>
+<td>0.25</td>
+<td>480x270</td>
+<td>15%</td>
+<td>100MB</td>
+<td>中</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_26">推奨設定</h3>
+<pre><code class="language-mermaid">flowchart TD
+    Start[&quot;ハードウェア性能&quot;]
+    CheckCPU{&quot;CPUコア数&quot;}
+    CheckMem{&quot;メモリ容量&quot;}
+    CheckCamera{&quot;カメラ数&quot;}
+
+    Scale100[&quot;SCALE=1.0&lt;br/&gt;最高精度&quot;]
+    Scale050[&quot;SCALE=0.5&lt;br/&gt;推奨&quot;]
+    Scale025[&quot;SCALE=0.25&lt;br/&gt;省リソース&quot;]
+
+    Start --&gt; CheckCPU
+    CheckCPU --&gt;|&quot;8コア以上&quot;| Scale100
+    CheckCPU --&gt;|&quot;4コア&quot;| CheckMem
+    CheckCPU --&gt;|&quot;2コア以下&quot;| Scale025
+
+    CheckMem --&gt;|&quot;16GB以上&quot;| Scale050
+    CheckMem --&gt;|&quot;8GB以下&quot;| CheckCamera
+
+    CheckCamera --&gt;|&quot;1-2台&quot;| Scale050
+    CheckCamera --&gt;|&quot;3台以上&quot;| Scale025
+
+    style Scale050 fill:#dff6e8
+</code></pre>
+<h3 id="_27">スケール別の特徴</h3>
+<h4 id="scale10">SCALE=1.0（等倍処理）</h4>
+<p><strong>メリット</strong>:
+- 最高精度
+- 小さな流星も検出
+- 軌跡が正確</p>
+<p><strong>デメリット</strong>:
+- CPU使用率が高い（90-100%）
+- メモリ消費が大きい
+- 多数カメラには不向き</p>
+<p><strong>推奨環境</strong>:
+- 高性能PC（8コア以上、16GB RAM以上）
+- カメラ1-2台
+- 短期観測</p>
+<hr />
+<h4 id="scale05">SCALE=0.5（推奨）</h4>
+<p><strong>メリット</strong>:
+- 精度とパフォーマンスのバランスが良い
+- CPU使用率30-50%
+- 多数カメラに対応可能</p>
+<p><strong>デメリット</strong>:
+- 微小な流星は検出困難</p>
+<p><strong>推奨環境</strong>:
+- 標準的PC（4コア、8GB RAM）
+- カメラ3-5台
+- 長期運用</p>
+<hr />
+<h4 id="scale025">SCALE=0.25（省リソース）</h4>
+<p><strong>メリット</strong>:
+- 最も軽い
+- CPU使用率15-20%
+- 多数カメラ対応</p>
+<p><strong>デメリット</strong>:
+- 検出精度が低下
+- 小さな流星は見逃す</p>
+<p><strong>推奨環境</strong>:
+- 低スペックPC（2コア、4GB RAM）
+- カメラ6台以上
+- 明るい流星のみ検出</p>
+<hr />
+<h2 id="_28">天文薄暮時間帯設定</h2>
+<h3 id="enable_time_window">ENABLE_TIME_WINDOW の仕組み</h3>
+<p><strong>説明</strong>: 天文薄暮期間（前日の日没～翌日の日出）のみ検出を有効化</p>
+<pre><code class="language-mermaid">gantt
+    title 1日の検出スケジュール
+    dateFormat HH:mm
+    axisFormat %H:%M
+
+    section 検出OFF
+    日中（検出無効）: done, day, 06:00, 10h
+
+    section 検出ON
+    夜間（検出有効）: active, night1, 16:00, 14h
+    夜間（検出有効）: active, night2, 00:00, 6h
+</code></pre>
+<h3 id="_29">設定方法</h3>
+<pre><code class="language-bash"># generate_compose.pyで設定
+python generate_compose.py \
+  --enable-time-window true \
+  --latitude 35.6762 \
+  --longitude 139.6503
+
+# docker-compose.ymlで直接設定
+environment:
+  - ENABLE_TIME_WINDOW=true
+  - LATITUDE=35.6762
+  - LONGITUDE=139.6503
+  - TIMEZONE=Asia/Tokyo
+</code></pre>
+<h3 id="_30">座標の取得方法</h3>
+<h4 id="1-google-maps">方法1: Google Mapsで取得</h4>
+<ol>
+<li>Google Mapsで観測地点を右クリック</li>
+<li>表示される座標をコピー</li>
+<li>例: <code>35.6762, 139.6503</code></li>
+</ol>
+<h4 id="2_1">方法2: コマンドラインで取得</h4>
+<pre><code class="language-bash"># curlで現在地の座標を取得
+curl -s &quot;https://ipapi.co/json/&quot; | jq '.latitude, .longitude'
+</code></pre>
+<h3 id="_31">主要都市の座標</h3>
+<table>
+<thead>
+<tr>
+<th>都市</th>
+<th>緯度</th>
+<th>経度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>東京</td>
+<td>35.6762</td>
+<td>139.6503</td>
+</tr>
+<tr>
+<td>大阪</td>
+<td>34.6937</td>
+<td>135.5023</td>
+</tr>
+<tr>
+<td>札幌</td>
+<td>43.0642</td>
+<td>141.3469</td>
+</tr>
+<tr>
+<td>福岡</td>
+<td>33.5904</td>
+<td>130.4017</td>
+</tr>
+<tr>
+<td>那覇</td>
+<td>26.2124</td>
+<td>127.6809</td>
+</tr>
+<tr>
+<td>富士山頂</td>
+<td>35.3606</td>
+<td>138.7274</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_32">時間帯の確認</h3>
+<pre><code class="language-bash"># ダッシュボードのAPIで確認
+curl &quot;http://localhost:8080/detection_window?lat=35.6762&amp;lon=139.6503&quot; | jq
+
+# レスポンス例
+{
+  &quot;start&quot;: &quot;2026-02-01 16:45:23&quot;,
+  &quot;end&quot;: &quot;2026-02-02 06:12:45&quot;,
+  &quot;enabled&quot;: true,
+  &quot;latitude&quot;: 35.6762,
+  &quot;longitude&quot;: 139.6503
+}
+</code></pre>
+<hr />
+<h2 id="_33">ハードウェア別推奨設定</h2>
+<h3 id="pc24gb-ram">低スペックPC（2コア、4GB RAM）</h3>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=medium
+  - SCALE=0.25
+  - BUFFER=10
+  - EXTRACT_CLIPS=false  # クリップ動画を保存しない
+  - ENABLE_TIME_WINDOW=true
+</code></pre>
+<p><strong>カメラ数</strong>: 最大2台</p>
+<hr />
+<h3 id="pc48gb-ram">標準PC（4コア、8GB RAM）★推奨</h3>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=medium
+  - SCALE=0.5
+  - BUFFER=15
+  - EXTRACT_CLIPS=true
+  - ENABLE_TIME_WINDOW=true
+</code></pre>
+<p><strong>カメラ数</strong>: 3-5台</p>
+<hr />
+<h3 id="pc816gb-ram">高性能PC（8コア以上、16GB RAM以上）</h3>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=high
+  - SCALE=0.75
+  - BUFFER=20
+  - EXTRACT_CLIPS=true
+  - ENABLE_TIME_WINDOW=false  # 常時検出
+</code></pre>
+<p><strong>カメラ数</strong>: 8台以上</p>
+<hr />
+<h3 id="raspberry-pi-44gb">Raspberry Pi 4（4GB）</h3>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=low
+  - SCALE=0.25
+  - BUFFER=10
+  - EXTRACT_CLIPS=false
+  - ENABLE_TIME_WINDOW=true
+</code></pre>
+<p><strong>カメラ数</strong>: 最大1台</p>
+<p><strong>注意</strong>: 長時間運用時はヒートシンク必須</p>
+<hr />
+<h2 id="_34">チューニング方法</h2>
+<h3 id="1_1">ステップ1: ベースライン設定</h3>
+<pre><code class="language-bash"># 推奨設定で開始
+python generate_compose.py \
+  --sensitivity medium \
+  --scale 0.5 \
+  --buffer 15
+
+./meteor-docker.sh start
+</code></pre>
+<hr />
+<h3 id="2_2">ステップ2: 誤検出の確認</h3>
+<pre><code class="language-bash"># 1時間運用後、検出結果を確認
+ls -lh ./detections/camera1_*/
+
+# ダッシュボードで確認
+open http://localhost:8080/
+</code></pre>
+<p><strong>誤検出の種類</strong>:
+- 航空機（点滅する光、ゆっくり移動）
+- 昆虫（不規則な動き）
+- 雲の移動（広範囲、ゆっくり）
+- 車のヘッドライト（画面下部）</p>
+<hr />
+<h3 id="3">ステップ3: 感度調整</h3>
+<h4 id="_35">誤検出が多い場合</h4>
+<pre><code class="language-bash"># 感度を下げる
+python generate_compose.py --sensitivity low
+
+# または画面下部除外を増やす
+python generate_compose.py --exclude-bottom 0.125
+</code></pre>
+<h4 id="_36">見逃しが多い場合</h4>
+<pre><code class="language-bash"># 感度を上げる
+python generate_compose.py --sensitivity high
+
+# さらに短く暗い流星を拾いたい
+python generate_compose.py --sensitivity faint
+</code></pre>
+<hr />
+<h3 id="4">ステップ4: パフォーマンス調整</h3>
+<pre><code class="language-bash"># リソース使用率を確認
+./meteor-docker.sh status
+
+# CPU使用率が高い（70%以上）
+python generate_compose.py --scale 0.25
+
+# メモリ使用量が多い
+python generate_compose.py --buffer 10
+</code></pre>
+<hr />
+<h3 id="5">ステップ5: 長期運用</h3>
+<pre><code class="language-bash"># 1週間運用後の統計
+find ./detections -name &quot;*.mp4&quot; | wc -l
+
+# 誤検出率を計算
+# 誤検出率 = 誤検出数 / 総検出数
+
+# 目標: 誤検出率 &lt; 20%
+</code></pre>
+<hr />
+<h2 id="_37">環境別チューニング例</h2>
+<h3 id="_38">市街地（光害あり）</h3>
+<p><strong>課題</strong>: 街灯、車のライト、建物の照明が多い</p>
+<p><strong>推奨設定</strong>:</p>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=low
+  - SCALE=0.5
+  - EXCLUDE_BOTTOM=0.125  # 下部1/8を除外
+  - ENABLE_TIME_WINDOW=true
+</code></pre>
+<p><strong>params調整</strong>:</p>
+<pre><code class="language-python">params.min_brightness = 220  # 明るい流星のみ
+params.min_speed = 70        # 遅い物体を除外
+</code></pre>
+<hr />
+<h3 id="_39">郊外（標準環境）</h3>
+<p><strong>推奨設定</strong>:</p>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=medium
+  - SCALE=0.5
+  - EXCLUDE_BOTTOM=0.0625
+  - ENABLE_TIME_WINDOW=true
+</code></pre>
+<p><strong>そのままでOK</strong></p>
+<hr />
+<h3 id="_40">山間部（光害なし）</h3>
+<p><strong>課題</strong>: 暗い流星も検出したい</p>
+<p><strong>推奨設定</strong>:</p>
+<pre><code class="language-yaml">environment:
+  - SENSITIVITY=faint
+  - SCALE=0.75
+  - EXCLUDE_BOTTOM=0.0
+  - ENABLE_TIME_WINDOW=true
+</code></pre>
+<p><strong>params調整</strong>:</p>
+<pre><code class="language-python">params.min_brightness = 150
+params.diff_threshold = 16
+params.min_area = 5
+params.max_distance = 90
+</code></pre>
+<hr />
+<h2 id="_41">トラブルシューティング</h2>
+<h3 id="_42">検出数が少なすぎる</h3>
+<p><strong>原因</strong>:
+- 感度が低すぎる
+- 時間帯設定の問題</p>
+<p><strong>対策</strong>:</p>
+<pre><code class="language-bash"># 感度を上げる
+python generate_compose.py --sensitivity high
+
+# さらに取りこぼしを減らす
+python generate_compose.py --sensitivity faint
+
+# 時間帯制限を無効化
+python generate_compose.py --enable-time-window false
+</code></pre>
+<hr />
+<h3 id="_43">誤検出が多すぎる</h3>
+<p><strong>原因</strong>:
+- 感度が高すぎる
+- 航空機や昆虫を検出</p>
+<p><strong>対策</strong>:</p>
+<pre><code class="language-bash"># 感度を下げる
+python generate_compose.py --sensitivity low
+
+# 画面下部を除外
+python generate_compose.py --exclude-bottom 0.125
+</code></pre>
+<hr />
+<h3 id="cpu">CPUが高い</h3>
+<p><strong>対策</strong>:</p>
+<pre><code class="language-bash"># 処理スケールを下げる
+python generate_compose.py --scale 0.25
+
+# カメラ数を減らす
+# streamersファイルから一部削除
+</code></pre>
+<hr />
+<h3 id="_44">ディスク容量が足りない</h3>
+<p><strong>対策</strong>:</p>
+<pre><code class="language-bash"># クリップ動画保存を無効化
+# docker-compose.ymlで EXTRACT_CLIPS=false
+
+# バッファを減らす
+python generate_compose.py --buffer 10
+
+# 古いファイルを削除
+./meteor-docker.sh clean
+</code></pre>
+<hr />
+<h2 id="_45">バージョン別新機能</h2>
+<h3 id="v1160-">v1.16.0 - 画面端ノイズ除外</h3>
+<p><strong>新規パラメータ</strong>:
+- <code>EXCLUDE_EDGE_RATIO</code>（環境変数、デフォルト: 0.0、範囲: 0.0-0.2）
+- <code>--exclude-edge-ratio</code>（コマンドライン引数）</p>
+<p><strong>機能</strong>:
+画面四辺（上下左右）から指定割合を除外し、端部のノイズや歪みによる誤検出を防止</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-bash">python generate_compose.py --exclude-edge-ratio 0.05
+</code></pre>
+<p><strong>ダッシュボードから即時反映可能</strong>（再起動不要）</p>
+<hr />
+<h3 id="v1140-">v1.14.0 - 録画マージン設定</h3>
+<p><strong>新規パラメータ</strong>:
+- <code>clip_margin_before</code>: 検出前の追加録画時間（秒）
+- <code>clip_margin_after</code>: 検出後の追加録画時間（秒）</p>
+<p><strong>機能</strong>:
+流星検出イベントの前後に余裕を持たせて録画</p>
+<p><strong>デフォルト値</strong>: 0.0秒（両方）</p>
+<p><strong>推奨値</strong>: 0.5秒（両方）</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-yaml">environment:
+  - CLIP_MARGIN_BEFORE=0.5
+  - CLIP_MARGIN_AFTER=0.5
+</code></pre>
+<p><strong>ダッシュボードから即時反映可能</strong>（再起動不要）</p>
+<hr />
+<h3 id="v1130-ui">v1.13.0 - 全カメラ設定UI</h3>
+<p><strong>新機能</strong>:
+- <code>/settings</code> ページによる全カメラへの一括設定
+- 設定差分のハイライト表示
+- <code>output/runtime_settings/&lt;camera&gt;.json</code> への永続化</p>
+<p><strong>即時反映項目（再起動不要）</strong>:
+- 検出パラメータ（diff_threshold, min_brightness, min_linearity等）
+- ノイズ除外パラメータ
+- マスク設定
+- 録画マージン設定（v1.14.0+）
+- 画面端除外設定（v1.16.0+）</p>
+<p><strong>自動再起動項目（再ビルド不要）</strong>:
+- sensitivity, scale, buffer, extract_clips</p>
+<p><strong>メリット</strong>:
+- Docker再ビルド不要で設定変更可能
+- 設定が永続化され、再起動後も維持
+- 複数カメラへの設定を一括適用</p>
+<hr />
+<h3 id="v1120-">v1.12.0 - ノイズ帯マスク</h3>
+<p><strong>新規パラメータ</strong>:
+- <code>nuisance_mask_image</code>: 事前生成済みノイズ帯マスク画像
+- <code>nuisance_from_night</code>: 夜間画像からマスク自動生成
+- <code>nuisance_dilate</code>: マスク拡張ピクセル数（デフォルト: 3）
+- <code>nuisance_overlap_threshold</code>: 重複率閾値（デフォルト: 0.3）</p>
+<p><strong>機能</strong>:
+電線、部分照明など固定された線状ノイズを除外</p>
+<p><strong>通常マスクとの違い</strong>:
+- 通常マスク: 領域内の検出を完全に無効化
+- ノイズ帯マスク: 軌跡がノイズ帯と一定以上重複した場合のみ除外</p>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-yaml">environment:
+  - NUISANCE_FROM_NIGHT=/app/night_with_wires.jpg
+  - NUISANCE_DILATE=5
+  - NUISANCE_OVERLAP_THRESHOLD=0.25
+</code></pre>
+<p><strong>ダッシュボードから閾値を即時調整可能</strong></p>
+<hr />
+<h2 id="_46">関連ドキュメント</h2>
+<ul>
+<li><a href="../OPERATIONS_GUIDE/">OPERATIONS_GUIDE.md</a> - 運用ガイド</li>
+<li><a href="../DETECTOR_COMPONENTS/">DETECTOR_COMPONENTS.md</a> - 検出アルゴリズム詳細</li>
+<li><a href="../DOCKER_ARCHITECTURE/">DOCKER_ARCHITECTURE.md</a> - Docker構成</li>
+<li><a href="../SECURITY/">SECURITY.md</a> - セキュリティガイド</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  ページトップへ戻る
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f", "clipboard.copy": "\u30af\u30ea\u30c3\u30d7\u30dc\u30fc\u30c9\u3078\u30b3\u30d4\u30fc", "search.result.more.one": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3082\u30461\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.more.other": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3042\u3068#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.none": "\u4f55\u3082\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f", "search.result.one": "1\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.other": "#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.placeholder": "\u691c\u7d22\u30ad\u30fc\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "search.result.term.missing": "\u691c\u7d22\u306b\u542b\u307e\u308c\u306a\u3044", "select.version": "\u30d0\u30fc\u30b8\u30e7\u30f3\u5207\u308a\u66ff\u3048"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

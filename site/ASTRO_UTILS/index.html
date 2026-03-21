@@ -1,0 +1,2556 @@
+
+<!doctype html>
+<html lang="ja" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="流星・雲検出システム Meteo の公式ドキュメント">
+      
+      
+      
+        <link rel="canonical" href="https://masakai.github.io/meteo/ASTRO_UTILS/">
+      
+      
+        <link rel="prev" href="../DETECTOR_COMPONENTS/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/mascot-meteo-cam.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>天文計算モジュール - Meteo Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Zen+Kaku+Gothic+New:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Zen Kaku Gothic New";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  <meta property="og:site_name" content="Meteo Documentation">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="天文計算モジュール | Meteo Documentation">
+  <meta property="og:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta property="og:url" content="https://masakai.github.io/meteo/ASTRO_UTILS/">
+  <meta property="og:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:secure_url" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="天文計算モジュール | Meteo Documentation">
+  <meta name="twitter:description" content="流星・雲検出システム Meteo の公式ドキュメント">
+  <meta name="twitter:image" content="https://masakai.github.io/meteo/assets/ogp-meteo-card.png">
+  <script>
+    document$.subscribe(function() {
+      if (!window.mermaid) return;
+      window.mermaid.initialize({
+        startOnLoad: true,
+        theme: "base",
+        themeVariables: {
+          primaryColor: "#e2ecff",
+          primaryTextColor: "#111111",
+          primaryBorderColor: "#7a92bf",
+          secondaryColor: "#dff3e2",
+          secondaryTextColor: "#111111",
+          secondaryBorderColor: "#6f9a79",
+          tertiaryColor: "#ffe8cc",
+          tertiaryTextColor: "#111111",
+          tertiaryBorderColor: "#c28a4a",
+          lineColor: "#7b8794",
+          textColor: "#111111",
+          mainBkg: "#e2ecff",
+          nodeBkg: "#e2ecff",
+          nodeBorder: "#7a92bf",
+          clusterBkg: "#f7f4ff",
+          clusterBorder: "#b8abd9",
+          defaultLinkColor: "#7b8794",
+          titleColor: "#111111",
+          edgeLabelBackground: "#ffffff",
+          actorBkg: "#e2ecff",
+          actorBorder: "#7a92bf",
+          actorTextColor: "#111111",
+          actorLineColor: "#7b8794",
+          signalColor: "#111111",
+          signalTextColor: "#111111",
+          labelBoxBkgColor: "#fff7e8",
+          labelBoxBorderColor: "#c28a4a",
+          labelTextColor: "#111111",
+          loopTextColor: "#111111",
+          noteBkgColor: "#fff7e8",
+          noteBorderColor: "#d1b27c",
+          noteTextColor: "#111111",
+          activationBkgColor: "#efe6ff",
+          activationBorderColor: "#ab92cf",
+          sectionBkgColor: "#f8fbff",
+          altSectionBkgColor: "#fef6ea",
+          gridColor: "#d6deea",
+          cScale0: "#f8d7da",
+          cScale1: "#ffe3c4",
+          cScale2: "#fff1bf",
+          cScale3: "#dff3e2",
+          cScale4: "#e2ecff",
+          cScale5: "#efe6ff",
+          cScale6: "#f7dff0",
+          cScale7: "#dff2f6"
+        }
+      });
+    });
+  </script>
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#astronomical-utilities" class="md-skip">
+          コンテンツにスキップ
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="ヘッダー">
+    <a href=".." title="Meteo Documentation" class="md-header__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Meteo Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              天文計算モジュール
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="light-blue"  aria-label="ダークモードに切り替え"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="ダークモードに切り替え" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="検索" placeholder="検索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="検索">
+        
+        <button type="reset" class="md-search__icon md-icon" title="クリア" aria-label="クリア" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            検索を初期化
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="タブ" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  ホーム
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SETUP_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セットアップ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  設定ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  運用ガイド
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../API_REFERENCE/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API リファレンス
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../DETECTION_TUNING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  検出感度チューニング
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../SECURITY/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  セキュリティ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../ARCHITECTURE/" class="md-tabs__link">
+          
+  
+  
+  アーキテクチャ
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="ナビゲーション" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Meteo Documentation" class="md-nav__button md-logo" aria-label="Meteo Documentation" data-md-component="logo">
+      
+  <img src="../assets/meteo-logotype.svg" alt="logo">
+
+    </a>
+    Meteo Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Masakai/meteo" title="リポジトリへ" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Masakai/meteo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ホーム
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セットアップ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CONFIGURATION_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設定ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../OPERATIONS_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用ガイド
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../API_REFERENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API リファレンス
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTION_TUNING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出感度チューニング
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SECURITY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    セキュリティ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アーキテクチャ
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    アーキテクチャ
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    全体構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DOCKER_ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker 構成
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DETECTOR_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    検出コンポーネント
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    天文計算モジュール
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    天文計算モジュール
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目次
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール概要
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="モジュール概要">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        依存ライブラリ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ファイル構成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関数リファレンス
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="関数リファレンス">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_detection_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_detection_window()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is_detection_active" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_detection_active()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        天文薄暮とは
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="天文薄暮とは">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        流星観測に適した時間帯
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#202622" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出期間の例（東京、2026年2月2日）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="使用例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        基本的な使い方
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meteor_detector_rtsp_webpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meteor_detector_rtsp_web.py での使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboardpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard.py での使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        計算原理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="計算原理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#astral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Astralライブラリの使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        計算フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        太陽位置の計算式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムゾーン処理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="タイムゾーン処理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サポートされるタイムゾーン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主要なタイムゾーン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        夏時間（DST）の処理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムゾーン変換
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーハンドリング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="エラーハンドリング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        よくあるエラー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="よくあるエラー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 無効なタイムゾーン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 極地での計算
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        パフォーマンス
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="パフォーマンス">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        計算時間
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャッシング
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テストケース
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ドキュメント
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        外部リンク
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目次">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目次
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        目次
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        モジュール概要
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="モジュール概要">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        依存ライブラリ
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ファイル構成
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関数リファレンス
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="関数リファレンス">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get_detection_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_detection_window()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is_detection_active" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_detection_active()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        天文薄暮とは
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="天文薄暮とは">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        定義
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        流星観測に適した時間帯
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#202622" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検出期間の例（東京、2026年2月2日）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        使用例
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="使用例">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        基本的な使い方
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meteor_detector_rtsp_webpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        meteor_detector_rtsp_web.py での使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboardpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard.py での使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        計算原理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="計算原理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#astral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Astralライブラリの使用
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        計算フロー
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        太陽位置の計算式
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムゾーン処理
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="タイムゾーン処理">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        サポートされるタイムゾーン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        主要なタイムゾーン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dst" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        夏時間（DST）の処理
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        タイムゾーン変換
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        エラーハンドリング
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="エラーハンドリング">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        よくあるエラー
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="よくあるエラー">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. 無効なタイムゾーン
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. 極地での計算
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        パフォーマンス
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="パフォーマンス">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        計算時間
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        キャッシング
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        テストケース
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        関連ドキュメント
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        外部リンク
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="astronomical-utilities">天文計算モジュール仕様 (Astronomical Utilities)</h1>
+<hr />
+<p><strong>Copyright (c) 2026 Masanori Sakai</strong></p>
+<p>Licensed under the MIT License</p>
+<hr />
+<h2 id="_1">概要</h2>
+<p><code>astro_utils.py</code> は、天文薄暮期間の計算と検出時間帯の判定を行うモジュールです。</p>
+<h2 id="_2">目次</h2>
+<ul>
+<li><a href="#モジュール概要">モジュール概要</a></li>
+<li><a href="#関数リファレンス">関数リファレンス</a></li>
+<li><a href="#天文薄暮とは">天文薄暮とは</a></li>
+<li><a href="#使用例">使用例</a></li>
+<li><a href="#計算原理">計算原理</a></li>
+<li><a href="#タイムゾーン処理">タイムゾーン処理</a></li>
+</ul>
+<hr />
+<h2 id="_3">モジュール概要</h2>
+<h3 id="_4">依存ライブラリ</h3>
+<pre><code class="language-python">from datetime import datetime, timedelta
+from typing import Tuple
+from astral import LocationInfo
+from astral.sun import sun
+from zoneinfo import ZoneInfo
+</code></pre>
+<p><strong>外部依存</strong>:
+- <code>astral</code>: 太陽・月の位置計算ライブラリ
+- <code>zoneinfo</code>: Python 3.9+ 標準ライブラリ</p>
+<p><strong>インストール</strong>:</p>
+<pre><code class="language-bash">pip install astral
+</code></pre>
+<hr />
+<h3 id="_5">ファイル構成</h3>
+<pre><code>astro_utils.py (82行)
+├── get_detection_window()  # 検出時間帯を取得
+└── is_detection_active()   # 現在が検出時間内か判定
+</code></pre>
+<hr />
+<h2 id="_6">関数リファレンス</h2>
+<h3 id="get_detection_window">get_detection_window()</h3>
+<p><strong>シグネチャ</strong>:</p>
+<pre><code class="language-python">def get_detection_window(
+    latitude: float = 35.3606,
+    longitude: float = 138.7274,
+    timezone: str = &quot;Asia/Tokyo&quot;
+) -&gt; Tuple[datetime, datetime]:
+</code></pre>
+<p><strong>説明</strong>: 天文薄暮期間（前日の日没から翌日の日出まで）を計算</p>
+<p><strong>パラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>名前</th>
+<th>型</th>
+<th>デフォルト</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>latitude</code></td>
+<td>float</td>
+<td><code>35.3606</code></td>
+<td>観測地の緯度（度）</td>
+</tr>
+<tr>
+<td><code>longitude</code></td>
+<td>float</td>
+<td><code>138.7274</code></td>
+<td>観測地の経度（度）</td>
+</tr>
+<tr>
+<td><code>timezone</code></td>
+<td>str</td>
+<td><code>"Asia/Tokyo"</code></td>
+<td>タイムゾーン名</td>
+</tr>
+</tbody>
+</table>
+<p><strong>戻り値</strong>:
+- <code>Tuple[datetime, datetime]</code>: (検出開始時刻, 検出終了時刻)
+- 両方ともタイムゾーン付きdatetimeオブジェクト</p>
+<p><strong>動作</strong>:</p>
+<pre><code class="language-mermaid">flowchart TD
+    Start[&quot;関数呼び出し&quot;]
+    GetNow[&quot;現在時刻を取得&lt;br/&gt;(指定タイムゾーン)&quot;]
+    CalcSun[&quot;太陽情報を計算&lt;br/&gt;- 昨日&lt;br/&gt;- 今日&lt;br/&gt;- 明日&quot;]
+    CheckTime{&quot;現在時刻 &lt; 今日の日出?&quot;}
+    SetYesterday[&quot;前日日没 ~ 今日日出&quot;]
+    SetToday[&quot;今日日没 ~ 明日日出&quot;]
+    Return[&quot;(開始時刻, 終了時刻)&quot;]
+
+    Start --&gt; GetNow
+    GetNow --&gt; CalcSun
+    CalcSun --&gt; CheckTime
+    CheckTime --&gt;|&quot;Yes&lt;br/&gt;(夜が続いている)&quot;| SetYesterday
+    CheckTime --&gt;|&quot;No&lt;br/&gt;(日出後)&quot;| SetToday
+    SetYesterday --&gt; Return
+    SetToday --&gt; Return
+
+    style CheckTime fill:#ffe3c4
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-python">from astro_utils import get_detection_window
+
+# デフォルト座標（富士山頂）
+start, end = get_detection_window()
+print(f&quot;検出期間: {start} ~ {end}&quot;)
+# 出力例: 検出期間: 2026-02-01 16:45:23+09:00 ~ 2026-02-02 06:12:45+09:00
+
+# 東京
+start, end = get_detection_window(
+    latitude=35.6762,
+    longitude=139.6503,
+    timezone=&quot;Asia/Tokyo&quot;
+)
+
+# ニューヨーク
+start, end = get_detection_window(
+    latitude=40.7128,
+    longitude=-74.0060,
+    timezone=&quot;America/New_York&quot;
+)
+</code></pre>
+<hr />
+<h3 id="is_detection_active">is_detection_active()</h3>
+<p><strong>シグネチャ</strong>:</p>
+<pre><code class="language-python">def is_detection_active(
+    latitude: float = 35.3606,
+    longitude: float = 138.7274,
+    timezone: str = &quot;Asia/Tokyo&quot;
+) -&gt; Tuple[bool, datetime, datetime]:
+</code></pre>
+<p><strong>説明</strong>: 現在が検出時間帯内かどうかを判定</p>
+<p><strong>パラメータ</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>名前</th>
+<th>型</th>
+<th>デフォルト</th>
+<th>説明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>latitude</code></td>
+<td>float</td>
+<td><code>35.3606</code></td>
+<td>観測地の緯度</td>
+</tr>
+<tr>
+<td><code>longitude</code></td>
+<td>float</td>
+<td><code>138.7274</code></td>
+<td>観測地の経度</td>
+</tr>
+<tr>
+<td><code>timezone</code></td>
+<td>str</td>
+<td><code>"Asia/Tokyo"</code></td>
+<td>タイムゾーン名</td>
+</tr>
+</tbody>
+</table>
+<p><strong>戻り値</strong>:
+- <code>Tuple[bool, datetime, datetime]</code>:
+  - <code>bool</code>: 検出時間内かどうか
+  - <code>datetime</code>: 検出開始時刻
+  - <code>datetime</code>: 検出終了時刻</p>
+<p><strong>動作</strong>:</p>
+<pre><code class="language-mermaid">flowchart TD
+    Start[&quot;関数呼び出し&quot;]
+    GetWindow[&quot;get_detection_window()を呼び出し&quot;]
+    GetNow[&quot;現在時刻を取得&quot;]
+    Compare{&quot;開始時刻 &lt;= 現在 &lt;= 終了時刻?&quot;}
+    ReturnTrue[&quot;(True, 開始, 終了)&quot;]
+    ReturnFalse[&quot;(False, 開始, 終了)&quot;]
+
+    Start --&gt; GetWindow
+    GetWindow --&gt; GetNow
+    GetNow --&gt; Compare
+    Compare --&gt;|&quot;Yes&quot;| ReturnTrue
+    Compare --&gt;|&quot;No&quot;| ReturnFalse
+
+    style Compare fill:#ffe3c4
+    style ReturnTrue fill:#dff6e8
+    style ReturnFalse fill:#f8d7da
+</code></pre>
+<p><strong>使用例</strong>:</p>
+<pre><code class="language-python">from astro_utils import is_detection_active
+
+# 現在が検出時間内か確認
+is_active, start, end = is_detection_active()
+
+if is_active:
+    print(f&quot;検出期間中です: {start} ~ {end}&quot;)
+else:
+    print(f&quot;検出期間外です。次回: {start} ~ {end}&quot;)
+
+# 使用例: meteor_detector_rtsp_web.pyでの使用
+if is_detection_active and is_detection_active(latitude, longitude, timezone)[0]:
+    objects = detector.detect_bright_objects(gray, prev_gray)
+    is_detecting_now = True
+else:
+    objects = []
+    is_detecting_now = False
+</code></pre>
+<hr />
+<h2 id="_7">天文薄暮とは</h2>
+<h3 id="_8">定義</h3>
+<p><strong>天文薄暮（Astronomical Twilight）</strong>: 太陽が地平線下6度～18度の時間帯</p>
+<pre><code class="language-mermaid">graph TD
+    subgraph &quot;太陽の高度と時間帯&quot;
+        Day[&quot;昼間&lt;br/&gt;太陽高度 &gt; 0°&quot;]
+        Civil[&quot;市民薄明&lt;br/&gt;0° ~ -6°&quot;]
+        Nautical[&quot;航海薄明&lt;br/&gt;-6° ~ -12°&quot;]
+        Astro[&quot;天文薄明&lt;br/&gt;-12° ~ -18°&quot;]
+        Night[&quot;完全な夜&lt;br/&gt;&lt; -18°&quot;]
+    end
+
+    Day --&gt; Civil
+    Civil --&gt; Nautical
+    Nautical --&gt; Astro
+    Astro --&gt; Night
+
+    style Day fill:#fff9c4
+    style Civil fill:#ffe7bf
+    style Nautical fill:#ffd8a8
+    style Astro fill:#e3dcff
+    style Night fill:#d6d9f8
+</code></pre>
+<h3 id="_9">流星観測に適した時間帯</h3>
+<table>
+<thead>
+<tr>
+<th>時間帯</th>
+<th>太陽高度</th>
+<th>流星観測</th>
+<th>本システムでの扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>昼間</td>
+<td>&gt; 0°</td>
+<td>不可</td>
+<td>検出OFF</td>
+</tr>
+<tr>
+<td>市民薄明</td>
+<td>0° ~ -6°</td>
+<td>困難</td>
+<td>検出OFF</td>
+</tr>
+<tr>
+<td>航海薄明</td>
+<td>-6° ~ -12°</td>
+<td>やや困難</td>
+<td>検出OFF</td>
+</tr>
+<tr>
+<td>天文薄明</td>
+<td>-12° ~ -18°</td>
+<td>可能</td>
+<td>検出OFF</td>
+</tr>
+<tr>
+<td>完全な夜</td>
+<td>&lt; -18°</td>
+<td>最適</td>
+<td>検出ON</td>
+</tr>
+</tbody>
+</table>
+<p><strong>本システムの実装</strong>:
+- <strong>簡略化</strong>: 日没（sunset）～日出（sunrise）を検出期間とする
+- <strong>理由</strong>: 実用上十分な精度、計算が簡単</p>
+<hr />
+<h3 id="202622">検出期間の例（東京、2026年2月2日）</h3>
+<pre><code>2026-02-01
+  16:45  前日の日没 ← 検出開始
+  17:15  市民薄明終了
+  17:45  航海薄明終了
+  18:15  天文薄明終了 ← 完全な夜
+
+2026-02-02
+  05:30  天文薄明開始 ← 完全な夜終了
+  06:00  航海薄明開始
+  06:30  市民薄明開始
+  06:55  日出 ← 検出終了
+</code></pre>
+<p><strong>検出期間</strong>: 前日16:45 ~ 当日06:55（約14時間10分）</p>
+<hr />
+<h2 id="_10">使用例</h2>
+<h3 id="_11">基本的な使い方</h3>
+<pre><code class="language-python">from astro_utils import get_detection_window, is_detection_active
+
+# 東京での検出時間帯を取得
+start, end = get_detection_window(
+    latitude=35.6762,
+    longitude=139.6503,
+    timezone=&quot;Asia/Tokyo&quot;
+)
+
+print(f&quot;検出期間: {start.strftime('%H:%M')} ~ {end.strftime('%H:%M')}&quot;)
+# 出力: 検出期間: 16:45 ~ 06:55
+
+# 現在が検出時間内か確認
+is_active, _, _ = is_detection_active(35.6762, 139.6503, &quot;Asia/Tokyo&quot;)
+print(f&quot;検出可能: {'はい' if is_active else 'いいえ'}&quot;)
+</code></pre>
+<hr />
+<h3 id="meteor_detector_rtsp_webpy">meteor_detector_rtsp_web.py での使用</h3>
+<pre><code class="language-python"># meteor_detector_rtsp_web.py (抜粋)
+from astro_utils import is_detection_active
+
+# 環境変数から設定を取得
+enable_time_window = os.environ.get('ENABLE_TIME_WINDOW', 'false').lower() == 'true'
+latitude = float(os.environ.get('LATITUDE', '35.3606'))
+longitude = float(os.environ.get('LONGITUDE', '138.7274'))
+timezone = os.environ.get('TIMEZONE', 'Asia/Tokyo')
+
+# 検出ループ内
+if enable_time_window and is_detection_active:
+    # 1分ごとに検出時間をチェック
+    if (current_time - last_time_check) &gt; 60:
+        is_detection_time, _, _ = is_detection_active(latitude, longitude, timezone)
+        last_time_check = current_time
+
+    if is_detection_time:
+        # 検出処理を実行
+        objects = detector.detect_bright_objects(gray, prev_gray)
+        is_detecting_now = True
+    else:
+        # 検出処理をスキップ
+        objects = []
+        is_detecting_now = False
+else:
+    # 時間帯制限なし（常時検出）
+    objects = detector.detect_bright_objects(gray, prev_gray)
+    is_detecting_now = True
+</code></pre>
+<hr />
+<h3 id="dashboardpy">dashboard.py での使用</h3>
+<pre><code class="language-python"># dashboard.py (抜粋)
+from astro_utils import get_detection_window
+
+def do_GET(self):
+    if self.path.startswith('/detection_window'):
+        # ブラウザから送信された座標を取得
+        from urllib.parse import urlparse, parse_qs
+        query = parse_qs(urlparse(self.path).query)
+
+        latitude = float(query.get('lat', [35.3606])[0])
+        longitude = float(query.get('lon', [138.7274])[0])
+        timezone = 'Asia/Tokyo'
+
+        try:
+            start, end = get_detection_window(latitude, longitude, timezone)
+            result = {
+                'start': start.strftime('%Y-%m-%d %H:%M:%S'),
+                'end': end.strftime('%Y-%m-%d %H:%M:%S'),
+                'enabled': os.environ.get('ENABLE_TIME_WINDOW', 'false').lower() == 'true',
+                'latitude': latitude,
+                'longitude': longitude
+            }
+        except Exception as e:
+            result = {
+                'error': str(e)
+            }
+
+        self.wfile.write(json.dumps(result).encode('utf-8'))
+</code></pre>
+<hr />
+<h2 id="_12">計算原理</h2>
+<h3 id="astral">Astralライブラリの使用</h3>
+<pre><code class="language-python">from astral import LocationInfo
+from astral.sun import sun
+
+# 観測地点の情報を作成
+location = LocationInfo(
+    name=&quot;Observer&quot;,
+    region=&quot;&quot;,
+    timezone=&quot;Asia/Tokyo&quot;,
+    latitude=35.6762,
+    longitude=139.6503
+)
+
+# 今日の太陽情報を取得
+from zoneinfo import ZoneInfo
+tz = ZoneInfo(&quot;Asia/Tokyo&quot;)
+today = datetime.now(tz).date()
+
+sun_info = sun(location.observer, date=today, tzinfo=tz)
+
+# 取得できる情報
+print(sun_info['sunrise'])    # 日出
+print(sun_info['sunset'])     # 日没
+print(sun_info['dawn'])       # 明け方（市民薄明開始）
+print(sun_info['dusk'])       # 夕方（市民薄明終了）
+</code></pre>
+<hr />
+<h3 id="_13">計算フロー</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Client as 呼び出し元
+    participant AstroUtils as astro_utils.py
+    participant Astral as astralライブラリ
+    participant ZoneInfo as zoneinfo
+
+    Client-&gt;&gt;AstroUtils: get_detection_window(lat, lon, tz)
+    AstroUtils-&gt;&gt;ZoneInfo: ZoneInfo(timezone)
+    ZoneInfo--&gt;&gt;AstroUtils: タイムゾーンオブジェクト
+
+    AstroUtils-&gt;&gt;AstroUtils: 現在時刻を取得
+
+    AstroUtils-&gt;&gt;Astral: LocationInfo作成
+    AstroUtils-&gt;&gt;Astral: sun(observer, 昨日, tz)
+    Astral--&gt;&gt;AstroUtils: 昨日の太陽情報
+
+    AstroUtils-&gt;&gt;Astral: sun(observer, 今日, tz)
+    Astral--&gt;&gt;AstroUtils: 今日の太陽情報
+
+    AstroUtils-&gt;&gt;Astral: sun(observer, 明日, tz)
+    Astral--&gt;&gt;AstroUtils: 明日の太陽情報
+
+    AstroUtils-&gt;&gt;AstroUtils: 現在時刻 &lt; 今日の日出?
+    alt 夜が続いている
+        AstroUtils-&gt;&gt;AstroUtils: 前日日没 ~ 今日日出
+    else 日出後
+        AstroUtils-&gt;&gt;AstroUtils: 今日日没 ~ 明日日出
+    end
+
+    AstroUtils--&gt;&gt;Client: (開始時刻, 終了時刻)
+</code></pre>
+<hr />
+<h3 id="_14">太陽位置の計算式</h3>
+<p>Astralライブラリ内部では以下の計算を行っています:</p>
+<ol>
+<li><strong>ユリウス日の計算</strong></li>
+<li><strong>太陽の赤経・赤緯の計算</strong></li>
+<li><strong>時角の計算</strong></li>
+<li><strong>高度角の計算</strong></li>
+</ol>
+<p>詳細は<a href="https://astral.readthedocs.io/">Astralドキュメント</a>を参照</p>
+<hr />
+<h2 id="_15">タイムゾーン処理</h2>
+<h3 id="_16">サポートされるタイムゾーン</h3>
+<p>Python 3.9+の<code>zoneinfo</code>がサポートする全タイムゾーン:</p>
+<pre><code class="language-python">from zoneinfo import available_timezones
+
+# 利用可能なタイムゾーン一覧
+print(list(available_timezones())[:10])
+# ['Africa/Abidjan', 'Africa/Accra', 'Africa/Addis_Ababa', ...]
+</code></pre>
+<h3 id="_17">主要なタイムゾーン</h3>
+<table>
+<thead>
+<tr>
+<th>地域</th>
+<th>タイムゾーン</th>
+<th>UTC offset</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>日本</td>
+<td><code>Asia/Tokyo</code></td>
+<td>+09:00</td>
+</tr>
+<tr>
+<td>韓国</td>
+<td><code>Asia/Seoul</code></td>
+<td>+09:00</td>
+</tr>
+<tr>
+<td>中国</td>
+<td><code>Asia/Shanghai</code></td>
+<td>+08:00</td>
+</tr>
+<tr>
+<td>アメリカ東部</td>
+<td><code>America/New_York</code></td>
+<td>-05:00/-04:00</td>
+</tr>
+<tr>
+<td>アメリカ西部</td>
+<td><code>America/Los_Angeles</code></td>
+<td>-08:00/-07:00</td>
+</tr>
+<tr>
+<td>イギリス</td>
+<td><code>Europe/London</code></td>
+<td>+00:00/+01:00</td>
+</tr>
+<tr>
+<td>オーストラリア</td>
+<td><code>Australia/Sydney</code></td>
+<td>+10:00/+11:00</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="dst">夏時間（DST）の処理</h3>
+<pre><code class="language-python">from zoneinfo import ZoneInfo
+from datetime import datetime
+
+# ニューヨーク（夏時間あり）
+tz = ZoneInfo(&quot;America/New_York&quot;)
+
+# 冬（標準時）
+winter = datetime(2026, 1, 1, 12, 0, 0, tzinfo=tz)
+print(winter.strftime('%Z %z'))  # EST -0500
+
+# 夏（夏時間）
+summer = datetime(2026, 7, 1, 12, 0, 0, tzinfo=tz)
+print(summer.strftime('%Z %z'))  # EDT -0400
+</code></pre>
+<p><strong>Astralライブラリの対応</strong>:
+- 自動的に夏時間を考慮
+- タイムゾーンを正しく指定すれば自動処理</p>
+<hr />
+<h3 id="_18">タイムゾーン変換</h3>
+<pre><code class="language-python">from datetime import datetime
+from zoneinfo import ZoneInfo
+
+# 東京時間で取得
+tokyo_tz = ZoneInfo(&quot;Asia/Tokyo&quot;)
+start, end = get_detection_window(35.6762, 139.6503, &quot;Asia/Tokyo&quot;)
+
+print(f&quot;東京: {start.strftime('%Y-%m-%d %H:%M %Z')}&quot;)
+# 出力: 東京: 2026-02-01 16:45 JST
+
+# ニューヨーク時間に変換
+ny_tz = ZoneInfo(&quot;America/New_York&quot;)
+start_ny = start.astimezone(ny_tz)
+
+print(f&quot;NY: {start_ny.strftime('%Y-%m-%d %H:%M %Z')}&quot;)
+# 出力: NY: 2026-02-01 02:45 EST
+</code></pre>
+<hr />
+<h2 id="_19">エラーハンドリング</h2>
+<h3 id="_20">よくあるエラー</h3>
+<h4 id="1">1. 無効なタイムゾーン</h4>
+<pre><code class="language-python"># エラー
+try:
+    start, end = get_detection_window(timezone=&quot;Invalid/Timezone&quot;)
+except ZoneInfoNotFoundError as e:
+    print(f&quot;エラー: {e}&quot;)
+</code></pre>
+<p><strong>対策</strong>:</p>
+<pre><code class="language-python">from zoneinfo import ZoneInfo, available_timezones
+
+def validate_timezone(tz: str) -&gt; bool:
+    return tz in available_timezones()
+
+# 使用前にチェック
+if validate_timezone(&quot;Asia/Tokyo&quot;):
+    start, end = get_detection_window(timezone=&quot;Asia/Tokyo&quot;)
+</code></pre>
+<hr />
+<h4 id="2">2. 極地での計算</h4>
+<p>極地（北緯66.5度以北、南緯66.5度以南）では白夜・極夜が発生:</p>
+<pre><code class="language-python"># 北極圏（白夜の時期）
+try:
+    start, end = get_detection_window(
+        latitude=80.0,  # 北極圏
+        longitude=0.0,
+        timezone=&quot;UTC&quot;
+    )
+except ValueError as e:
+    print(f&quot;エラー: {e}&quot;)
+    # エラー: Sun never sets on this day
+</code></pre>
+<p><strong>対策</strong>:</p>
+<pre><code class="language-python">from astral import AstralError
+
+try:
+    start, end = get_detection_window(latitude, longitude, timezone)
+except AstralError as e:
+    print(f&quot;極地エラー: {e}&quot;)
+    # フォールバック: 24時間検出
+    start = datetime.now(ZoneInfo(timezone))
+    end = start + timedelta(days=1)
+</code></pre>
+<hr />
+<h2 id="_21">パフォーマンス</h2>
+<h3 id="_22">計算時間</h3>
+<pre><code class="language-python">import time
+from astro_utils import get_detection_window
+
+# ベンチマーク
+start_time = time.time()
+for _ in range(1000):
+    get_detection_window()
+elapsed = time.time() - start_time
+
+print(f&quot;1000回の計算: {elapsed:.3f}秒&quot;)
+print(f&quot;1回あたり: {elapsed/1000*1000:.3f}ミリ秒&quot;)
+
+# 出力例:
+# 1000回の計算: 0.523秒
+# 1回あたり: 0.523ミリ秒
+</code></pre>
+<p><strong>結論</strong>: 非常に高速（1回あたり約0.5ms）</p>
+<hr />
+<h3 id="_23">キャッシング</h3>
+<p>頻繁に呼び出す場合はキャッシュを推奨:</p>
+<pre><code class="language-python">from functools import lru_cache
+from datetime import datetime, timedelta
+
+@lru_cache(maxsize=128)
+def cached_detection_window(date_str: str, lat: float, lon: float, tz: str):
+    &quot;&quot;&quot;日付ベースでキャッシュ&quot;&quot;&quot;
+    return get_detection_window(lat, lon, tz)
+
+# 使用例
+today = datetime.now().date().isoformat()
+start, end = cached_detection_window(today, 35.6762, 139.6503, &quot;Asia/Tokyo&quot;)
+</code></pre>
+<hr />
+<h2 id="_24">テストケース</h2>
+<pre><code class="language-python">import unittest
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from astro_utils import get_detection_window, is_detection_active
+
+class TestAstroUtils(unittest.TestCase):
+    def test_get_detection_window_tokyo(self):
+        &quot;&quot;&quot;東京での検出時間帯を取得&quot;&quot;&quot;
+        start, end = get_detection_window(35.6762, 139.6503, &quot;Asia/Tokyo&quot;)
+
+        # 検証
+        self.assertIsInstance(start, datetime)
+        self.assertIsInstance(end, datetime)
+        self.assertLess(start, end)  # 開始 &lt; 終了
+        self.assertEqual(start.tzinfo, ZoneInfo(&quot;Asia/Tokyo&quot;))
+
+    def test_is_detection_active(self):
+        &quot;&quot;&quot;検出時間の判定&quot;&quot;&quot;
+        is_active, start, end = is_detection_active()
+
+        # 検証
+        self.assertIsInstance(is_active, bool)
+        self.assertIsInstance(start, datetime)
+        self.assertIsInstance(end, datetime)
+
+    def test_different_timezones(self):
+        &quot;&quot;&quot;異なるタイムゾーンでの動作&quot;&quot;&quot;
+        timezones = [&quot;Asia/Tokyo&quot;, &quot;America/New_York&quot;, &quot;Europe/London&quot;]
+
+        for tz in timezones:
+            start, end = get_detection_window(35.0, 139.0, tz)
+            self.assertEqual(start.tzinfo, ZoneInfo(tz))
+
+if __name__ == '__main__':
+    unittest.main()
+</code></pre>
+<hr />
+<h2 id="_25">関連ドキュメント</h2>
+<ul>
+<li><a href="../CONFIGURATION_GUIDE/">CONFIGURATION_GUIDE.md</a> - 天文薄暮時間帯設定の詳細</li>
+<li><a href="../DETECTOR_COMPONENTS/">DETECTOR_COMPONENTS.md</a> - 検出エンジンでの使用方法</li>
+<li><a href="../API_REFERENCE/">API_REFERENCE.md</a> - <code>/detection_window</code> APIの詳細</li>
+</ul>
+<h2 id="_26">外部リンク</h2>
+<ul>
+<li><a href="https://astral.readthedocs.io/">Astral Documentation</a></li>
+<li><a href="https://docs.python.org/3/library/zoneinfo.html">Python zoneinfo Documentation</a></li>
+<li><a href="https://www.iana.org/time-zones">IANA Time Zone Database</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  ページトップへ戻る
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u30b3\u30d4\u30fc\u3057\u307e\u3057\u305f", "clipboard.copy": "\u30af\u30ea\u30c3\u30d7\u30dc\u30fc\u30c9\u3078\u30b3\u30d4\u30fc", "search.result.more.one": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3082\u30461\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.more.other": "\u3053\u306e\u30da\u30fc\u30b8\u5185\u306b\u3042\u3068#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.none": "\u4f55\u3082\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f", "search.result.one": "1\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.other": "#\u4ef6\u898b\u3064\u304b\u308a\u307e\u3057\u305f", "search.result.placeholder": "\u691c\u7d22\u30ad\u30fc\u30ef\u30fc\u30c9\u3092\u5165\u529b\u3057\u3066\u304f\u3060\u3055\u3044", "search.result.term.missing": "\u691c\u7d22\u306b\u542b\u307e\u308c\u306a\u3044", "select.version": "\u30d0\u30fc\u30b8\u30e7\u30f3\u5207\u308a\u66ff\u3048"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
