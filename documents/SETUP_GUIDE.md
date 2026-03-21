@@ -1,4 +1,4 @@
-# セットアップマニュアル（初心者向け）
+# セットアップマニュアル（初心者向け）v3.2.1
 
 Windows と macOS で、実行環境の作成から動作確認までの手順をまとめています。
 
@@ -154,6 +154,8 @@ python3 generate_compose.py --streaming-mode webrtc
 ```
 http://localhost:8080/
 ```
+
+カメラライブ画面では「録画予約」UIから手動録画（開始時刻・録画秒数を指定）ができます。録画ファイルは `detections/<カメラ名>/manual_recordings/` 以下に MP4 形式で保存され、完了後にサムネイル JPEG が自動生成されます。
 
 終了する場合:
 

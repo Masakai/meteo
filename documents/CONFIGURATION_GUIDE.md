@@ -1,5 +1,7 @@
 # 設定ガイド (Configuration Guide)
 
+**バージョン: v3.2.1**
+
 ---
 
 **Copyright (c) 2026 Masanori Sakai**
@@ -53,7 +55,7 @@ docker-compose.ymlで設定される環境変数:
 | `LATITUDE` | `35.3606` | 観測地の緯度 | `35.6762`（東京） |
 | `LONGITUDE` | `138.7274` | 観測地の経度 | `139.6503`（東京） |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 | `UTC` / `Europe/London` |
-| `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限 | `true` / `false` |
+| `ENABLE_TIME_WINDOW` | `true` | 天文薄暮時間帯制限 | `true` / `false` |
 | `WEB_PORT` | `8080` | 内部HTTPポート | 通常変更不要 |
 | `MASK_IMAGE` | `""` | 事前生成済みマスク画像（優先） | `/app/mask_image.png` |
 | `MASK_FROM_DAY` | `""` | 昼間画像からマスク生成 | `/app/mask_from_day.jpg` |
@@ -73,7 +75,7 @@ docker-compose.ymlで設定される環境変数:
 | `LATITUDE` | `35.3606` | 観測地の緯度 |
 | `LONGITUDE` | `138.7274` | 観測地の経度 |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
-| `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限 |
+| `ENABLE_TIME_WINDOW` | `true` | 天文薄暮時間帯制限 |
 | `CAMERA1_NAME` | - | カメラ1の内部名（ディレクトリ名・識別子） |
 | `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名（UI専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
 | `CAMERA1_URL` | - | カメラ1のURL |
@@ -229,23 +231,7 @@ rtsp://user:pass@10.0.1.11/live
 
 ### 設定方法
 
-#### 方法1: 夜間画像から自動生成
-
-```bash
-# streamers に夜間画像を指定
-python generate_compose.py \
-  --streamers streamers \
-  --nuisance-images nuisance_images
-```
-
-`nuisance_images` ファイル例:
-```
-camera1_night.jpg
-camera2_night.jpg
-camera3_night.jpg
-```
-
-#### 方法2: 環境変数で直接指定
+#### 方法1: 環境変数で直接指定
 
 ```yaml
 environment:
@@ -254,7 +240,7 @@ environment:
   - NUISANCE_OVERLAP_THRESHOLD=0.3
 ```
 
-#### 方法3: ダッシュボードから設定（v1.13.0+）
+#### 方法2: ダッシュボードから設定（v1.13.0+）
 
 1. `/settings` ページにアクセス
 2. `nuisance_overlap_threshold` を調整（0.2 = 20%重複で除外）
@@ -1099,6 +1085,38 @@ python generate_compose.py --buffer 10
 ---
 
 ## バージョン別新機能
+
+### v3.2.1 - 手動録画一覧表示改善
+
+手動録画の一覧表示を改善。`manual_recordings/<camera>/` 配下の録画ファイルが正しくリストアップされるよう修正。
+
+---
+
+### v3.2.0 - 手動録画機能
+
+**新機能**:
+- ダッシュボードから任意タイミングで録画予約が可能（録画予約 UI）
+- 手動録画の保存先: `manual_recordings/<camera>/`
+
+---
+
+### v3.1.0 - WebRTC/go2rtc サポート
+
+**新機能**:
+- `generate_compose.py` に `--streaming-mode webrtc` オプションを追加
+- `--go2rtc-candidate-host <IP>` でWebRTC candidateホストを上書き指定可能（未指定時は自動検出）
+- `go2rtc.yaml` の自動生成（`--go2rtc-config` で出力先変更可）
+- ダッシュボード環境変数 `CAMERA1_STREAM_KIND=webrtc` / `CAMERA1_STREAM_URL` によるWebRTC埋め込み表示
+
+**使用例**:
+```bash
+python generate_compose.py \
+  --streamers streamers \
+  --streaming-mode webrtc \
+  --go2rtc-candidate-host 192.168.1.10
+```
+
+---
 
 ### v1.16.0 - 画面端ノイズ除外
 

@@ -42,11 +42,11 @@ graph TB
     Dashboard -->|"HTTP GET /camera_snapshot など"| Detector1
     Dashboard -->|"HTTP GET /camera_snapshot など"| Detector2
     Dashboard -->|"HTTP GET /camera_snapshot など"| Detector3
+    Dashboard -->|"POST /recording/schedule など"| Detector1
+    Dashboard -->|"POST /recording/schedule など"| Detector2
+    Dashboard -->|"POST /recording/schedule など"| Detector3
     Dashboard -->|"HTTP GET /go2rtc_asset/*"| Go2RTC
-    Dashboard -->|"HTTP GET /stats"| Detector1
-    Dashboard -->|"HTTP GET /stats"| Detector2
-    Dashboard -->|"HTTP GET /stats"| Detector3
-    Dashboard -->|"ファイル読み込み"| Storage
+    Dashboard -->|"ファイル読み込み・削除"| Storage
     Go2RTC -->|"RTSP受信"| RTSP1
     Go2RTC -->|"RTSP受信"| RTSP2
     Go2RTC -->|"RTSP受信"| RTSP3
@@ -205,7 +205,39 @@ sequenceDiagram
     WebServer-->>Browser: MJPEGストリーム配信
 ```
 
-### 4. 検出結果削除シーケンス
+### 4. 手動録画シーケンス（v3.2.0+）
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Dashboard
+    participant Detector as meteor_detector<br/>(カメラN)
+    participant Storage as /output/camera_name/manual_recordings
+
+    Browser->>Dashboard: POST /camera_recording_schedule/0<br/>{start_at, duration_sec}
+    Dashboard->>Detector: POST /recording/schedule
+    Detector-->>Dashboard: {success: true, recording: {state: "scheduled"}}
+    Dashboard-->>Browser: {success: true, recording: {...}}
+
+    Note over Detector: 指定時刻になると ffmpeg で録画開始
+
+    Browser->>Dashboard: GET /camera_recording_status/0
+    Dashboard->>Detector: GET /recording/status
+    Detector-->>Dashboard: {recording: {state: "recording", remaining_sec: 42}}
+    Dashboard-->>Browser: {recording: {state: "recording", remaining_sec: 42}}
+
+    Note over Detector: 録画完了後、サムネイル JPEG を自動生成 (v3.2.1)
+
+    Detector->>Storage: manual_camera1_20260319_213000_90s.mp4
+    Detector->>Storage: manual_camera1_20260319_213000_90s.jpg
+
+    Browser->>Dashboard: DELETE /manual_recording/camera1/.../manual_camera1_....mp4
+    Dashboard->>Storage: mp4 削除
+    Dashboard->>Storage: 同名 jpg 削除（存在すれば）
+    Dashboard-->>Browser: {success: true, deleted_files: [...]}
+```
+
+### 5. 検出結果削除シーケンス
 
 ```mermaid
 sequenceDiagram
@@ -213,14 +245,14 @@ sequenceDiagram
     participant Dashboard
     participant Storage as /output/camera_name
 
-    Browser->>Dashboard: DELETE /detection/camera1/2026-02-02 06:55:33
+    Browser->>Dashboard: DELETE /detection/camera1/det_a1b2c3d4e5f6g7h8i9j0
 
-    Dashboard->>Storage: タイムスタンプからファイル名を生成<br/>meteor_20260202_065533_*.{mov,mp4,jpg}
+    Dashboard->>Dashboard: detection_id から対象レコードを検索
 
-    Dashboard->>Storage: ファイル削除<br/>- meteor_20260202_065533.mp4<br/>- meteor_20260202_065533_composite.jpg<br/>- meteor_20260202_065533_composite_original.jpg
+    Dashboard->>Storage: ファイル削除（他レコードから参照されていない場合）<br/>- meteor_20260202_065533.mp4<br/>- meteor_20260202_065533_composite.jpg<br/>- meteor_20260202_065533_composite_original.jpg
 
     Dashboard->>Storage: detections.jsonl読み込み
-    Dashboard->>Dashboard: 該当タイムスタンプの行を除外
+    Dashboard->>Dashboard: 該当 detection_id の行を除外
     Dashboard->>Storage: detections.jsonl上書き
 
     Dashboard-->>Browser: {success: true, deleted_files: [...]}
@@ -235,14 +267,17 @@ sequenceDiagram
 
 ```
 /output/
-  ├── camera1_10.0.1.25/
-  │   ├── detections.jsonl          # 検出ログ (1行1イベント)
+  ├── camera1_10_0_1_25/
+  │   ├── detections.jsonl                   # 検出ログ (1行1イベント)
   │   ├── meteor_20260202_065533.mp4
   │   ├── meteor_20260202_065533_composite.jpg
-  │   └── meteor_20260202_065533_composite_original.jpg
-  ├── camera2_10.0.1.3/
+  │   ├── meteor_20260202_065533_composite_original.jpg
+  │   └── manual_recordings/                 # 手動録画保存先 (v3.2.0+)
+  │       ├── manual_camera1_20260319_213000_90s.mp4
+  │       └── manual_camera1_20260319_213000_90s.jpg  # サムネイル (v3.2.1+)
+  ├── camera2_10_0_1_3/
   │   └── ...
-  └── camera3_10.0.1.11/
+  └── camera3_10_0_1_11/
       └── ...
 ```
 
@@ -271,7 +306,10 @@ sequenceDiagram
 | `/` | GET | プレビューHTML | `text/html` |
 | `/stream` | GET | MJPEGストリーム | `multipart/x-mixed-replace` |
 | `/snapshot` | GET | 現在フレームJPEG取得 | `image/jpeg` |
-| `/stats` | GET | 統計情報 | `application/json` |
+| `/stats` | GET | 統計情報（v3.2.0以降は `recording` フィールドを含む） | `application/json` |
+| `/recording/status` | GET | 手動録画状態取得（v3.2.0+） | `application/json` |
+| `/recording/schedule` | POST | 手動録画の予約/即時開始（v3.2.0+） | `application/json` |
+| `/recording/stop` | POST | 手動録画の停止（v3.2.0+） | `application/json` |
 | `/update_mask` | POST | 現在フレームからマスク更新 | `application/json` |
 | `/apply_settings` | POST | 設定をランタイム反映（必要時自動再起動） | `application/json` |
 | `/restart` | POST | プロセス再起動要求 | `application/json` |
@@ -282,7 +320,7 @@ sequenceDiagram
 {
   "detections": 5,
   "elapsed": 3600.5,
-  "camera": "camera1_10.0.1.25",
+  "camera": "camera1_10_0_1_25",
   "settings": {
     "sensitivity": "medium",
     "scale": 0.5,
@@ -302,24 +340,53 @@ sequenceDiagram
   "runtime_fps": 19.83,
   "stream_alive": true,
   "time_since_last_frame": 0.03,
-  "is_detecting": true
+  "is_detecting": true,
+  "detection_status": "DETECTING",
+  "recording": {
+    "supported": true,
+    "state": "idle",
+    "start_at": "",
+    "duration_sec": 0,
+    "remaining_sec": 0,
+    "output_path": "",
+    "error": ""
+  }
 }
 ```
+
+`recording` フィールドは v3.2.0 で追加されました。`state` は `idle` / `scheduled` / `recording` / `completed` / `stopped` のいずれかです。
 
 ### dashboard.py のエンドポイント
 
 | エンドポイント | メソッド | 説明 | レスポンス |
 |--------------|---------|------|-----------|
-| `/` | GET | ダッシュボードHTML | `text/html` |
+| `/health` | GET | ダッシュボードヘルスチェック | `application/json` |
+| `/` | GET | ダッシュボードHTML（検出一覧） | `text/html` |
+| `/cameras` | GET | カメラライブ画面HTML | `text/html` |
+| `/settings` | GET | 全カメラ設定ページ | `text/html` |
 | `/detection_window` | GET | 検出時間帯取得 | `application/json` |
 | `/detections` | GET | 検出リスト取得 | `application/json` |
-| `/settings` | GET | 全カメラ設定ページ | `text/html` |
+| `/detections_mtime` | GET | 検出ログ更新時刻取得 | `application/json` |
+| `/dashboard_stats` | GET | ダッシュボードCPU統計取得 | `application/json` |
+| `/camera_stats/{index}` | GET | カメラ統計情報取得 | `application/json` |
+| `/camera_embed/{index}` | GET | WebRTC 埋め込みページ（v3.1.0+） | `text/html` |
+| `/go2rtc_asset/{name}` | GET | go2rtc フロント資産プロキシ（v3.1.0+） | `application/javascript` |
+| `/camera_recording_status/{index}` | GET | カメラ手動録画状態取得（v3.2.0+） | `application/json` |
+| `/camera_recording_schedule/{index}` | POST | カメラ手動録画の予約/即時開始（v3.2.0+） | `application/json` |
+| `/camera_recording_stop/{index}` | POST | カメラ手動録画の停止（v3.2.0+） | `application/json` |
 | `/camera_settings/current` | GET | 設定の現在値取得 | `application/json` |
 | `/camera_settings/apply_all` | POST | 設定を全カメラへ一括反映 | `application/json` |
-| `/camera_snapshot/{index}` | GET | カメラスナップショット取得 | `image/jpeg` |
+| `/camera_mask/{index}` | GET/POST | カメラマスクの取得/更新 | `application/json` |
+| `/camera_mask_confirm/{index}` | POST | マスク更新を確定 | `application/json` |
+| `/camera_mask_discard/{index}` | POST | マスク更新を破棄 | `application/json` |
+| `/camera_mask_image/{index}` | GET | マスク画像取得 | `image/jpeg` |
+| `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） | `image/jpeg` |
 | `/camera_restart/{index}` | POST | カメラ再起動要求 | `application/json` |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 | `image/jpeg` |
 | `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 | `application/json` |
+| `/manual_recording/{path}` | DELETE | 手動録画ファイル削除（v3.2.1+） | `application/json` |
+| `/detection_label` | POST | 検出ラベル設定 | `application/json` |
+| `/bulk_delete_non_meteor/{camera_name}` | POST | 非流星検出一括削除 | `application/json` |
 | `/changelog` | GET | CHANGELOG表示 | `text/plain` |
 
 #### /detections レスポンス例
@@ -329,14 +396,22 @@ sequenceDiagram
   "total": 15,
   "recent": [
     {
+      "id": "det_a1b2c3d4e5f6g7h8i9j0",
       "time": "2026-02-02 06:55:33",
-      "camera": "camera1_10.0.1.25",
+      "camera": "camera1_10_0_1_25",
+      "camera_display": "カメラ1",
       "confidence": "87%",
-      "image": "camera1_10.0.1.25/meteor_20260202_065533_composite.jpg"
+      "image": "camera1_10_0_1_25/meteor_20260202_065533_composite.jpg",
+      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mp4",
+      "composite_original": "camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg",
+      "label": "detected",
+      "source_type": "manual_recording"
     }
   ]
 }
 ```
+
+`id` は検出エントリの一意識別子（SHA-1 ダイジェスト）です。`source_type` は手動録画エントリの場合のみ `"manual_recording"` が設定されます。
 
 ## 設計のポイント
 
@@ -372,8 +447,27 @@ sequenceDiagram
 - `sensitivity` / `scale` / `buffer` など起動時依存項目は自動再起動で反映
 - 起動時依存項目は `output/runtime_settings/<camera>.json` に保存し、再起動後も維持
 
+### 7. 手動録画アーキテクチャ（v3.2.0+）
+- ダッシュボードが `POST /camera_recording_schedule/{index}` を受け付け、カメラコンテナの `POST /recording/schedule` へ中継
+- カメラコンテナが `ffmpeg` で RTSP 入力を MP4 に変換して `manual_recordings/<camera>/` へ保存
+- v3.2.1 以降、録画完了後にサムネイル JPEG を自動生成し、ダッシュボードの検出一覧に手動録画も表示
+- 削除は `DELETE /manual_recording/{path}` で MP4 と同名 JPEG をまとめて削除
+- パストラバーサル対策として、パスが `manual_recordings` ディレクトリ配下かつ拡張子 `.mp4` であることを必須確認
+
+### 8. WebRTC ライブ表示アーキテクチャ（v3.1.0+）
+- `CAMERA*_STREAM_KIND=webrtc` 設定時、ダッシュボードは `/camera_embed/{index}` でブラウザ向け埋め込みページを生成
+- 埋め込みページは `/go2rtc_asset/video-stream.js` を読み込み、`go2rtc` の WebSocket API へ直接接続
+- Docker 内でループバックアドレスが指定された場合、ダッシュボードは `go2rtc` コンテナ名で名前解決してアセット取得
+- `go2rtc.yaml` の `webrtc.candidates` にブラウザから到達可能なホスト側 IP を設定する必要がある（`generate_compose.py --streaming-mode webrtc` で自動設定）
+
 ## 関連ファイル
 
 - `docker-compose.yml`: コンテナオーケストレーション設定
+- `generate_compose.py`: docker-compose.yml / go2rtc.yaml 生成スクリプト
+- `go2rtc.yaml`: go2rtc WebRTC 候補アドレスとストリーム定義
 - `astro_utils.py`: 天文計算ユーティリティ (検出時間帯判定)
+- `dashboard_config.py`: カメラ設定・バージョン定義
+- `dashboard_routes.py`: ルートハンドラ（検出監視・カメラ監視を含む）
+- `dashboard_camera_handlers.py`: カメラ操作系ハンドラ（スナップショット・マスク・再起動）
+- `dashboard_templates.py`: HTMLテンプレート生成
 - `CHANGELOG.md`: バージョン履歴

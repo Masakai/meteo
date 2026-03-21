@@ -2,6 +2,8 @@
 
 ---
 
+**Version: v3.2.1**
+
 **Copyright (c) 2026 Masanori Sakai**
 
 Licensed under the MIT License
@@ -111,6 +113,19 @@ python generate_compose.py --streaming-mode webrtc
 
 - `スナップショット保存`: 各カメラの現在フレームをJPEGでダウンロード
 - `再起動`: 対象カメラのみ再起動要求（反映まで数秒かかる場合あり）
+
+### 手動録画（v3.2.0+）
+
+カメラライブ画面（`/cameras`）から、カメラごとに手動録画を予約・管理できます。
+
+- **録画予約**: 開始時刻と録画秒数を指定して予約。開始時刻を空欄にすると即時開始。
+- **録画停止**: 予約中・録画中の場合に停止ボタンで中断可能。
+- **録画ファイルの保存先**: `./detections/<camera>/manual_recordings/` 配下に MP4 として保存されます。
+- **音声コーデック制限（v3.2.1+）**: RTSP ストリームの音声が pcm_alaw の場合、音声トラックを除いた映像のみの MP4 として保存されます。
+- **サムネイル自動生成（v3.2.1+）**: 録画完了後に同名の JPEG サムネイルが自動生成され、検出一覧カレンダーからプレビュー・削除が可能になります。
+- **一覧からの削除**: 検出一覧に手動録画が表示され、「削除」ボタンで MP4 とサムネイルをまとめて削除できます。
+
+録画状態は `GET /camera_recording_status/{index}` で確認できます（`state`: `idle` / `scheduled` / `recording` / `completed` / `stopped`）。
 
 ### WebRTC ライブ表示運用
 
@@ -570,7 +585,12 @@ find ./detections -name "*.mp4" -mtime +7 -delete
 
 # 特定カメラのみ削除
 find ./detections/camera1_10_0_1_25 -type f -mtime +7 -delete
+
+# 手動録画ファイルのみ削除（v3.2.0+）
+find ./detections -path "*/manual_recordings/*" -mtime +7 -delete
 ```
+
+手動録画ファイルはダッシュボードの検出一覧の「削除」ボタン（`DELETE /manual_recording/{path}`）でも個別削除できます。
 
 ---
 

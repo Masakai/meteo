@@ -140,7 +140,8 @@ Licensed under the MIT License
 | `/camera_restart/{index}` | POST | カメラ再起動要求 |
 | `/camera_stats/{index}` | GET | カメラ統計情報取得 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
-| `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 |
+| `/detection/{camera}/{id}` | DELETE | 検出結果削除 |
+| `/dashboard_stats` | GET | ダッシュボードCPU統計取得 |
 | `/manual_recording/{path}` | DELETE | 手動録画ファイル削除 |
 | `/bulk_delete_non_meteor/{camera_name}` | POST | カメラの非流星検出を一括削除 |
 | `/detection_label` | POST | 検出にラベルを設定 |
@@ -353,6 +354,7 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
 | `recent[].mp4` | string | 動画パス（通常は `.mp4`） |
 | `recent[].composite_original` | string | 元画像の比較明合成パス |
 | `recent[].label` | string | 検出ラベル（v1.10.0以降、未設定時は空文字） |
+| `recent[].source_type` | string | `"manual_recording"` の場合は手動録画（v3.2.1以降、手動録画エントリのみ付与） |
 
 **使用例**:
 ```bash
@@ -406,7 +408,7 @@ fetch('/detections_mtime')
 
 ### GET /camera_stats/{index}
 
-**説明**: 指定カメラの統計情報を取得（v1.17.0で監視機能を追加）
+**説明**: 指定カメラの統計情報を取得（v1.17.0で監視機能を追加、v3.2.0で `recording` フィールドを追加）
 
 **URLパラメータ**:
 
@@ -454,6 +456,7 @@ fetch('/detections_mtime')
 | `monitor_last_restart_at` | string/null | 最終再起動時刻 |
 | `monitor_restart_count` | integer | 再起動回数 |
 | `monitor_restart_triggered` | boolean | 再起動トリガー発動中か |
+| `recording` | object/null | 手動録画状態（v3.2.0以降、カメラが対応している場合に含まれる） |
 
 **使用例**:
 ```bash
@@ -744,7 +747,7 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 
 ---
 
-### DELETE /detection/{camera}/{timestamp}
+### DELETE /detection/{camera}/{id}
 
 **説明**: 検出結果を削除（動画、画像、JSONLエントリ）
 
@@ -753,7 +756,7 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 | パラメータ | 型 | 説明 | 例 |
 |-----------|-----|------|-----|
 | `camera` | string | カメラディレクトリ名 | `camera1_10_0_1_25` |
-| `timestamp` | string | 検出時刻（URL encoded） | `2026-02-02 06:55:33` |
+| `id` | string | 検出ID（`/detections` レスポンスの `id` フィールド） | `det_a1b2c3d4e5f6789012` |
 
 **レスポンス**:
 - Content-Type: `application/json`
@@ -763,6 +766,7 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 ```json
 {
   "success": true,
+  "id": "det_a1b2c3d4e5f6789012",
   "deleted_files": [
     "meteor_20260202_065533.mp4",
     "meteor_20260202_065533_composite.jpg",
@@ -776,17 +780,17 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 ```json
 {
   "success": false,
-  "error": "File not found"
+  "error": "detection id not found: camera1_10_0_1_25 det_a1b2c3d4e5f6789012"
 }
 ```
 
 **使用例**:
 ```bash
-# curlで削除
-curl -X DELETE "http://localhost:8080/detection/camera1_10_0_1_25/2026-02-02%2006:55:33"
+# curlで削除（idは/detectionsで取得）
+curl -X DELETE "http://localhost:8080/detection/camera1_10_0_1_25/det_a1b2c3d4e5f6789012"
 
 # JavaScriptから削除
-fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
+fetch(`/detection/camera1_10_0_1_25/${detectionId}`, {
   method: 'DELETE'
 })
 .then(r => r.json())
@@ -801,9 +805,37 @@ fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
 
 ---
 
+### GET /dashboard_stats
+
+**説明**: ダッシュボードプロセスの CPU 使用率を取得
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "cpu_percent": 12.3
+}
+```
+
+**フィールド説明**:
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `cpu_percent` | float | CPU使用率（%、0.0〜100.0） |
+
+**使用例**:
+```bash
+curl http://localhost:8080/dashboard_stats | jq
+```
+
+---
+
 ### POST /bulk_delete_non_meteor/{camera_name}
 
-**説明**: 指定カメラの非流星検出（ラベルが "non-meteor" の検出）を一括削除（v1.18.0）
+**説明**: 指定カメラの「それ以外」検出（ラベルが `post_detected` の検出）を一括削除（v1.18.0）
 
 **URLパラメータ**:
 
@@ -846,7 +878,7 @@ fetch('/detection/camera1_10_0_1_25/2026-02-02 06:55:33', {
 ```json
 {
   "success": false,
-  "error": "No non-meteor detections found"
+  "error": "camera directory not found: camera1_10_0_1_25"
 }
 ```
 
@@ -862,7 +894,7 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 .then(r => r.json())
 .then(data => {
   if (data.success) {
-    alert(`${data.deleted_count}件の非流星検出を削除しました`);
+    alert(`${data.deleted_count}件の「それ以外」検出を削除しました`);
   } else {
     alert('削除失敗: ' + data.error);
   }
@@ -879,8 +911,8 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 ```json
 {
   "camera": "camera1_10_0_1_25",
-  "timestamp": "2026-02-02 06:55:33",
-  "label": "meteor"
+  "id": "det_a1b2c3d4e5f6789012",
+  "label": "detected"
 }
 ```
 
@@ -889,8 +921,8 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 | パラメータ | 型 | 必須 | 説明 | 例 |
 |-----------|-----|------|------|-----|
 | `camera` | string | Yes | カメラディレクトリ名 | `camera1_10_0_1_25` |
-| `timestamp` | string | Yes | 検出時刻 | `2026-02-02 06:55:33` |
-| `label` | string | Yes | ラベル（`meteor`, `non-meteor`, 空文字など） | `meteor` |
+| `id` | string | Yes | 検出ID（`/detections` レスポンスの `id` フィールド） | `det_a1b2c3d4e5f6789012` |
+| `label` | string | Yes | ラベル（`detected` または `post_detected`） | `detected` |
 
 **レスポンス**:
 - Content-Type: `application/json`
@@ -919,8 +951,8 @@ curl -X POST "http://localhost:8080/detection_label" \
   -H "Content-Type: application/json" \
   -d '{
     "camera": "camera1_10_0_1_25",
-    "timestamp": "2026-02-02 06:55:33",
-    "label": "meteor"
+    "id": "det_a1b2c3d4e5f6789012",
+    "label": "detected"
   }' | jq
 
 # JavaScriptからラベル設定
@@ -929,8 +961,8 @@ fetch('/detection_label', {
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify({
     camera: 'camera1_10_0_1_25',
-    timestamp: '2026-02-02 06:55:33',
-    label: 'meteor'
+    id: detectionId,
+    label: 'detected'
   })
 })
 .then(r => r.json())
@@ -944,10 +976,8 @@ fetch('/detection_label', {
 ```
 
 **ラベルの活用**:
-- `meteor`: 流星として確認済み
-- `non-meteor`: 非流星（誤検出）
-- 空文字: 未確認
-- カスタムラベル: 任意の文字列（例: `satellite`, `aircraft`, `noise`）
+- `detected`: 流星として確認済み
+- `post_detected`: 自動検出後に「それ以外」と判定されたもの（`bulk_delete_non_meteor` の削除対象）
 
 ---
 
@@ -1436,27 +1466,25 @@ server {
 | 環境変数 | デフォルト | 説明 |
 |---------|----------|------|
 | `CAMERA_MONITOR_ENABLED` | `true` | カメラ監視機能の有効/無効 |
-| `CAMERA_MONITOR_INTERVAL` | `60` | 監視チェック間隔（秒） |
-| `CAMERA_MONITOR_TIMEOUT` | `120` | フレーム未受信タイムアウト（秒） |
-| `CAMERA_RESTART_ENABLED` | `true` | 自動再起動の有効/無効 |
-| `CAMERA_RESTART_DELAY` | `5` | 再起動実行までの遅延（秒） |
-| `CAMERA_RESTART_MAX_COUNT` | `10` | 最大再起動回数（この回数を超えると監視停止） |
-| `CAMERA_RESTART_COOLDOWN` | `300` | 再起動後のクールダウン時間（秒） |
+| `CAMERA_MONITOR_INTERVAL` | `2.0` | 監視チェック間隔（秒） |
+| `CAMERA_MONITOR_TIMEOUT` | `6.0` | カメラ統計取得タイムアウト（秒） |
+| `CAMERA_RESTART_TIMEOUT` | `5.0` | 再起動リクエストタイムアウト（秒） |
+| `CAMERA_RESTART_COOLDOWN_SEC` | `120` | 再起動後のクールダウン時間（秒） |
+| `CAMERA_MONITOR_FAIL_THRESHOLD` | `12` | 統計取得失敗が連続でこの回数に達すると再起動を試みる |
+| `DETECTION_MONITOR_INTERVAL` | `2.0` | 検出キャッシュ更新間隔（秒） |
 
 **使用例（docker-compose.yml）**:
 ```yaml
-version: '3.8'
 services:
   dashboard:
     image: meteor-dashboard:latest
     environment:
       - CAMERA_MONITOR_ENABLED=true
-      - CAMERA_MONITOR_INTERVAL=60
-      - CAMERA_MONITOR_TIMEOUT=120
-      - CAMERA_RESTART_ENABLED=true
-      - CAMERA_RESTART_DELAY=5
-      - CAMERA_RESTART_MAX_COUNT=10
-      - CAMERA_RESTART_COOLDOWN=300
+      - CAMERA_MONITOR_INTERVAL=2.0
+      - CAMERA_MONITOR_TIMEOUT=6.0
+      - CAMERA_RESTART_TIMEOUT=5.0
+      - CAMERA_RESTART_COOLDOWN_SEC=120
+      - CAMERA_MONITOR_FAIL_THRESHOLD=12
     ports:
       - "8080:8080"
 ```

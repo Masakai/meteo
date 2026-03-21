@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-03-21
+### Fixed
+- 画像リクエストのパスが検出ディレクトリ外に逸脱するパストラバーサルを修正。
+
+### Changed
+- 各種ドキュメント（API リファレンス・アーキテクチャ・設定・Docker・運用・セキュリティ・セットアップ）を v3.2.1 の実装に合わせて改版。
+
 ## [3.2.1] - 2026-03-19
 ### Fixed
 - 手動録画で RTSP 音声が `pcm_alaw` の場合に MP4 へ `-c copy` できず録画開始に失敗する問題を修正し、映像のみを MP4 保存するよう改善。

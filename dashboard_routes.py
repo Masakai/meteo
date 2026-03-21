@@ -879,6 +879,16 @@ def handle_image(handler):
             camera_name = unquote(parts[0])
             filename = unquote(parts[1])
             image_path = Path(DETECTIONS_DIR) / camera_name / filename
+            detections_root = Path(DETECTIONS_DIR).resolve()
+            if detections_root not in image_path.resolve().parents:
+                logger.warning(
+                    "Image request path escapes detections dir: raw_path=%s resolved=%s",
+                    handler.path,
+                    image_path.resolve(),
+                )
+                handler.send_response(404)
+                handler.end_headers()
+                return True
             logger.info(
                 "Image request: raw_path=%s camera=%s filename=%s resolved=%s exists=%s",
                 handler.path,

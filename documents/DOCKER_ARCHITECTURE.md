@@ -1,5 +1,7 @@
 # Docker コンテナ構成ドキュメント
 
+**バージョン: v3.2.1**
+
 ---
 
 **Copyright (c) 2026 Masanori Sakai**
@@ -137,14 +139,18 @@ graph LR
 ```dockerfile
 FROM python:3.11-slim
 WORKDIR /app
+COPY requirements-docker.txt .
+RUN pip install --no-cache-dir -r requirements-docker.txt
 COPY dashboard*.py .
 COPY astro_utils.py .
 COPY documents/assets/meteo-logotype.svg ./documents/assets/meteo-logotype.svg
-RUN pip install --no-cache-dir astral
 ENV TZ=Asia/Tokyo
+ENV PORT=8080
 EXPOSE 8080
 CMD ["python", "dashboard.py"]
 ```
+
+主な依存ライブラリ: `flask`, `astral`
 
 ---
 
@@ -215,20 +221,28 @@ WORKDIR /app
 COPY requirements-docker.txt .
 RUN pip install --no-cache-dir -r requirements-docker.txt
 
-# OpenCV用システムライブラリ
-RUN mkdir -p /dev/shm/apt-cache && \
-    apt-get update --allow-releaseinfo-change && \
+# OpenCV・ffmpeg 用システムライブラリ（手動録画に ffmpeg が必要）
+RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
-        -o APT::Keep-Downloaded-Packages=false \
-        -o Dir::Cache::archives=/dev/shm/apt-cache \
-        libxcb1 libglib2.0-0 libgomp1 && \
-    rm -rf /var/lib/apt/lists/* /dev/shm/apt-cache
+        ffmpeg \
+        libxcb1 \
+        libglib2.0-0 \
+        libgomp1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 
 # アプリケーションコード
 COPY meteor_detector_rtsp_web.py .
 COPY meteor_detector_realtime.py .
 COPY meteor_detector_common.py .
+COPY meteor_mask_utils.py .
 COPY astro_utils.py .
+
+# マスク画像（デフォルトは空ファイル）
+ARG MASK_FROM_DAY=mask_none.jpg
+ARG MASK_IMAGE=mask_none.jpg
+COPY ${MASK_FROM_DAY} /app/mask_from_day.jpg
+COPY ${MASK_IMAGE} /app/mask_image.png
 
 # 出力ディレクトリ
 RUN mkdir -p /output
@@ -236,17 +250,35 @@ RUN mkdir -p /output
 # タイムゾーン設定
 ENV TZ=Asia/Tokyo
 
+# 環境変数のデフォルト値
+ENV RTSP_URL=""
+ENV SENSITIVITY="medium"
+ENV SCALE="0.5"
+ENV BUFFER="15"
+ENV EXCLUDE_BOTTOM="0.125"
+ENV CAMERA_NAME="camera"
+ENV CAMERA_NAME_DISPLAY=""
+ENV WEB_PORT="8080"
+ENV EXTRACT_CLIPS="true"
+ENV MASK_IMAGE=""
+ENV MASK_DILATE="20"
+ENV MASK_SAVE=""
+
 EXPOSE 8080
 
-CMD python meteor_detector_rtsp_web.py \
-    "${RTSP_URL}" \
-    -o "/output/${CAMERA_NAME}" \
-    --sensitivity "${SENSITIVITY}" \
-    --scale "${SCALE}" \
-    --buffer "${BUFFER}" \
-    --exclude-bottom "${EXCLUDE_BOTTOM}" \
-    --web-port "${WEB_PORT}" \
-    --camera-name "${CAMERA_NAME}"
+CMD ["/bin/sh", "-c", "exec python meteor_detector_rtsp_web.py \
+  \"${RTSP_URL}\" \
+  -o \"/output/${CAMERA_NAME}\" \
+  --sensitivity \"${SENSITIVITY}\" \
+  --scale \"${SCALE}\" \
+  --buffer \"${BUFFER}\" \
+  --exclude-bottom \"${EXCLUDE_BOTTOM}\" \
+  --mask-image \"${MASK_IMAGE}\" \
+  --mask-from-day \"${MASK_FROM_DAY}\" \
+  --mask-dilate \"${MASK_DILATE}\" \
+  --mask-save \"${MASK_SAVE}\" \
+  --web-port \"${WEB_PORT}\" \
+  --camera-name \"${CAMERA_NAME}\""]
 ```
 
 ---
@@ -398,7 +430,11 @@ graph TB
   │   ├── detections.jsonl
   │   ├── meteor_20260202_065533.mp4
   │   ├── meteor_20260202_065533_composite.jpg
-  │   └── meteor_20260202_065533_composite_original.jpg
+  │   ├── meteor_20260202_065533_composite_original.jpg
+  │   └── manual_recordings/                         # 手動録画保存先 (v3.2.0+)
+  │       └── camera1_10_0_1_25/                     # カメラ名サブディレクトリ
+  │           ├── manual_camera1_20260319_213000_90s.mp4
+  │           └── manual_camera1_20260319_213000_90s.jpg  # サムネイル (v3.2.1+)
   ├── camera2_10_0_1_3/
   │   └── ...
   └── camera3_10_0_1_11/
@@ -409,10 +445,10 @@ graph TB
 
 | コンテナ | パス | モード | 操作 |
 |---------|------|--------|------|
-| camera1 | `/output` | rw | 検出結果の書き込み |
-| camera2 | `/output` | rw | 検出結果の書き込み |
-| camera3 | `/output` | rw | 検出結果の書き込み |
-| dashboard | `/output` | rw | 検出結果の読み込み、削除 |
+| camera1 | `/output` | rw | 検出結果・手動録画 MP4/JPEG の書き込み |
+| camera2 | `/output` | rw | 検出結果・手動録画 MP4/JPEG の書き込み |
+| camera3 | `/output` | rw | 検出結果・手動録画 MP4/JPEG の書き込み |
+| dashboard | `/output` | rw | 検出結果・手動録画ファイルの読み込みおよび削除 |
 
 ### 設定ファイル: ./go2rtc.yaml
 
