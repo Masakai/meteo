@@ -20,7 +20,9 @@ RUN apt-get update --allow-releaseinfo-change && \
         ffmpeg \
         libxcb1 \
         libglib2.0-0 \
-        libgomp1 && \
+        libgomp1 \
+        iputils-ping \
+        netcat-openbsd && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
 

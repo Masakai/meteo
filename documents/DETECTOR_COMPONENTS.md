@@ -59,9 +59,8 @@ graph TB
 
 ```python
 class RTSPReader:
-    def __init__(self, url: str, reconnect_delay: float = 5.0)
+    def __init__(self, url: str, reconnect_delay: float = 5.0, log_detail: bool = False)
     def start(self) -> RTSPReader
-    def read(self) -> Tuple[bool, float, Optional[np.ndarray]]
     def stop(self)
     def _read_loop(self)  # 内部スレッド
 ```
@@ -87,7 +86,6 @@ stateDiagram-v2
 | メソッド | 説明 | 戻り値 |
 |---------|------|--------|
 | `start()` | RTSPリーダースレッドを起動 | `self` |
-| `read()` | キューからフレームを取得（タイムアウト1秒） | `(success, timestamp, frame)` |
 | `stop()` | スレッドを停止 | なし |
 | `_read_loop()` | 内部ループ（別スレッド） | なし |
 
@@ -133,10 +131,8 @@ sequenceDiagram
         Thread->>Thread: 5秒待機して再接続
     end
 
-    Main->>RTSPReader: read()
-    RTSPReader->>Queue: get(timeout=1.0)
-    Queue-->>RTSPReader: (timestamp, frame)
-    RTSPReader-->>Main: (True, timestamp, frame)
+    Main->>Queue: get(timeout=1.0)
+    Queue-->>Main: (timestamp, frame)
 ```
 
 ---
@@ -627,7 +623,7 @@ sequenceDiagram
   "settings": {
     "sensitivity": "medium",
     "scale": 0.5,
-    "buffer": 12.0,
+    "buffer": 15.0,
     "extract_clips": true,
     "exclude_bottom": 0.0625,
     "nuisance_overlap_threshold": 0.6,
@@ -640,11 +636,30 @@ sequenceDiagram
     "mask_dilate": 5,
     "nuisance_mask_image": "",
     "nuisance_from_night": "",
-    "nuisance_dilate": 3
+    "nuisance_dilate": 3,
+    "clip_margin_before": 1.0,
+    "clip_margin_after": 1.0
   },
+  "runtime_fps": 19.83,
   "stream_alive": true,
   "time_since_last_frame": 0.03,
-  "is_detecting": true
+  "is_detecting": true,
+  "detection_status": "DETECTING",
+  "detection_window_enabled": true,
+  "detection_window_active": true,
+  "detection_window_start": "18:00:00",
+  "detection_window_end": "05:00:00",
+  "mask_active": true,
+  "mask_update_pending": false,
+  "recording": {
+    "supported": true,
+    "state": "idle",
+    "start_at": "",
+    "duration_sec": 0,
+    "remaining_sec": 0,
+    "output_path": "",
+    "error": ""
+  }
 }
 ```
 
@@ -763,6 +778,7 @@ cv2.circle(composite, end_point, 6, (0, 0, 255), 2)    # 終了点（赤）
 | `LONGITUDE` | `138.7274` | 観測地の経度（富士山頂） |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン |
 | `EXTRACT_CLIPS` | `true` | クリップ動画保存の有効化 |
+| `RTSP_LOG_DETAIL` | `true` | RTSP 接続の詳細ログ出力 (v3.1.1+) |
 
 ---
 

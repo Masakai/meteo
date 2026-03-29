@@ -306,11 +306,14 @@ sequenceDiagram
 | `/` | GET | プレビューHTML | `text/html` |
 | `/stream` | GET | MJPEGストリーム | `multipart/x-mixed-replace` |
 | `/snapshot` | GET | 現在フレームJPEG取得 | `image/jpeg` |
+| `/mask` | GET | マスク画像取得（`?pending=1` で保留中マスク） | `image/png` |
 | `/stats` | GET | 統計情報（v3.2.0以降は `recording` フィールドを含む） | `application/json` |
 | `/recording/status` | GET | 手動録画状態取得（v3.2.0+） | `application/json` |
 | `/recording/schedule` | POST | 手動録画の予約/即時開始（v3.2.0+） | `application/json` |
 | `/recording/stop` | POST | 手動録画の停止（v3.2.0+） | `application/json` |
 | `/update_mask` | POST | 現在フレームからマスク更新 | `application/json` |
+| `/confirm_mask_update` | POST | 保留中のマスク更新を確定 | `application/json` |
+| `/discard_mask_update` | POST | 保留中のマスク更新を破棄 | `application/json` |
 | `/apply_settings` | POST | 設定をランタイム反映（必要時自動再起動） | `application/json` |
 | `/restart` | POST | プロセス再起動要求 | `application/json` |
 
@@ -342,6 +345,12 @@ sequenceDiagram
   "time_since_last_frame": 0.03,
   "is_detecting": true,
   "detection_status": "DETECTING",
+  "detection_window_enabled": true,
+  "detection_window_active": true,
+  "detection_window_start": "18:00:00",
+  "detection_window_end": "05:00:00",
+  "mask_active": true,
+  "mask_update_pending": false,
   "recording": {
     "supported": true,
     "state": "idle",
@@ -471,3 +480,6 @@ sequenceDiagram
 - `dashboard_camera_handlers.py`: カメラ操作系ハンドラ（スナップショット・マスク・再起動）
 - `dashboard_templates.py`: HTMLテンプレート生成
 - `CHANGELOG.md`: バージョン履歴
+- `API_REFERENCE.md`: API 仕様の詳細ドキュメント
+- `DETECTOR_COMPONENTS.md`: 検出エンジンの内部構造詳細
+- `CONFIGURATION_GUIDE.md`: 環境変数と設定項目のガイド
