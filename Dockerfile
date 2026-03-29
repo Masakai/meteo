@@ -20,11 +20,17 @@ RUN apt-get update --allow-releaseinfo-change && \
         ffmpeg \
         libxcb1 \
         libglib2.0-0 \
-        libgomp1 \
-        iputils-ping \
-        netcat-openbsd && \
+        libgomp1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
+
+# デバッグツール（--debug-tools 指定時のみインストール）
+ARG DEBUG_TOOLS=false
+RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
+    apt-get update --allow-releaseinfo-change && \
+    apt-get install -y --no-install-recommends iputils-ping netcat-openbsd && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 # アプリケーションコード
 COPY meteor_detector_rtsp_web.py .

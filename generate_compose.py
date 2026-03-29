@@ -148,13 +148,17 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
     # CAMERA_NAME_DISPLAY環境変数を追加（表示名がある場合のみ）
     display_name_env = f"      - CAMERA_NAME_DISPLAY={display_name}\n" if display_name else ""
 
+    debug_tools_arg = ""
+    if settings.get("debug_tools"):
+        debug_tools_arg = "\n        DEBUG_TOOLS: \"true\""
+
     return f"""
   # カメラ{index} ({rtsp_info['host']})
   {service_name}:
     build:
       context: .
       args:
-        MASK_IMAGE: {mask_build_arg}
+        MASK_IMAGE: {mask_build_arg}{debug_tools_arg}
     container_name: meteor-{service_name}
     restart: unless-stopped
     environment:
@@ -447,6 +451,8 @@ streamersファイルの形式:
                        help="生成する go2rtc 設定ファイル (default: go2rtc.yaml)")
     parser.add_argument("--go2rtc-candidate-host", default="",
                        help="go2rtc がブラウザへ返す到達可能アドレスのホスト/IP (default: 自動検出)")
+    parser.add_argument("--debug-tools", action="store_true", default=False,
+                       help="デバッグツール(ping, nc)をカメラコンテナにインストール")
 
     args = parser.parse_args()
     if args.streaming_mode == "webrtc" and not args.go2rtc_candidate_host:
@@ -469,6 +475,7 @@ streamersファイルの形式:
         'go2rtc_webrtc_port': args.go2rtc_webrtc_port,
         'go2rtc_config_path': f"./{Path(args.go2rtc_config).name}",
         'go2rtc_candidate_host': args.go2rtc_candidate_host,
+        'debug_tools': args.debug_tools,
     }
 
     # 生成
