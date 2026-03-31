@@ -398,7 +398,7 @@ def _youtube_json_response(handler, data: dict, status: int = 200) -> bool:
 def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
     """YouTube Live配信を開始する"""
     try:
-        camera_index = parse_index(handler.path, len(cameras))
+        camera_index = parse_index(handler.path)
     except (ValueError, IndexError):
         return _youtube_json_response(handler, {"success": False, "error": "invalid camera index"}, 400)
 
@@ -423,7 +423,7 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
 def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
     """YouTube Live配信を停止する"""
     try:
-        camera_index = parse_index(handler.path, len(cameras))
+        camera_index = parse_index(handler.path)
     except (ValueError, IndexError):
         return _youtube_json_response(handler, {"success": False, "error": "invalid camera index"}, 400)
 
@@ -448,7 +448,7 @@ def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_c
 def handle_youtube_status(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
     """YouTube Live配信の状態を取得する"""
     try:
-        camera_index = parse_index(handler.path, len(cameras))
+        camera_index = parse_index(handler.path)
     except (ValueError, IndexError):
         return _youtube_json_response(handler, {"streaming": False, "error": "invalid camera index"}, 400)
 

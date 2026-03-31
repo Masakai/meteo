@@ -513,6 +513,8 @@ streamersファイルの形式:
         if not info:
             continue
         info["name"] = f"camera{i}_{info['host'].replace('.', '_')}"
+        if parsed.get("youtube_key"):
+            info["youtube_key"] = parsed["youtube_key"]
         cameras.append(info)
 
     if args.streaming_mode == "webrtc":

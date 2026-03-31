@@ -2423,7 +2423,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             .then(r => r.json())
             .then(data => {{
                 if (data.success) {{
-                    alert(data.message);
                     // 検出リストを即座に更新
                     updateDetections();
                 }} else {{
