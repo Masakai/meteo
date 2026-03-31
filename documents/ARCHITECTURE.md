@@ -46,12 +46,12 @@ graph TB
     Dashboard -->|"POST /recording/schedule など"| Detector2
     Dashboard -->|"POST /recording/schedule など"| Detector3
     Dashboard -->|"HTTP GET /go2rtc_asset/*"| Go2RTC
-    Dashboard -->|"POST/DELETE /api/streams"| Go2RTC
+    Dashboard -->|"GET /api/streams（状態確認）"| Go2RTC
     Dashboard -->|"ファイル読み込み・削除"| Storage
+    Dashboard -->|"RTMP配信（ffmpegサブプロセス）"| YouTube["YouTube Live"]
     Go2RTC -->|"RTSP受信"| RTSP1
     Go2RTC -->|"RTSP受信"| RTSP2
     Go2RTC -->|"RTSP受信"| RTSP3
-    Go2RTC -->|"RTMP配信"| YouTube["YouTube Live"]
 
     Detector1 -->|"映像取得"| RTSP1
     Detector2 -->|"映像取得"| RTSP2

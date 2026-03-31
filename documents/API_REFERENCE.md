@@ -674,7 +674,7 @@ curl -X POST "http://localhost:8080/camera_restart/1" | jq
 
 ### POST /youtube_start/{index}
 
-**説明**: 指定カメラのYouTube Live配信を開始する。go2rtc APIを介してRTMP出力を開始。
+**説明**: 指定カメラのYouTube Live配信を開始する。dashboard コンテナ内で ffmpeg サブプロセスを起動し、go2rtc の RTSP リレー経由で YouTube へ直接 RTMP 送信する。
 
 **URLパラメータ**:
 
@@ -701,7 +701,7 @@ curl -X POST "http://localhost:8080/youtube_start/2" | jq
 
 ### POST /youtube_stop/{index}
 
-**説明**: 指定カメラのYouTube Live配信を停止する。go2rtc APIを介してRTMP出力を削除。
+**説明**: 指定カメラのYouTube Live配信を停止する。dashboard コンテナ内の ffmpeg サブプロセスを terminate/kill で確実に終了する。
 
 **URLパラメータ**:
 
@@ -726,7 +726,7 @@ curl -X POST "http://localhost:8080/youtube_stop/2" | jq
 
 ### GET /youtube_status/{index}
 
-**説明**: 指定カメラのYouTube Live配信状態を取得する。go2rtc APIからRTMPコンシューマの有無を確認。
+**説明**: 指定カメラのYouTube Live配信状態を取得する。dashboard コンテナ内の ffmpeg サブプロセスの生死を確認。
 
 **URLパラメータ**:
 

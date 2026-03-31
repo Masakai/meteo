@@ -333,20 +333,13 @@ streams:
     - rtsp://...
   camera3:
     - rtsp://...
-  camera3_youtube:
-    - "ffmpeg:rtsp://...#video=copy#audio=aac"
-
-publish:
-  camera3_youtube:
-    - rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx-xxxx-xxxx
 ```
 
 - `api.origin` はダッシュボードからの埋め込みアクセスを許可します。
 - `webrtc.candidates` はブラウザが接続するホスト側候補アドレスです。
 - `streams.*` は各カメラの RTSP ソース定義です。
-- `streams.camera{N}_youtube` は YouTube 配信用の ffmpeg ソース（映像コピー＋AAC音声変換）です。`streamers` ファイルで `youtube:KEY` を指定したカメラに自動生成されます。
-- `publish` セクションは配信先の RTMP URL を定義します。ダッシュボードの API 呼び出しで配信が開始されます。
-- ボリュームは読み書き可能としています（DELETE API による配信停止に必要）。
+
+> **注**: YouTube Live 配信は go2rtc ではなく、dashboard コンテナ内の ffmpeg サブプロセスが担当します（後述）。go2rtc.yaml に `publish` セクションや `camera{N}_youtube` ストリームは不要です。
 
 ---
 

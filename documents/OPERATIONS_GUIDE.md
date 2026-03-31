@@ -140,7 +140,7 @@ python generate_compose.py --streaming-mode webrtc
 **配信開始**: 「YouTube配信」ボタンをクリック → 確認ダイアログで「OK」
 **配信停止**: 「配信中 LIVE」ボタンをクリック → 確認ダイアログで「OK」
 
-配信状態は10秒間隔で自動更新されます。go2rtcコンテナを再起動すると配信は停止します。
+配信状態は10秒間隔で自動更新されます。配信は dashboard コンテナ内の ffmpeg サブプロセスが管理するため、dashboard コンテナを再起動すると配信は停止します。
 
 **ストリームキーの変更手順**:
 
@@ -151,7 +151,7 @@ python generate_compose.py --streaming-mode webrtc
 **トラブルシューティング**:
 
 - YouTube Studioで「配信が始まらない」→ カメラのRTSPがH.264であることを確認
-- 「音声がない」→ go2rtcのffmpegがPCMA→AAC変換を行うので通常は自動対応
+- 「音声がない」→ dashboard コンテナの ffmpeg が PCMA→AAC 変換を行うので通常は自動対応
 - ボタンが表示されない → `streamers` に `youtube:KEY` が正しく設定されているか確認
 
 ### ダッシュボードからの全カメラ一括設定（/settings）

@@ -1109,9 +1109,9 @@ python generate_compose.py --buffer 10
 **新機能**:
 - ダッシュボードからカメラ単位でYouTube Liveへの配信開始/停止が可能
 - `streamers` ファイルの4番目のフィールドに `youtube:STREAM_KEY` を指定
-- `generate_compose.py` が go2rtc.yaml に ffmpeg ソース（AAC音声変換）+ publish セクションを自動生成
+- ダッシュボードコンテナ内の ffmpeg サブプロセスが go2rtc の RTSP リレー経由で映像を取得し、YouTube に直接 RTMP 送信
 - 配信中は「配信中 LIVE」ボタンがパルスアニメーションで表示
-- 10秒間隔で go2rtc から実際の配信状態を自動ポーリング
+- 10秒間隔でプロセス状態を確認して配信状態を自動ポーリング
 
 **設定例**:
 ```
@@ -1125,8 +1125,8 @@ rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
 - `GO2RTC_API_URL` — go2rtc APIのURL（通常は自動設定）
 
 **注意事項**:
-- YouTubeはH.264映像 + AAC音声が必須。go2rtc内のffmpegが自動的にAAC変換を行う
-- go2rtc.yaml のボリュームマウントは読み書き可能に変更（DELETE APIによる配信停止に必要）
+- YouTube は H.264 映像 + AAC 音声が必須。dashboard コンテナ内の ffmpeg が自動的に変換する
+- ffmpeg は `-re` フラグでリアルタイム読み込みを強制し、バースト送信を防止
 
 ---
 
