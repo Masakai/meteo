@@ -447,7 +447,8 @@ def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_c
         return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
 
     stream_name = f"camera{camera_index + 1}_youtube"
-    api_url = f"{go2rtc_api_url}/api/streams?name={quote(stream_name, safe='')}"
+    dst = _youtube_rtmp_dst(youtube_key)
+    api_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
 
     try:
         req = request_cls(api_url, method="DELETE")
