@@ -305,8 +305,6 @@ def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
         lines.append(f"  camera{i}:")
         lines.append(f"    - {cam['url']}")
         if cam.get("youtube_key"):
-            lines.append(f"  camera{i}_youtube:")
-            lines.append(f'    - "ffmpeg:rtsp://127.0.0.1:8554/camera{i}#video=h264#audio=aac"')
             youtube_cameras.append((i, cam["youtube_key"]))
     if youtube_cameras:
         lines.extend([
