@@ -411,20 +411,26 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
         return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
 
     stream_name = f"camera{camera_index + 1}_youtube"
+    internal_src = f"ffmpeg:rtsp://127.0.0.1:8554/camera{camera_index + 1}#video=h264#audio=aac"
     dst = _youtube_rtmp_dst(youtube_key)
-    api_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
 
     try:
-        req = request_cls(api_url, method="POST")
-        resp = urlopen_fn(req, timeout=15)
-        resp.read()
+        # Step 1: ストリームをランタイムに登録（停止後に削除されている場合の復元）
+        put_url = f"{go2rtc_api_url}/api/streams?name={quote(stream_name, safe='')}&src={quote(internal_src, safe='')}"
+        req = request_cls(put_url, method="PUT")
+        urlopen_fn(req, timeout=10).read()
+
+        # Step 2: RTMPコンシューマを追加して配信開始
+        post_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
+        req = request_cls(post_url, method="POST")
+        urlopen_fn(req, timeout=15).read()
         return _youtube_json_response(handler, {"success": True})
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        logger.error("youtube_start go2rtc HTTP %s: %s  url=%s", exc.code, body, api_url)
+        logger.error("youtube_start go2rtc HTTP %s: %s", exc.code, body)
         return _youtube_json_response(handler, {"success": False, "error": f"go2rtc {exc.code}: {body}"}, 502)
     except Exception as exc:
-        logger.error("youtube_start error: %s  url=%s", exc, api_url)
+        logger.error("youtube_start error: %s", exc)
         return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
 
 
@@ -441,13 +447,11 @@ def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_c
         return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
 
     stream_name = f"camera{camera_index + 1}_youtube"
-    dst = _youtube_rtmp_dst(youtube_key)
-    api_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
+    api_url = f"{go2rtc_api_url}/api/streams?name={quote(stream_name, safe='')}"
 
     try:
         req = request_cls(api_url, method="DELETE")
-        resp = urlopen_fn(req, timeout=15)
-        resp.read()
+        urlopen_fn(req, timeout=15).read()
         return _youtube_json_response(handler, {"success": True})
     except Exception as exc:
         return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
