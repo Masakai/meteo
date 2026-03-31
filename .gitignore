@@ -38,3 +38,7 @@ streamers
 /camera3_mask.png
 /repos/
 /scaffold/
+
+# Logs (persisted to host, but not committed)
+/logs/*.log
+/logs/*.log.*

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 import json
 import logging
+import os
 import subprocess
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlparse
@@ -431,7 +432,25 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
         "-f", "flv", rtmp_dst,
     ]
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log_path = os.environ.get("LOG_FILE", "")
+        if log_path:
+            log_dir = os.path.dirname(log_path)
+            ffmpeg_log_path = os.path.join(log_dir, f"ffmpeg_youtube_{camera_index + 1}.log")
+        else:
+            ffmpeg_log_path = None
+        if ffmpeg_log_path:
+            try:
+                os.makedirs(os.path.dirname(ffmpeg_log_path), exist_ok=True)
+                ffmpeg_log_fh = open(ffmpeg_log_path, "ab")
+            except Exception:
+                ffmpeg_log_fh = None
+        else:
+            ffmpeg_log_fh = None
+        proc = subprocess.Popen(
+            cmd,
+            stdout=ffmpeg_log_fh or subprocess.DEVNULL,
+            stderr=ffmpeg_log_fh or subprocess.DEVNULL,
+        )
         _youtube_processes[camera_index] = proc
         logger.info("youtube_start camera%d pid=%d", camera_index + 1, proc.pid)
         return _youtube_json_response(handler, {"success": True})

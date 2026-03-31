@@ -24,9 +24,19 @@ import dashboard_routes as routes
 from dashboard_config import CAMERAS, PORT, VERSION
 from dashboard_templates import render_dashboard_html, render_settings_html
 
+_log_handlers: list[logging.Handler] = [logging.StreamHandler()]
+_log_file = os.environ.get("LOG_FILE", "/logs/dashboard.log")
+try:
+    from logging.handlers import RotatingFileHandler as _RFH
+    import pathlib as _pl
+    _pl.Path(_log_file).parent.mkdir(parents=True, exist_ok=True)
+    _log_handlers.append(_RFH(_log_file, maxBytes=10 * 1024 * 1024, backupCount=5))
+except Exception:
+    pass
 logging.basicConfig(
     level=os.environ.get("DASHBOARD_LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=_log_handlers,
 )
 
 class HandlerAdapter:

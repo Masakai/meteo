@@ -184,10 +184,12 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
       - MASK_DILATE={settings.get('mask_dilate', '5')}
       - MASK_SAVE={settings.get('mask_save', '')}
       - WEB_PORT=8080
+      - LOG_FILE=/logs/{service_name}.log
     ports:
       - "{web_port}:8080"
     volumes:
       - ./detections:/output
+      - ./logs:/logs
     networks:
       - meteor-net
     logging:
@@ -250,10 +252,16 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
       - "{base_port}:8080"
     volumes:
       - ./detections:/output
+      - ./logs:/logs
     networks:
       - meteor-net
     depends_on:
       - {depends_str}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 """
 
 
@@ -275,8 +283,14 @@ def generate_go2rtc_service(settings: dict) -> str:
       - "{webrtc_port}:8555/udp"
     volumes:
       - {config_path}:/config/go2rtc.yaml
+      - ./logs:/logs
     networks:
       - meteor-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 """
 
 
@@ -513,6 +527,9 @@ streamersファイルの形式:
         go2rtc_output = Path(args.go2rtc_config)
         with open(go2rtc_output, 'w', encoding='utf-8') as f:
             f.write(go2rtc_config)
+
+    # logsディレクトリを作成
+    Path("logs").mkdir(exist_ok=True)
 
     # 出力
     with open(args.output, 'w') as f:

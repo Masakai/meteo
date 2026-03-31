@@ -2054,5 +2054,49 @@ def main():
     )
 
 
+def _setup_log_file():
+    """LOG_FILE環境変数が指定されていれば stdout/stderr をファイルにも出力する"""
+    log_path = os.environ.get("LOG_FILE")
+    if not log_path:
+        return
+    try:
+        from logging.handlers import RotatingFileHandler
+
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+        class _TeeStream:
+            """元のストリームとローテーションファイルの両方に書き込む"""
+            def __init__(self, orig, handler):
+                self._orig = orig
+                self._handler = handler
+
+            def write(self, data):
+                self._orig.write(data)
+                if data:
+                    self._handler.stream.write(data)
+                    self._handler.doRollover() if (
+                        self._handler.stream.tell() >= self._handler.maxBytes
+                    ) else None
+
+            def flush(self):
+                self._orig.flush()
+                try:
+                    self._handler.stream.flush()
+                except Exception:
+                    pass
+
+            def fileno(self):
+                return self._orig.fileno()
+
+        handler = RotatingFileHandler(
+            log_path, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        )
+        sys.stdout = _TeeStream(sys.__stdout__, handler)
+        sys.stderr = _TeeStream(sys.__stderr__, handler)
+    except Exception as e:
+        print(f"[WARN] ログファイル設定に失敗: {e}", file=sys.__stderr__)
+
+
 if __name__ == "__main__":
+    _setup_log_file()
     main()
