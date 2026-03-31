@@ -310,7 +310,7 @@ def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
         lines.extend([
             "",
             "ffmpeg:",
-            '  h264: "-c:v libx264 -g 40 -bf 0 -profile:v high -level:v 4.1 -preset:v superfast -tune:v zerolatency -pix_fmt:v yuv420p"',
+            '  h264: "-c:v libx264 -r 20 -g 40 -bf 0 -profile:v high -level:v 4.1 -preset:v superfast -tune:v zerolatency -pix_fmt:v yuv420p -maxrate 2000k -bufsize 2000k"',
         ])
     return "\n".join(lines) + "\n"
 
