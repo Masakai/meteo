@@ -2,7 +2,7 @@
 
 ---
 
-**Version: v3.2.1**
+**Version: v3.3.1**
 
 **Copyright (c) 2026 Masanori Sakai**
 
@@ -24,6 +24,7 @@ Licensed under the MIT License
 ## 目次
 
 - [起動と停止](#起動と停止)
+- [アップデート手順](#アップデート手順)
 - [meteor-docker.sh コマンドリファレンス](#meteor-dockersh-コマンドリファレンス)
 - [ログの監視](#ログの監視)
 - [状態確認](#状態確認)
@@ -186,6 +187,77 @@ docker compose stop
 ```bash
 # コンテナを再起動（設定変更時など）
 ./meteor-docker.sh restart
+```
+
+---
+
+## アップデート手順
+
+コードを更新した後にリモートホストへ反映する標準手順です。
+
+### パターン1: Pythonファイルのみ変更した場合
+
+コンテナイメージに影響しない変更（テンプレート、設定読み込みロジック等）は
+コンテナを再ビルドせず `docker compose restart` で反映できます。
+
+```bash
+# 1. 最新コードを取得
+git pull
+
+# 2. コンテナを再起動（イメージはそのまま）
+./meteor-docker.sh restart
+```
+
+### パターン2: Dockerfileや requirements.txt を変更した場合
+
+パッケージ追加・Dockerfileの変更は完全な再ビルドが必要です。
+
+```bash
+# 1. 最新コードを取得
+git pull
+
+# 2. docker-compose.yml を再生成（streamers が変わった場合のみ）
+python3 generate_compose.py
+
+# 3. 変更対象のサービスを再ビルド（例: dashboard のみ）
+docker compose build --no-cache dashboard
+
+# 全サービスを再ビルドする場合
+./meteor-docker.sh build
+
+# 4. コンテナを再起動
+docker compose up -d
+```
+
+### パターン3: streamers ファイルを変更した場合
+
+カメラの追加・削除・YouTube キー変更などは `generate_compose.py` の再実行が必要です。
+
+```bash
+# 1. streamers を編集
+vim streamers
+
+# 2. docker-compose.yml と go2rtc.yaml を再生成
+python3 generate_compose.py
+
+# 3. コンテナを再起動
+./meteor-docker.sh restart
+```
+
+> **注意**: go2rtc.yaml を変更した場合は go2rtc コンテナも再起動してください。
+> `docker compose restart go2rtc`
+
+### アップデート後の確認
+
+```bash
+# コンテナがすべて Up になっているか確認
+./meteor-docker.sh status
+
+# ダッシュボードのバージョンを確認
+curl -s http://localhost:8080/health | jq .version
+
+# エラーが出ていないか確認
+./meteor-docker.sh logs dashboard | grep -i error
 ```
 
 ---
@@ -437,6 +509,51 @@ Local Volumes   2         2         1.5GB
 ---
 
 ## ログの監視
+
+### ログの永続化（v3.3.1+）
+
+v3.3.1 以降、すべてのコンテナのログはホスト側の `./logs/` ディレクトリにマウントされます。
+コンテナを再ビルド・削除してもログは失われません。
+
+#### 生成されるログファイル
+
+| ファイル | 内容 | ローテーション |
+|---|---|---|
+| `logs/dashboard.log` | ダッシュボードの Python ログ | 10MB × 5世代（Python） |
+| `logs/camera1.log`（camera2, 3 …） | 各カメラコンテナの stdout/stderr | 10MB × 5世代（Python） |
+| `logs/ffmpeg_youtube_3.log`（N はカメラ番号） | YouTube 配信 ffmpeg の出力 | 起動ごとに追記 |
+
+> Docker コンテナ自体のログ（`docker compose logs`）は json-file ドライバで 10MB × 3 ファイルに回転します。
+
+#### ログファイルの確認
+
+```bash
+# ダッシュボードのログをリアルタイムで確認
+tail -f ./logs/dashboard.log
+
+# カメラ1のログを確認
+tail -f ./logs/camera1.log
+
+# YouTube ffmpeg の出力を確認（カメラ3の場合）
+tail -f ./logs/ffmpeg_youtube_3.log
+
+# エラーのみ抽出
+grep -i error ./logs/dashboard.log
+```
+
+#### logs/ ディレクトリの容量管理
+
+各ログは Python の `RotatingFileHandler` によって自動的に回転します。
+最大容量は `(10MB × 5世代) × コンテナ数` 程度です。
+
+不要になった古いローテートファイル（`.log.1`〜`.log.5`）は手動削除できます:
+
+```bash
+# ローテート済みファイルのみ削除（最新の .log は残す）
+rm -f ./logs/*.log.[1-9]
+```
+
+---
 
 ### ログレベルと内容
 
@@ -951,8 +1068,8 @@ df -h
 # バックアップ実行
 ./backup.sh
 
-# ログファイルのローテーション
-docker compose logs --tail=1000 > logs-$(date +%Y%m%d).txt
+# ローテート済みログの掃除（任意）
+rm -f ./logs/*.log.[1-9]
 ```
 
 ### 月次
