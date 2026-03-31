@@ -230,6 +230,18 @@ def create_app() -> Flask:
     def camera_restart(camera_index: int) -> Response:
         return _dispatch(routes.handle_camera_restart, path=f"/camera_restart/{camera_index}")
 
+    @app.post("/youtube_start/<int:camera_index>")
+    def youtube_start(camera_index: int) -> Response:
+        return _dispatch(routes.handle_youtube_start, path=f"/youtube_start/{camera_index}")
+
+    @app.post("/youtube_stop/<int:camera_index>")
+    def youtube_stop(camera_index: int) -> Response:
+        return _dispatch(routes.handle_youtube_stop, path=f"/youtube_stop/{camera_index}")
+
+    @app.get("/youtube_status/<int:camera_index>")
+    def youtube_status(camera_index: int) -> Response:
+        return _dispatch(routes.handle_youtube_status, path=f"/youtube_status/{camera_index}")
+
     @app.get("/camera_snapshot/<int:camera_index>")
     def camera_snapshot(camera_index: int) -> Response:
         query = request.query_string.decode("utf-8")

@@ -22,6 +22,7 @@
 - **RTSPストリームのリアルタイム検出** - ライブカメラストリームから流星を自動検出
 - **Webプレビュー** - ブラウザで検出状況をリアルタイム確認
 - **ダッシュボード** - 複数カメラの検出状況を一画面で表示
+- **YouTube Live配信** - ダッシュボードからワンクリックでカメラ映像をYouTube Liveに配信
 - **Docker対応** - 複数カメラを並列監視可能
 
 ## 天文観測者向けの直感的な目安
@@ -236,16 +237,17 @@ rtsp://user:pass@10.0.1.3/live
 rtsp://user:pass@10.0.1.11/live
 ```
 
-表示名を付けたい場合は `|` 区切りの3項目目に指定できます。
+`|` 区切りでマスク画像、表示名、YouTube配信キーを指定できます。
 
 ```
 rtsp://user:pass@10.0.1.25/live | camera1.jpg | 東側
 rtsp://user:pass@10.0.1.3/live  | camera2.jpg | 南側
-rtsp://user:pass@10.0.1.11/live | | 西側
+rtsp://user:pass@10.0.1.11/live || 西側 | youtube:xxxx-xxxx-xxxx-xxxx
 ```
 
 - 表示名はダッシュボードや単体カメラUIの表示専用です
 - 保存先ディレクトリ、`output/runtime_settings/<camera>.json`、マスク画像名は内部名を使います
+- `youtube:KEY` を指定したカメラはダッシュボードに「YouTube配信」ボタンが表示されます
 
 **昼間画像による自動マスク（任意）**
 
@@ -788,6 +790,7 @@ All rights reserved.
 
 ## 更新履歴
 
+- 2026-03-31: YouTube Live配信機能追加（ダッシュボードからカメラ単位で配信開始/停止）
 - 2024-02-02: --extract-clips / --no-clips オプション追加
 - 2024-02-01: RTSP検出、Webプレビュー、Dockerサポート追加
 - 2024-01-31: MP4動画検出、火球モード、高速化オプション追加

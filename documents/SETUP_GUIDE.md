@@ -126,11 +126,15 @@ http://localhost:8080/
 ### 7-1. streamers ファイルを設定
 
 `streamers` に RTSP URL を1行1カメラで記載します。
+`|` 区切りでマスク画像、表示名、YouTube配信キーも指定可能です。
 
 ```
-rtsp://user:pass@10.0.1.25/live
-rtsp://user:pass@10.0.1.3/live
+rtsp://user:pass@10.0.1.25/live | camera1.jpg | 東カメラ
+rtsp://user:pass@10.0.1.3/live  || 西カメラ
+rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
 ```
+
+YouTube Liveに配信したいカメラは、4番目のフィールドに `youtube:` に続けてストリームキーを記載します。ストリームキーはYouTube Studioのライブ配信設定画面で取得できます。
 
 ### 7-2. docker-compose.yml を生成
 

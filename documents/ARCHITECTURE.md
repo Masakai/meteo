@@ -46,10 +46,12 @@ graph TB
     Dashboard -->|"POST /recording/schedule など"| Detector2
     Dashboard -->|"POST /recording/schedule など"| Detector3
     Dashboard -->|"HTTP GET /go2rtc_asset/*"| Go2RTC
+    Dashboard -->|"POST/DELETE /api/streams"| Go2RTC
     Dashboard -->|"ファイル読み込み・削除"| Storage
     Go2RTC -->|"RTSP受信"| RTSP1
     Go2RTC -->|"RTSP受信"| RTSP2
     Go2RTC -->|"RTSP受信"| RTSP3
+    Go2RTC -->|"RTMP配信"| YouTube["YouTube Live"]
 
     Detector1 -->|"映像取得"| RTSP1
     Detector2 -->|"映像取得"| RTSP2
@@ -473,11 +475,11 @@ sequenceDiagram
 
 - `docker-compose.yml`: コンテナオーケストレーション設定
 - `generate_compose.py`: docker-compose.yml / go2rtc.yaml 生成スクリプト
-- `go2rtc.yaml`: go2rtc WebRTC 候補アドレスとストリーム定義
+- `go2rtc.yaml`: go2rtc WebRTC 候補アドレス・ストリーム定義・YouTube配信設定
 - `astro_utils.py`: 天文計算ユーティリティ (検出時間帯判定)
 - `dashboard_config.py`: カメラ設定・バージョン定義
 - `dashboard_routes.py`: ルートハンドラ（検出監視・カメラ監視を含む）
-- `dashboard_camera_handlers.py`: カメラ操作系ハンドラ（スナップショット・マスク・再起動）
+- `dashboard_camera_handlers.py`: カメラ操作系ハンドラ（スナップショット・マスク・再起動・YouTube配信）
 - `dashboard_templates.py`: HTMLテンプレート生成
 - `CHANGELOG.md`: バージョン履歴
 - `API_REFERENCE.md`: API 仕様の詳細ドキュメント

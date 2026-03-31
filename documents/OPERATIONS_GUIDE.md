@@ -133,6 +133,27 @@ python generate_compose.py --streaming-mode webrtc
 - `go2rtc.yaml` の `webrtc.candidates` は既定でローカル IP を自動検出して設定されます。
 - ブラウザ開発者ツールに `srflx` candidate が見えても、`host` candidate が同時に返っていて画面表示が `RTC` なら正常です。
 
+### YouTube Live配信（v3.3.0+）
+
+`streamers` ファイルでYouTubeストリームキーを設定したカメラは、ダッシュボードのカメラライブ画面に「YouTube配信」ボタンが表示されます。
+
+**配信開始**: 「YouTube配信」ボタンをクリック → 確認ダイアログで「OK」
+**配信停止**: 「配信中 LIVE」ボタンをクリック → 確認ダイアログで「OK」
+
+配信状態は10秒間隔で自動更新されます。go2rtcコンテナを再起動すると配信は停止します。
+
+**ストリームキーの変更手順**:
+
+1. `streamers` ファイルのYouTubeキーを更新
+2. `python3 generate_compose.py --streaming-mode webrtc` で再生成
+3. `./meteor-docker.sh restart` で反映
+
+**トラブルシューティング**:
+
+- YouTube Studioで「配信が始まらない」→ カメラのRTSPがH.264であることを確認
+- 「音声がない」→ go2rtcのffmpegがPCMA→AAC変換を行うので通常は自動対応
+- ボタンが表示されない → `streamers` に `youtube:KEY` が正しく設定されているか確認
+
 ### ダッシュボードからの全カメラ一括設定（/settings）
 
 ダッシュボード上部の「全カメラ設定」から、複数カメラへ同時に設定反映できます。

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 import json
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 
 def parse_camera_index(path: str, camera_count: int) -> int:
@@ -380,3 +380,95 @@ def handle_camera_settings_apply_all(handler, cameras, camera_apply_settings_tar
         ).encode("utf-8")
     )
     return True
+
+
+def _youtube_rtmp_dst(youtube_key: str) -> str:
+    return f"rtmp://a.rtmp.youtube.com/live2/{youtube_key}"
+
+
+def _youtube_json_response(handler, data: dict, status: int = 200) -> bool:
+    handler.send_response(status)
+    handler.send_header("Content-type", "application/json")
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(json.dumps(data).encode("utf-8"))
+    return True
+
+
+def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
+    """YouTube Live配信を開始する"""
+    try:
+        camera_index = parse_index(handler.path, len(cameras))
+    except (ValueError, IndexError):
+        return _youtube_json_response(handler, {"success": False, "error": "invalid camera index"}, 400)
+
+    cam = cameras[camera_index]
+    youtube_key = cam.get("youtube_key", "")
+    if not youtube_key:
+        return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
+
+    stream_name = f"camera{camera_index + 1}_youtube"
+    dst = _youtube_rtmp_dst(youtube_key)
+    api_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
+
+    try:
+        req = request_cls(api_url, method="POST")
+        resp = urlopen_fn(req, timeout=15)
+        resp.read()
+        return _youtube_json_response(handler, {"success": True})
+    except Exception as exc:
+        return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
+
+
+def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
+    """YouTube Live配信を停止する"""
+    try:
+        camera_index = parse_index(handler.path, len(cameras))
+    except (ValueError, IndexError):
+        return _youtube_json_response(handler, {"success": False, "error": "invalid camera index"}, 400)
+
+    cam = cameras[camera_index]
+    youtube_key = cam.get("youtube_key", "")
+    if not youtube_key:
+        return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
+
+    stream_name = f"camera{camera_index + 1}_youtube"
+    dst = _youtube_rtmp_dst(youtube_key)
+    api_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
+
+    try:
+        req = request_cls(api_url, method="DELETE")
+        resp = urlopen_fn(req, timeout=15)
+        resp.read()
+        return _youtube_json_response(handler, {"success": True})
+    except Exception as exc:
+        return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
+
+
+def handle_youtube_status(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
+    """YouTube Live配信の状態を取得する"""
+    try:
+        camera_index = parse_index(handler.path, len(cameras))
+    except (ValueError, IndexError):
+        return _youtube_json_response(handler, {"streaming": False, "error": "invalid camera index"}, 400)
+
+    cam = cameras[camera_index]
+    if not cam.get("youtube_key"):
+        return _youtube_json_response(handler, {"streaming": False})
+
+    stream_name = f"camera{camera_index + 1}_youtube"
+    api_url = f"{go2rtc_api_url}/api/streams"
+
+    try:
+        req = request_cls(api_url)
+        resp = urlopen_fn(req, timeout=5)
+        streams = json.loads(resp.read().decode("utf-8"))
+        stream_info = streams.get(stream_name, {})
+        consumers = stream_info.get("consumers") or []
+        streaming = any(
+            c.get("format_name") == "rtmp" or "rtmp" in (c.get("remote_addr") or "")
+            for c in consumers
+        )
+        return _youtube_json_response(handler, {"streaming": streaming})
+    except Exception:
+        return _youtube_json_response(handler, {"streaming": False})

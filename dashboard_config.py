@@ -4,7 +4,7 @@ Dashboard configuration and environment setup.
 
 import os
 
-VERSION = "3.2.5"
+VERSION = "3.3.0"
 
 # 検出時間の取得用
 try:
@@ -23,15 +23,18 @@ for i in range(1, 10):
         stream_kind = os.environ.get(f"CAMERA{i}_STREAM_KIND", "webrtc").strip().lower() or "webrtc"
         if stream_kind not in ("mjpeg", "webrtc"):
             stream_kind = "webrtc"
-        CAMERAS.append(
-            {
-                "name": name,
-                "url": url,
-                "display_name": display_name,
-                "stream_url": stream_url,
-                "stream_kind": stream_kind,
-            }
-        )
+        cam = {
+            "name": name,
+            "url": url,
+            "display_name": display_name,
+            "stream_url": stream_url,
+            "stream_kind": stream_kind,
+        }
+        youtube_key = os.environ.get(f"CAMERA{i}_YOUTUBE_KEY", "").strip()
+        if youtube_key:
+            cam["youtube_key"] = youtube_key
+            cam["rtsp_url"] = os.environ.get(f"CAMERA{i}_RTSP_URL", "").strip()
+        CAMERAS.append(cam)
 
 # デフォルト設定
 if not CAMERAS:
@@ -40,6 +43,15 @@ if not CAMERAS:
         {"name": "camera2_10.0.1.3", "url": "http://camera2:8080", "stream_url": "http://camera2:8080", "stream_kind": "webrtc"},
         {"name": "camera3_10.0.1.11", "url": "http://camera3:8080", "stream_url": "http://camera3:8080", "stream_kind": "webrtc"},
     ]
+
+# go2rtc API URL (Docker内ではホスト名go2rtcを使用)
+_go2rtc_url = os.environ.get("GO2RTC_API_URL", "http://localhost:1984")
+if os.path.exists("/.dockerenv") and "localhost" in _go2rtc_url:
+    from urllib.parse import urlparse as _urlparse
+    _parsed = _urlparse(_go2rtc_url)
+    if (_parsed.hostname or "") in ("localhost", "127.0.0.1", "::1"):
+        _go2rtc_url = f"{_parsed.scheme}://go2rtc:{_parsed.port or 1984}"
+GO2RTC_API_URL = _go2rtc_url
 
 PORT = int(os.environ.get("PORT", 8080))
 _default_detections = "/output"

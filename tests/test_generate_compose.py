@@ -31,7 +31,7 @@ def test_generate_compose_includes_webrtc_dashboard_and_go2rtc(tmp_path):
     assert "meteor-go2rtc" in compose
     assert "CAMERA1_STREAM_KIND=webrtc" in compose
     assert "CAMERA1_STREAM_URL=http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false" in compose
-    assert "./go2rtc.yaml:/config/go2rtc.yaml:ro" in compose
+    assert "./go2rtc.yaml:/config/go2rtc.yaml" in compose
 
 
 def test_generate_go2rtc_config_uses_camera_sources():

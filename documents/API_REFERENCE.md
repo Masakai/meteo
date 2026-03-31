@@ -27,6 +27,13 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.3.0 - YouTube Live配信
+- **追加**: `POST /youtube_start/{index}` — カメラのYouTube Live配信を開始
+- **追加**: `POST /youtube_stop/{index}` — カメラのYouTube Live配信を停止
+- **追加**: `GET /youtube_status/{index}` — カメラのYouTube Live配信状態を取得
+- **追加**: ダッシュボード環境変数 `CAMERA{i}_YOUTUBE_KEY`、`CAMERA{i}_RTSP_URL`、`GO2RTC_API_URL`
+- **変更**: go2rtc ボリュームマウントを読み書き可能に変更（DELETE APIによる配信停止に必要）
+
 ### v3.2.5 - メンテナンスアップデート
 - **変更**: ダッシュボードのバージョンを 3.2.5 へ更新
 - **変更**: 各種ドキュメント（ARCHITECTURE.md, DETECTOR_COMPONENTS.md）を最新のコード実態に合わせて改版
@@ -60,7 +67,7 @@ Licensed under the MIT License
 ### v1.24.1 - ダッシュボードの Flask アプリ運用整備
 - **新規エンドポイント**: `GET /health`
   - ダッシュボードのヘルスチェックを返却
-  - レスポンス例: `{ "status": "ok", "version": "3.2.0", "camera_count": 3 }`
+  - レスポンス例: `{ "status": "ok", "version": "3.3.0", "camera_count": 3 }`
 - **変更**: `dashboard.py` を Flask のアプリファクトリ構成へ整理し、WSGI 配備やコンテナ運用時でも監視スレッドが初回リクエストで起動するよう改善
 
 ### v1.24.0 - 検出 ID 管理と運用制御の拡張
@@ -142,6 +149,9 @@ Licensed under the MIT License
 | `/camera_recording_schedule/{index}` | POST | カメラ手動録画の予約/即時開始 |
 | `/camera_recording_stop/{index}` | POST | カメラ手動録画の停止 |
 | `/camera_restart/{index}` | POST | カメラ再起動要求 |
+| `/youtube_start/{index}` | POST | YouTube Live配信を開始 |
+| `/youtube_stop/{index}` | POST | YouTube Live配信を停止 |
+| `/youtube_status/{index}` | GET | YouTube Live配信状態を取得 |
 | `/camera_stats/{index}` | GET | カメラ統計情報取得 |
 | `/image/{camera}/{filename}` | GET | 画像ファイル取得 |
 | `/detection/{camera}/{id}` | DELETE | 検出結果削除 |
@@ -165,7 +175,7 @@ Licensed under the MIT License
 ```json
 {
   "status": "ok",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "camera_count": 3
 }
 ```
@@ -658,6 +668,83 @@ curl -X POST "http://localhost:8080/camera_recording_stop/0" | jq
 **使用例**:
 ```bash
 curl -X POST "http://localhost:8080/camera_restart/1" | jq
+```
+
+---
+
+### POST /youtube_start/{index}
+
+**説明**: 指定カメラのYouTube Live配信を開始する。go2rtc APIを介してRTMP出力を開始。
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `index` | integer | カメラインデックス（0始まり） | `2` |
+
+**前提条件**: 対象カメラに `CAMERA{i}_YOUTUBE_KEY` が設定されていること
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK / 400 Bad Request / 502 Bad Gateway
+
+```json
+{"success": true}
+```
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/youtube_start/2" | jq
+```
+
+---
+
+### POST /youtube_stop/{index}
+
+**説明**: 指定カメラのYouTube Live配信を停止する。go2rtc APIを介してRTMP出力を削除。
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `index` | integer | カメラインデックス（0始まり） | `2` |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK / 400 Bad Request / 502 Bad Gateway
+
+```json
+{"success": true}
+```
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/youtube_stop/2" | jq
+```
+
+---
+
+### GET /youtube_status/{index}
+
+**説明**: 指定カメラのYouTube Live配信状態を取得する。go2rtc APIからRTMPコンシューマの有無を確認。
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `index` | integer | カメラインデックス（0始まり） | `2` |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+```json
+{"streaming": true}
+```
+
+**使用例**:
+```bash
+curl "http://localhost:8080/youtube_status/2" | jq
 ```
 
 ---

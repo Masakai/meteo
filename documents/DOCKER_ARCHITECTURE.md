@@ -313,7 +313,7 @@ graph TB
 | **コンテナ名** | `meteor-go2rtc` |
 | **ポートマッピング** | `1984:1984`, `8555:8555/tcp`, `8555:8555/udp` |
 | **再起動ポリシー** | `unless-stopped` |
-| **ボリューム** | `./go2rtc.yaml:/config/go2rtc.yaml:ro` |
+| **ボリューム** | `./go2rtc.yaml:/config/go2rtc.yaml` |
 | **ネットワーク** | `meteor-net` (bridge) |
 
 #### go2rtc.yaml の役割
@@ -333,11 +333,20 @@ streams:
     - rtsp://...
   camera3:
     - rtsp://...
+  camera3_youtube:
+    - "ffmpeg:rtsp://...#video=copy#audio=aac"
+
+publish:
+  camera3_youtube:
+    - rtmp://a.rtmp.youtube.com/live2/xxxx-xxxx-xxxx-xxxx
 ```
 
 - `api.origin` はダッシュボードからの埋め込みアクセスを許可します。
 - `webrtc.candidates` はブラウザが接続するホスト側候補アドレスです。
 - `streams.*` は各カメラの RTSP ソース定義です。
+- `streams.camera{N}_youtube` は YouTube 配信用の ffmpeg ソース（映像コピー＋AAC音声変換）です。`streamers` ファイルで `youtube:KEY` を指定したカメラに自動生成されます。
+- `publish` セクションは配信先の RTMP URL を定義します。ダッシュボードの API 呼び出しで配信が開始されます。
+- ボリュームは読み書き可能としています（DELETE API による配信停止に必要）。
 
 ---
 
@@ -454,7 +463,7 @@ graph TB
 
 | コンテナ | パス | モード | 操作 |
 |---------|------|--------|------|
-| go2rtc | `/config/go2rtc.yaml` | ro | WebRTC candidate とストリーム定義の読み込み |
+| go2rtc | `/config/go2rtc.yaml` | rw | WebRTC candidate・ストリーム定義の読み込み、YouTube配信停止時の DELETE API 用に書き込み可能 |
 
 ---
 

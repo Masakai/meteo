@@ -1,6 +1,6 @@
 # 設定ガイド (Configuration Guide)
 
-**バージョン: v3.2.5**
+**バージョン: v3.3.0**
 
 ---
 
@@ -82,6 +82,9 @@ docker-compose.ymlで設定される環境変数:
 | `CAMERA1_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
 | `CAMERA1_STREAM_URL` | `CAMERA1_URL` | ライブ表示用URL (`webrtc` 時は `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse...` など。埋め込み時はダッシュボード表示中のホスト名を優先して接続) |
 | `DETECTIONS_DIR` | `/output` | 検出結果ディレクトリ |
+| `CAMERA1_YOUTUBE_KEY` | - | カメラ1のYouTubeストリームキー（設定時のみYouTube配信ボタン表示） |
+| `CAMERA1_RTSP_URL` | - | カメラ1のRTSP URL（YouTube配信用。ffmpegでAAC変換に使用） |
+| `GO2RTC_API_URL` | `http://localhost:1984` | go2rtc APIのURL（Docker内では自動的に `http://go2rtc:1984` に変換） |
 | `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |
 | `CAMERA_TIMEOUT` | `5` | カメラ応答タイムアウト（秒） |
 
@@ -192,16 +195,31 @@ environment:
 
 ## マスク設定（固定カメラ向け）
 
+### streamers ファイルの書式
+
+`streamers` ファイルでは `|` 区切りで最大4フィールドを指定できます。
+
+```
+RTSP URL | マスク画像 | 表示名 | youtube:STREAM_KEY
+```
+
+| フィールド | 必須 | 説明 |
+|---|---|---|
+| RTSP URL | ○ | カメラのRTSP接続URL |
+| マスク画像 | - | 除外マスク生成用の昼間画像パス |
+| 表示名 | - | ダッシュボードでのカメラ表示名 |
+| youtube:KEY | - | YouTube Liveストリームキー（`youtube:`プレフィックス必須） |
+
+```
+rtsp://user:pass@10.0.1.25/live | camera1.jpg | 東カメラ
+rtsp://user:pass@10.0.1.3/live  | camera2.jpg | 西カメラ
+rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
+```
+
 ### streamers に昼間画像を指定
 
 `streamers` で `RTSP URL | 昼間画像` の形式にすると、`generate_compose.py` 実行時に
 除外マスクを自動生成してコンテナに同梱します。
-
-```
-rtsp://user:pass@10.0.1.25/live | camera1.jpg
-rtsp://user:pass@10.0.1.3/live  | camera2.jpg
-rtsp://user:pass@10.0.1.11/live
-```
 
 - 画像パスは `streamers` と同じフォルダ基準（相対パス可）
 - マスク生成には OpenCV が必要
@@ -1085,6 +1103,32 @@ python generate_compose.py --buffer 10
 ---
 
 ## バージョン別新機能
+
+### v3.3.0 - YouTube Live配信
+
+**新機能**:
+- ダッシュボードからカメラ単位でYouTube Liveへの配信開始/停止が可能
+- `streamers` ファイルの4番目のフィールドに `youtube:STREAM_KEY` を指定
+- `generate_compose.py` が go2rtc.yaml に ffmpeg ソース（AAC音声変換）+ publish セクションを自動生成
+- 配信中は「配信中 LIVE」ボタンがパルスアニメーションで表示
+- 10秒間隔で go2rtc から実際の配信状態を自動ポーリング
+
+**設定例**:
+```
+# streamers ファイル
+rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
+```
+
+**新規環境変数**:
+- `CAMERA{i}_YOUTUBE_KEY` — YouTubeストリームキー
+- `CAMERA{i}_RTSP_URL` — RTSP URL（ffmpeg AAC変換用）
+- `GO2RTC_API_URL` — go2rtc APIのURL（通常は自動設定）
+
+**注意事項**:
+- YouTubeはH.264映像 + AAC音声が必須。go2rtc内のffmpegが自動的にAAC変換を行う
+- go2rtc.yaml のボリュームマウントは読み書き可能に変更（DELETE APIによる配信停止に必要）
+
+---
 
 ### v3.2.1 - 手動録画一覧表示改善
 

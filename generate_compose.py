@@ -97,7 +97,13 @@ def parse_streamers_line(line: str) -> dict:
     url = parts[0] if len(parts) > 0 else line.strip()
     mask_path = parts[1] if len(parts) > 1 else ""
     display_name = parts[2] if len(parts) > 2 else ""
-    return {"url": url, "mask_path": mask_path, "display_name": display_name}
+    youtube_key = ""
+    if len(parts) > 3:
+        extra = parts[3]
+        if extra.startswith("youtube:"):
+            youtube_key = extra[len("youtube:"):]
+    return {"url": url, "mask_path": mask_path, "display_name": display_name,
+            "youtube_key": youtube_key}
 
 
 def expand_mask_path(mask_template: str, index: int, rtsp_info: dict, base_dir: Path) -> str:
@@ -214,6 +220,9 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
         else:
             camera_envs.append(f"      - CAMERA{i}_STREAM_KIND=mjpeg")
             camera_envs.append(f"      - CAMERA{i}_STREAM_URL=http://localhost:{base_port + i}")
+        if cam.get("youtube_key"):
+            camera_envs.append(f"      - CAMERA{i}_YOUTUBE_KEY={cam['youtube_key']}")
+            camera_envs.append(f"      - CAMERA{i}_RTSP_URL={cam['url']}")
         depends.append(f"camera{i}")
     if streaming_mode == "webrtc":
         depends.append("go2rtc")
@@ -265,7 +274,7 @@ def generate_go2rtc_service(settings: dict) -> str:
       - "{webrtc_port}:8555/tcp"
       - "{webrtc_port}:8555/udp"
     volumes:
-      - {config_path}:/config/go2rtc.yaml:ro
+      - {config_path}:/config/go2rtc.yaml
     networks:
       - meteor-net
 """
@@ -291,9 +300,19 @@ def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
             ]
         )
     lines.extend(["", "streams:"])
+    youtube_cameras = []
     for i, cam in enumerate(cameras, 1):
         lines.append(f"  camera{i}:")
         lines.append(f"    - {cam['url']}")
+        if cam.get("youtube_key"):
+            lines.append(f"  camera{i}_youtube:")
+            lines.append(f'    - "ffmpeg:{cam["url"]}#video=copy#audio=aac"')
+            youtube_cameras.append((i, cam["youtube_key"]))
+    if youtube_cameras:
+        lines.extend(["", "publish:"])
+        for i, key in youtube_cameras:
+            lines.append(f"  camera{i}_youtube:")
+            lines.append(f"    - rtmp://a.rtmp.youtube.com/live2/{key}")
     return "\n".join(lines) + "\n"
 
 
@@ -317,6 +336,8 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
             # 表示名を保持
             if parsed["display_name"]:
                 info["display_name"] = parsed["display_name"]
+            if parsed["youtube_key"]:
+                info["youtube_key"] = parsed["youtube_key"]
             cameras.append(info)
             web_port = base_port + i  # 8081, 8082, 8083, ...
             mask_image = ""
@@ -398,14 +419,15 @@ def main():
 streamersファイルの形式:
   1行に1つのRTSP URLを記載
   # で始まる行はコメント
-  | で区切ってマスク画像パスと表示名を指定可能
-    形式: URL|マスク画像|表示名
+  | で区切ってマスク画像パス、表示名、YouTubeキーを指定可能
+    形式: URL|マスク画像|表示名|youtube:STREAM_KEY
 
 例:
   rtsp://user:pass@192.168.1.100/live
   rtsp://user:pass@192.168.1.101/live|mask1.png|玄関カメラ
   # これはコメント
   rtsp://192.168.1.102:554/stream||駐車場
+  rtsp://192.168.1.103:554/stream||屋上|youtube:xxxx-xxxx-xxxx-xxxx
         """
     )
 

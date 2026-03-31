@@ -7,6 +7,17 @@ from pathlib import Path
 from dashboard_templates_settings import render_settings_html
 
 
+def _sanitize_cameras_for_js(cameras):
+    """ブラウザに送るカメラ情報からsecret(youtube_key等)を除去する"""
+    result = []
+    for cam in cameras:
+        safe = {k: v for k, v in cam.items() if k not in ("youtube_key", "rtsp_url")}
+        if cam.get("youtube_key"):
+            safe["has_youtube_key"] = True
+        result.append(safe)
+    return result
+
+
 def render_dashboard_html(cameras, version, server_start_time, page_mode="detections"):
     fps_warning_ratio = 0.8
     is_camera_page = page_mode == "cameras"
@@ -50,6 +61,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
                         <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
                         <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
+                        {'<button class="youtube-btn" id="youtube-btn' + str(i) + '" onclick="toggleYouTube(' + str(i) + ')">YouTube配信</button>' if cam.get("youtube_key") else ''}
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="recording-panel" id="recording-panel{i}" hidden>
@@ -514,6 +526,32 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         .restart-btn:disabled {{
             opacity: 0.6;
             cursor: wait;
+        }}
+        .youtube-btn {{
+            background: #3d1212;
+            border: 1px solid #ff4444;
+            color: #ff9d9d;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }}
+        .youtube-btn:hover {{
+            background: #ff4444;
+            color: #fff;
+        }}
+        .youtube-btn.active {{
+            background: #ff4444;
+            color: #fff;
+            animation: youtube-pulse 2s infinite;
+        }}
+        .youtube-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        @keyframes youtube-pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0.7; }}
         }}
         .mask-preview-btn {{
             background: #1f324f;
@@ -1133,7 +1171,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     </div>
 
     <script>
-        const cameras = {json.dumps(cameras)};
+        const cameras = {json.dumps(_sanitize_cameras_for_js(cameras))};
         const cameraPageEnabled = {str(is_camera_page).lower()};
         const detectionsPageEnabled = {str(is_detections_page).lower()};
         const serverStartTime = {int(server_start_time * 1000)};
@@ -2222,6 +2260,60 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         btn.disabled = false;
                     }}, 3000);
                 }});
+        }}
+
+        function toggleYouTube(i) {{
+            const btn = document.getElementById('youtube-btn' + i);
+            if (!btn) return;
+            const cam = cameras[i];
+            if (!cam) return;
+            const isActive = btn.classList.contains('active');
+            const action = isActive ? 'stop' : 'start';
+            const displayName = cam.display_name || cam.name;
+            const msg = isActive
+                ? `YouTube配信を停止しますか?\n${{displayName}}`
+                : `YouTube配信を開始しますか?\n${{displayName}}`;
+            if (!confirm(msg)) return;
+            btn.disabled = true;
+            btn.textContent = isActive ? '停止中...' : '開始中...';
+            fetch('/youtube_' + action + '/' + i, {{ method: 'POST' }})
+                .then(r => r.json())
+                .then(data => {{
+                    if (data.success) {{
+                        btn.classList.toggle('active');
+                        btn.textContent = isActive ? 'YouTube配信' : '配信中 LIVE';
+                    }} else {{
+                        btn.textContent = '失敗';
+                    }}
+                }})
+                .catch(() => {{ btn.textContent = '失敗'; }})
+                .finally(() => {{
+                    setTimeout(() => {{ btn.disabled = false; }}, 1500);
+                }});
+        }}
+
+        function pollYouTubeStatus() {{
+            cameras.forEach((cam, i) => {{
+                if (!cam.has_youtube_key) return;
+                fetch('/youtube_status/' + i)
+                    .then(r => r.json())
+                    .then(data => {{
+                        const btn = document.getElementById('youtube-btn' + i);
+                        if (!btn || btn.disabled) return;
+                        if (data.streaming) {{
+                            btn.classList.add('active');
+                            btn.textContent = '配信中 LIVE';
+                        }} else {{
+                            btn.classList.remove('active');
+                            btn.textContent = 'YouTube配信';
+                        }}
+                    }})
+                    .catch(() => {{}});
+            }});
+        }}
+        if (cameras.some(c => c.has_youtube_key)) {{
+            setInterval(pollYouTubeStatus, 10000);
+            pollYouTubeStatus();
         }}
 
         function setMaskOverlay(i, visible) {{

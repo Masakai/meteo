@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError
 
 import dashboard_camera_handlers as camera_handlers
-from dashboard_config import CAMERAS, DETECTIONS_DIR, VERSION, get_detection_window
+from dashboard_config import CAMERAS, DETECTIONS_DIR, GO2RTC_API_URL, VERSION, get_detection_window
 from dashboard_templates import render_dashboard_html, render_settings_html
 
 logger = logging.getLogger(__name__)
@@ -1406,3 +1406,21 @@ def handle_bulk_delete_non_meteor(handler):
         }
         handler.wfile.write(json.dumps(response, ensure_ascii=False).encode("utf-8"))
         return True
+
+
+def handle_youtube_start(handler):
+    return camera_handlers.handle_youtube_start(
+        handler, CAMERAS, GO2RTC_API_URL, _parse_camera_index, Request, urlopen,
+    )
+
+
+def handle_youtube_stop(handler):
+    return camera_handlers.handle_youtube_stop(
+        handler, CAMERAS, GO2RTC_API_URL, _parse_camera_index, Request, urlopen,
+    )
+
+
+def handle_youtube_status(handler):
+    return camera_handlers.handle_youtube_status(
+        handler, CAMERAS, GO2RTC_API_URL, _parse_camera_index, Request, urlopen,
+    )

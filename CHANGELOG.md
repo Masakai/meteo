@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-03-31
+### Added
+- ダッシュボードからカメラ単位で YouTube Live 配信の開始/停止が可能に。
+- `streamers` ファイルの4番目のフィールドに `youtube:STREAM_KEY` を指定すると、ダッシュボードに「YouTube配信」ボタンを表示。
+- `generate_compose.py` が go2rtc.yaml に ffmpeg ソース（映像コピー＋AAC音声変換）と `publish` セクションを自動生成。
+- ダッシュボード API に `POST /youtube_start/{index}`、`POST /youtube_stop/{index}`、`GET /youtube_status/{index}` を追加。
+- ダッシュボード環境変数 `CAMERA{i}_YOUTUBE_KEY`、`CAMERA{i}_RTSP_URL`、`GO2RTC_API_URL` を追加。
+- 配信中は「配信中 LIVE」ボタンがパルスアニメーションで表示され、10秒間隔で go2rtc から実際の配信状態を自動ポーリング。
+
+### Changed
+- go2rtc ボリュームマウントを読み書き可能に変更（DELETE API による配信停止に必要）。
+
 ## [3.2.5] - 2026-03-22
 ### Fixed
 - ダッシュボードのフッタにあるバージョンリンクから `CHANGELOG.md` を開けない問題を修正し、`CHANGELOG.md` をダッシュボードコンテナへ同梱。
@@ -560,7 +572,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - 未使用の constellation_drawer.py と constellation_drawer_astrometry.py を削除
 
-[Unreleased]: https://github.com/Masakai/meteo/compare/v3.2.5...HEAD
+[Unreleased]: https://github.com/Masakai/meteo/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/Masakai/meteo/compare/v3.2.5...v3.3.0
 [3.2.5]: https://github.com/Masakai/meteo/compare/v3.2.4...v3.2.5
 [3.2.4]: https://github.com/Masakai/meteo/compare/v3.2.3...v3.2.4
 [3.2.3]: https://github.com/Masakai/meteo/compare/v3.2.2...v3.2.3
