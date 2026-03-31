@@ -314,10 +314,6 @@ def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
             "ffmpeg:",
             '  h264: "-c:v libx264 -g 40 -bf 0 -profile:v high -level:v 4.1 -preset:v superfast -tune:v zerolatency -pix_fmt:v yuv420p"',
         ])
-        lines.extend(["", "publish:"])
-        for i, key in youtube_cameras:
-            lines.append(f"  camera{i}_youtube:")
-            lines.append(f"    - rtmp://a.rtmp.youtube.com/live2/{key}")
     return "\n".join(lines) + "\n"
 
 
