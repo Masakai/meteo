@@ -2262,6 +2262,28 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 }});
         }}
 
+        let _youtubePollingTimer = null;
+
+        function _isAnyYoutubeActive() {{
+            return cameras.some((cam, i) => {{
+                if (!cam.has_youtube_key) return false;
+                const btn = document.getElementById('youtube-btn' + i);
+                return btn && btn.classList.contains('active');
+            }});
+        }}
+
+        function _startYoutubePolling() {{
+            if (_youtubePollingTimer) return;
+            _youtubePollingTimer = setInterval(pollYouTubeStatus, 10000);
+        }}
+
+        function _stopYoutubePolling() {{
+            if (_youtubePollingTimer) {{
+                clearInterval(_youtubePollingTimer);
+                _youtubePollingTimer = null;
+            }}
+        }}
+
         function toggleYouTube(i) {{
             const btn = document.getElementById('youtube-btn' + i);
             if (!btn) return;
@@ -2282,6 +2304,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     if (data.success) {{
                         btn.classList.toggle('active');
                         btn.textContent = isActive ? 'YouTube配信' : '配信中 LIVE';
+                        if (!isActive) {{
+                            _startYoutubePolling();
+                        }} else if (!_isAnyYoutubeActive()) {{
+                            _stopYoutubePolling();
+                        }}
                     }} else {{
                         btn.textContent = '失敗';
                     }}
@@ -2295,10 +2322,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         function pollYouTubeStatus() {{
             cameras.forEach((cam, i) => {{
                 if (!cam.has_youtube_key) return;
+                const btn = document.getElementById('youtube-btn' + i);
+                if (!btn || !btn.classList.contains('active')) return;
                 fetch('/youtube_status/' + i)
                     .then(r => r.json())
                     .then(data => {{
-                        const btn = document.getElementById('youtube-btn' + i);
                         if (!btn || btn.disabled) return;
                         if (data.streaming) {{
                             btn.classList.add('active');
@@ -2306,14 +2334,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         }} else {{
                             btn.classList.remove('active');
                             btn.textContent = 'YouTube配信';
+                            if (!_isAnyYoutubeActive()) _stopYoutubePolling();
                         }}
                     }})
                     .catch(() => {{}});
             }});
-        }}
-        if (cameras.some(c => c.has_youtube_key)) {{
-            setInterval(pollYouTubeStatus, 10000);
-            pollYouTubeStatus();
         }}
 
         function setMaskOverlay(i, visible) {{
