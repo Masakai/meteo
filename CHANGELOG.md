@@ -7,17 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-04-01
+### Fixed
+- YouTube Live 配信の開始/停止が正しく動作しない問題を修正。
+  - go2rtc の ffmpeg 機能はストリーム削除後もプロセスが残留するバグがあったため、
+    dashboard コンテナ内で ffmpeg サブプロセスを直接管理する方式に変更。
+  - 停止時は `terminate()` → `kill()` で確実に RTMP 接続を切断。
+  - 開始時は `-re` フラグでリアルタイム読み込みを強制し、「リアルタイムより高速」送信警告を解消。
+  - `-r 20 -maxrate 2000k -bufsize 2000k` による CFR 変換と CBR 制御を追加。
+  - 停止後に再開始すると失敗する問題を修正。
+- go2rtc.yaml から `publish` セクションおよび `camera{N}_youtube` ストリームを削除（go2rtc 自動配信との競合解消）。
+
+### Changed
+- YouTube 配信アーキテクチャを変更: go2rtc の `publish` セクション → dashboard コンテナ内 ffmpeg サブプロセスによる直接 RTMP 送信。
+- `Dockerfile.dashboard` に ffmpeg を追加。
+- go2rtc の役割をカメラ RTSP 中継と WebRTC 配信のみに限定。
+
 ## [3.3.0] - 2026-03-31
 ### Added
 - ダッシュボードからカメラ単位で YouTube Live 配信の開始/停止が可能に。
 - `streamers` ファイルの4番目のフィールドに `youtube:STREAM_KEY` を指定すると、ダッシュボードに「YouTube配信」ボタンを表示。
-- `generate_compose.py` が go2rtc.yaml に ffmpeg ソース（映像コピー＋AAC音声変換）と `publish` セクションを自動生成。
 - ダッシュボード API に `POST /youtube_start/{index}`、`POST /youtube_stop/{index}`、`GET /youtube_status/{index}` を追加。
 - ダッシュボード環境変数 `CAMERA{i}_YOUTUBE_KEY`、`CAMERA{i}_RTSP_URL`、`GO2RTC_API_URL` を追加。
-- 配信中は「配信中 LIVE」ボタンがパルスアニメーションで表示され、10秒間隔で go2rtc から実際の配信状態を自動ポーリング。
-
-### Changed
-- go2rtc ボリュームマウントを読み書き可能に変更（DELETE API による配信停止に必要）。
+- 配信中は「配信中 LIVE」ボタンがパルスアニメーションで表示され、10秒間隔で配信状態を自動ポーリング。
 
 ## [3.2.5] - 2026-03-22
 ### Fixed
