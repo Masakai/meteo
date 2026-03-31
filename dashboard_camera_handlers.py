@@ -5,10 +5,14 @@ from __future__ import annotations
 from datetime import datetime
 import json
 import logging
+import subprocess
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlparse
 
 logger = logging.getLogger(__name__)
+
+# YouTube配信中のffmpegサブプロセス {camera_index: subprocess.Popen}
+_youtube_processes: dict[int, subprocess.Popen] = {}
 
 
 def parse_camera_index(path: str, camera_count: int) -> int:
@@ -399,7 +403,7 @@ def _youtube_json_response(handler, data: dict, status: int = 200) -> bool:
 
 
 def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
-    """YouTube Live配信を開始する"""
+    """YouTube Live配信を開始する（ffmpegサブプロセスで直接RTMP送信）"""
     try:
         camera_index = parse_index(handler.path)
     except (ValueError, IndexError):
@@ -410,28 +414,43 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
     if not youtube_key:
         return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
 
-    stream_name = f"camera{camera_index + 1}_youtube"
-    internal_src = f"ffmpeg:rtsp://127.0.0.1:8554/camera{camera_index + 1}#video=h264#audio=aac"
-    dst = _youtube_rtmp_dst(youtube_key)
+    # 既存プロセスがあれば先に停止
+    _stop_youtube_process(camera_index)
 
+    rtsp_src = f"rtsp://go2rtc:8554/camera{camera_index + 1}"
+    rtmp_dst = _youtube_rtmp_dst(youtube_key)
+    cmd = [
+        "ffmpeg", "-re",
+        "-rtsp_transport", "tcp",
+        "-i", rtsp_src,
+        "-c:v", "libx264", "-r", "20", "-g", "40", "-bf", "0",
+        "-profile:v", "high", "-level:v", "4.1",
+        "-preset", "superfast", "-tune", "zerolatency",
+        "-pix_fmt", "yuv420p", "-maxrate", "2000k", "-bufsize", "2000k",
+        "-c:a", "aac", "-ar", "44100", "-b:a", "128k",
+        "-f", "flv", rtmp_dst,
+    ]
     try:
-        # Step 1: ストリームをランタイムに登録（停止後に削除されている場合の復元）
-        put_url = f"{go2rtc_api_url}/api/streams?name={quote(stream_name, safe='')}&src={quote(internal_src, safe='')}"
-        req = request_cls(put_url, method="PUT")
-        urlopen_fn(req, timeout=10).read()
-
-        # Step 2: RTMPコンシューマを追加して配信開始
-        post_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
-        req = request_cls(post_url, method="POST")
-        urlopen_fn(req, timeout=15).read()
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _youtube_processes[camera_index] = proc
+        logger.info("youtube_start camera%d pid=%d", camera_index + 1, proc.pid)
         return _youtube_json_response(handler, {"success": True})
-    except HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        logger.error("youtube_start go2rtc HTTP %s: %s", exc.code, body)
-        return _youtube_json_response(handler, {"success": False, "error": f"go2rtc {exc.code}: {body}"}, 502)
     except Exception as exc:
         logger.error("youtube_start error: %s", exc)
         return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
+
+
+def _stop_youtube_process(camera_index: int) -> None:
+    """ffmpegサブプロセスを停止する"""
+    proc = _youtube_processes.pop(camera_index, None)
+    if proc is None:
+        return
+    try:
+        proc.terminate()
+        proc.wait(timeout=5)
+        logger.info("youtube_stop camera%d pid=%d terminated", camera_index + 1, proc.pid)
+    except Exception:
+        proc.kill()
 
 
 def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
@@ -442,20 +461,11 @@ def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_c
         return _youtube_json_response(handler, {"success": False, "error": "invalid camera index"}, 400)
 
     cam = cameras[camera_index]
-    youtube_key = cam.get("youtube_key", "")
-    if not youtube_key:
+    if not cam.get("youtube_key"):
         return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
 
-    stream_name = f"camera{camera_index + 1}_youtube"
-    dst = _youtube_rtmp_dst(youtube_key)
-    api_url = f"{go2rtc_api_url}/api/streams?src={quote(stream_name, safe='')}&dst={quote(dst, safe='')}"
-
-    try:
-        req = request_cls(api_url, method="DELETE")
-        urlopen_fn(req, timeout=15).read()
-        return _youtube_json_response(handler, {"success": True})
-    except Exception as exc:
-        return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
+    _stop_youtube_process(camera_index)
+    return _youtube_json_response(handler, {"success": True})
 
 
 def handle_youtube_status(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
@@ -469,19 +479,6 @@ def handle_youtube_status(handler, cameras, go2rtc_api_url, parse_index, request
     if not cam.get("youtube_key"):
         return _youtube_json_response(handler, {"streaming": False})
 
-    stream_name = f"camera{camera_index + 1}_youtube"
-    api_url = f"{go2rtc_api_url}/api/streams"
-
-    try:
-        req = request_cls(api_url)
-        resp = urlopen_fn(req, timeout=5)
-        streams = json.loads(resp.read().decode("utf-8"))
-        stream_info = streams.get(stream_name, {})
-        consumers = stream_info.get("consumers") or []
-        streaming = any(
-            c.get("format_name") == "rtmp" or "rtmp" in (c.get("remote_addr") or "")
-            for c in consumers
-        )
-        return _youtube_json_response(handler, {"streaming": streaming})
-    except Exception:
-        return _youtube_json_response(handler, {"streaming": False})
+    proc = _youtube_processes.get(camera_index)
+    streaming = proc is not None and proc.poll() is None
+    return _youtube_json_response(handler, {"streaming": streaming})
