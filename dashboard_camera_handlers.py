@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
+import logging
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlparse
+
+logger = logging.getLogger(__name__)
 
 
 def parse_camera_index(path: str, camera_count: int) -> int:
@@ -416,7 +419,12 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
         resp = urlopen_fn(req, timeout=15)
         resp.read()
         return _youtube_json_response(handler, {"success": True})
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        logger.error("youtube_start go2rtc HTTP %s: %s  url=%s", exc.code, body, api_url)
+        return _youtube_json_response(handler, {"success": False, "error": f"go2rtc {exc.code}: {body}"}, 502)
     except Exception as exc:
+        logger.error("youtube_start error: %s  url=%s", exc, api_url)
         return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
 
 
