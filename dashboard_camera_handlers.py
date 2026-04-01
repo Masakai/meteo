@@ -429,8 +429,8 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
         "-profile:v", "high", "-level:v", "4.1",
         "-preset", "superfast", "-tune", "zerolatency",
         "-pix_fmt", "yuv420p", "-maxrate", "2000k", "-bufsize", "2000k",
-        "-af", "aresample=async=1",
-        "-c:a", "aac", "-ar", "44100", "-b:a", "128k",
+        "-af", "aresample=async=1,volume=0",
+        "-c:a", "aac", "-ar", "44100", "-b:a", "32k",
         "-f", "flv", rtmp_dst,
     ]
     try:
