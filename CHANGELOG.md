@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-04-02
+### Added
+- 多地点流星三角測量システムを追加（`triangulation/`, `triangulation_server.py`, `station_reporter.py`）。
+  - 複数の観測拠点から同一流星を同時検出し、スキューライン最近接点アルゴリズムで3D軌道（高度・緯度経度・速度）を算出。
+  - ピンホールカメラモデルによるピクセル座標 → 方位角・仰角変換（`triangulation/pixel_to_sky.py`）。
+  - WGS84 / ECEF / ENU 座標変換（`triangulation/geo_utils.py`）。
+  - 時刻±5秒の時間窓 + 角度相関によるイベントマッチング（`triangulation/event_matcher.py`）。
+  - Flask 中央サーバ（SQLite 永続化、REST API）と Deck.gl + MapLibre GL による3Dマップ UI。
+  - 高度スケール調整（1×〜100×）、観測拠点 FOV 可視化、地表面投影線、信頼度フィルター。
+  - `station.json` が存在する場合に `docker-compose.yml` へ `station-reporter` サイドカーを自動追加（`generate_compose.py`）。
+  - デモ用スクリプト `demo_triangulation.py`（合成データ3拠点・5流星、ポート8090）。
+  - ユニットテスト40件（`tests/test_geo_utils.py`, `test_pixel_to_sky.py`, `test_triangulator.py`, `test_event_matcher.py`）。
+  - アーキテクチャ・アルゴリズム・デプロイ手順を Mermaid 図付きで解説（`documents/TRIANGULATION.md`）。
+
 ## [3.3.1] - 2026-04-01
 ### Fixed
 - YouTube Live 配信の開始/停止が正しく動作しない問題を修正。

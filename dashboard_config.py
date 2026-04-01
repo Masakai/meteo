@@ -4,7 +4,7 @@ Dashboard configuration and environment setup.
 
 import os
 
-VERSION = "3.3.1"
+VERSION = "3.4.0"
 
 # 検出時間の取得用
 try:
