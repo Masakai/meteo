@@ -2074,9 +2074,9 @@ def _setup_log_file():
                 self._orig.write(data)
                 if data:
                     self._handler.stream.write(data)
-                    self._handler.doRollover() if (
-                        self._handler.stream.tell() >= self._handler.maxBytes
-                    ) else None
+                    self._handler.stream.flush()
+                    if self._handler.stream.tell() >= self._handler.maxBytes:
+                        self._handler.doRollover()
 
             def flush(self):
                 self._orig.flush()

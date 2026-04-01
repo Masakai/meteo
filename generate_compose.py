@@ -247,6 +247,7 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
       - LONGITUDE={settings.get('longitude', '138.7274')}
       - TIMEZONE=Asia/Tokyo
       - ENABLE_TIME_WINDOW={settings.get('enable_time_window', 'true')}
+      - LOG_FILE=/logs/dashboard.log
 {camera_env_str}
     ports:
       - "{base_port}:8080"
