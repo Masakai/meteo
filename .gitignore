@@ -42,3 +42,11 @@ streamers
 # Logs (persisted to host, but not committed)
 /logs/*.log
 /logs/*.log.*
+go2rtc.yaml
+
+# 三角測量デモ用一時ファイル
+demo_stations/
+demo_triangulation.db
+
+# 外部ツール
+.junie/

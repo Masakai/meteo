@@ -295,6 +295,34 @@ def generate_go2rtc_service(settings: dict) -> str:
 """
 
 
+def generate_station_reporter(station_config_path: str) -> str:
+    """三角測量用 station_reporter サイドカーサービスを生成"""
+    return f"""
+  # 三角測量レポーター（検出結果を中央サーバへ送信）
+  station-reporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.reporter
+    container_name: meteor-station-reporter
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Tokyo
+      - STATION_CONFIG=/app/station.json
+      - DETECTIONS_DIR=/output
+      - POLL_INTERVAL=5
+    volumes:
+      - ./detections:/output:ro
+      - ./{station_config_path}:/app/station.json:ro
+    networks:
+      - meteor-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+"""
+
+
 def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
     """go2rtc設定ファイルを生成"""
 
@@ -407,6 +435,11 @@ services:"""
     # カメラサービス
     compose += "".join(services)
 
+    # station_reporter サイドカー（station.json が指定されている場合）
+    station_config_path = settings.get("station_config", "")
+    if station_config_path and Path(station_config_path).exists():
+        compose += generate_station_reporter(station_config_path)
+
     # ネットワーク
     compose += """
 networks:
@@ -481,6 +514,8 @@ streamersファイルの形式:
                        help="go2rtc がブラウザへ返す到達可能アドレスのホスト/IP (default: 自動検出)")
     parser.add_argument("--debug-tools", action="store_true", default=False,
                        help="デバッグツール(ping, nc)をカメラコンテナにインストール")
+    parser.add_argument("--station-config", default="",
+                       help="三角測量用の拠点設定ファイル (station.json) のパス")
 
     args = parser.parse_args()
     if args.streaming_mode == "webrtc" and not args.go2rtc_candidate_host:
@@ -504,6 +539,7 @@ streamersファイルの形式:
         'go2rtc_config_path': f"./{Path(args.go2rtc_config).name}",
         'go2rtc_candidate_host': args.go2rtc_candidate_host,
         'debug_tools': args.debug_tools,
+        'station_config': args.station_config,
     }
 
     # 生成
