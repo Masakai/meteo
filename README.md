@@ -24,6 +24,85 @@
 - **ダッシュボード** - 複数カメラの検出状況を一画面で表示
 - **YouTube Live配信** - ダッシュボードからワンクリックでカメラ映像をYouTube Liveに配信
 - **Docker対応** - 複数カメラを並列監視可能
+- **多地点三角測量** - 複数拠点の同時観測から流星の3D軌道（高度・緯度経度・速度）を算出
+
+---
+
+## 多地点流星三角測量システム
+
+複数の観測拠点から同一流星を同時検出し、スキューライン最近接点アルゴリズムで3D空間上の軌道を算出します。結果はDeck.gl + MapLibre GLによるインタラクティブな3Dマップで可視化されます。SonotaCo Network / Global Meteor Network と同じ三角測量原理を採用しています。
+
+### 画面サンプル
+
+#### 広域ビュー（関東上空の流星軌道）
+
+![三角測量 広域マップ](documents/assets/triangulation-3dmap-wide.png)
+
+#### ズームビュー（富士山周辺・3D軌道）
+
+![三角測量 ズームマップ](documents/assets/triangulation-3dmap-zoom.png)
+
+### 主な機能
+
+- **3D軌道可視化** - 流星の始点・終点を高度付きで3D表示、地表面への投影線も描画
+- **高度スケール調整** - スライダーで高度方向の倍率を1×〜100×に変更可能
+- **観測拠点FOV表示** - 各カメラの視野角（FOV）を地図上にポリゴン表示
+- **信頼度フィルター** - 三角測量の信頼度（missdistance）でフィルタリング
+- **速度・高度表示** - 流星の飛行速度（km/s）、高度（km）を一覧表示
+- **クリックで飛行** - 一覧の流星をクリックするとカメラがその軌道にフライト
+
+### アーキテクチャ（ハブ＆スポーク型）
+
+```
+拠点A (既存Docker環境)         拠点B (既存Docker環境)
+  ├─ camera1..N (既存)           ├─ camera1..N (既存)
+  └─ station_reporter (新)       └─ station_reporter (新)
+       │ HTTP POST                    │ HTTP POST
+       └──────► triangulation_server ◄┘
+                     │
+                     ├─ イベントマッチング（時刻・角度相関）
+                     ├─ 3D三角測量（スキューライン最近接点）
+                     └─ Deck.gl + MapLibre 3Dマップ表示
+```
+
+### クイックスタート（デモ）
+
+```bash
+# 仮想環境で依存ライブラリをインストール
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# デモサーバーを起動（合成データ3拠点・5流星入り）
+python demo_triangulation.py
+
+# ブラウザで確認
+# http://localhost:8090/
+```
+
+### 拠点設定（`station.json`）
+
+```json
+{
+  "station_id": "fuji-north",
+  "station_name": "富士北麓観測所",
+  "latitude": 35.3606,
+  "longitude": 138.7274,
+  "altitude": 2400.0,
+  "triangulation_server_url": "https://tri.example.com",
+  "api_key": "secret-key",
+  "cameras": {
+    "camera1_10_0_1_25": {
+      "azimuth": 90.0, "elevation": 45.0, "roll": 0.0,
+      "fov_horizontal": 90.0, "fov_vertical": 60.0,
+      "resolution": [960, 540]
+    }
+  }
+}
+```
+
+詳細は [`documents/TRIANGULATION.md`](documents/TRIANGULATION.md) を参照してください。
+
+---
 
 ## 天文観測者向けの直感的な目安
 
@@ -790,6 +869,7 @@ All rights reserved.
 
 ## 更新履歴
 
+- 2026-04-02: 多地点流星三角測量システム追加（`triangulation/`, `triangulation_server.py`, `station_reporter.py`）
 - 2026-03-31: YouTube Live配信機能追加（ダッシュボードからカメラ単位で配信開始/停止）
 - 2024-02-02: --extract-clips / --no-clips オプション追加
 - 2024-02-01: RTSP検出、Webプレビュー、Dockerサポート追加
