@@ -1,0 +1,27 @@
+{
+  "station_id": "fuji-north",
+  "station_name": "富士北麓観測所",
+  "latitude": 35.3606,
+  "longitude": 138.7274,
+  "altitude": 2400.0,
+  "triangulation_server_url": "https://triangulation.example.com",
+  "api_key": "your-secret-api-key-here",
+  "cameras": {
+    "camera1_10_0_1_25": {
+      "azimuth": 90.0,
+      "elevation": 45.0,
+      "roll": 0.0,
+      "fov_horizontal": 90.0,
+      "fov_vertical": 60.0,
+      "resolution": [960, 540]
+    },
+    "camera2_10_0_1_3": {
+      "azimuth": 180.0,
+      "elevation": 45.0,
+      "roll": 0.0,
+      "fov_horizontal": 90.0,
+      "fov_vertical": 60.0,
+      "resolution": [960, 540]
+    }
+  }
+}

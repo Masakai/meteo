@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir flask numpy requests
+
+COPY triangulation/ /app/triangulation/
+COPY triangulation_server.py /app/
+COPY triangulation_templates.py /app/
+
+EXPOSE 8090
+
+CMD ["python", "triangulation_server.py"]
