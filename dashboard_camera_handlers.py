@@ -426,6 +426,7 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
         "-thread_queue_size", "4096",
         "-i", rtsp_src,
         "-c:v", "copy",
+        "-bsf:v", "h264_mp4toannexb",
         "-af", "aresample=async=1,volume=0",
         "-c:a", "aac", "-ar", "44100", "-b:a", "32k",
         "-f", "flv", rtmp_dst,
