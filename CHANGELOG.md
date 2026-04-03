@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.2] - 2026-04-03
+### Fixed
+- YouTube Live 配信が切断後に自動復帰しない問題を修正。
+  - ffmpeg をバックグラウンドスレッドで監視し、切断時に15秒待機後に自動再接続するループを実装。
+  - Intel QSV / VAAPI が N100 環境で動作しなかったため `-c:v copy` に戻した。
+  - `generate_compose.py` の dashboard コンテナから `/dev/dri` デバイスマッピングを削除（QSV不使用）。
+
 ## [3.4.1] - 2026-04-03
 ### Fixed
 - YouTube Live 配信が頻繁に切断される問題を修正。

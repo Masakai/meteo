@@ -7,6 +7,8 @@ import json
 import logging
 import os
 import subprocess
+import threading
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlparse
 
@@ -14,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 # YouTube配信中のffmpegサブプロセス {camera_index: subprocess.Popen}
 _youtube_processes: dict[int, subprocess.Popen] = {}
+# 自動再接続ループの継続フラグ {camera_index: bool}
+_youtube_active: dict[int, bool] = {}
+# 自動再接続ループのスレッド {camera_index: threading.Thread}
+_youtube_threads: dict[int, threading.Thread] = {}
 
 
 def parse_camera_index(path: str, camera_count: int) -> int:
@@ -403,8 +409,45 @@ def _youtube_json_response(handler, data: dict, status: int = 200) -> bool:
     return True
 
 
+_RECONNECT_DELAY = 15  # 切断後の再接続待機秒数
+
+
+def _youtube_loop(camera_index: int, cmd: list, ffmpeg_log_path: str | None) -> None:
+    """ffmpegを自動再接続ループで実行するバックグラウンドスレッド"""
+    while _youtube_active.get(camera_index, False):
+        try:
+            ffmpeg_log_fh = None
+            if ffmpeg_log_path:
+                try:
+                    os.makedirs(os.path.dirname(ffmpeg_log_path), exist_ok=True)
+                    ffmpeg_log_fh = open(ffmpeg_log_path, "ab")
+                except Exception:
+                    pass
+            proc = subprocess.Popen(
+                cmd,
+                stdout=ffmpeg_log_fh or subprocess.DEVNULL,
+                stderr=ffmpeg_log_fh or subprocess.DEVNULL,
+            )
+            _youtube_processes[camera_index] = proc
+            logger.info("youtube camera%d started pid=%d", camera_index + 1, proc.pid)
+            proc.wait()
+            if ffmpeg_log_fh:
+                ffmpeg_log_fh.close()
+            _youtube_processes.pop(camera_index, None)
+            logger.info("youtube camera%d ffmpeg exited (rc=%d)", camera_index + 1, proc.returncode)
+        except Exception as exc:
+            logger.error("youtube camera%d error: %s", camera_index + 1, exc)
+
+        if not _youtube_active.get(camera_index, False):
+            break
+        logger.info("youtube camera%d reconnecting in %ds...", camera_index + 1, _RECONNECT_DELAY)
+        time.sleep(_RECONNECT_DELAY)
+
+    logger.info("youtube camera%d loop ended", camera_index + 1)
+
+
 def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
-    """YouTube Live配信を開始する（ffmpegサブプロセスで直接RTMP送信）"""
+    """YouTube Live配信を開始する（ffmpegサブプロセスで直接RTMP送信・自動再接続）"""
     try:
         camera_index = parse_index(handler.path)
     except (ValueError, IndexError):
@@ -415,7 +458,7 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
     if not youtube_key:
         return _youtube_json_response(handler, {"success": False, "error": "YouTube key not configured"}, 400)
 
-    # 既存プロセスがあれば先に停止
+    # 既存ループがあれば先に停止
     _stop_youtube_process(camera_index)
 
     rtsp_src = f"rtsp://go2rtc:8554/camera{camera_index + 1}"
@@ -425,51 +468,46 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
         "-rtsp_transport", "tcp",
         "-thread_queue_size", "4096",
         "-i", rtsp_src,
-        "-c:v", "h264_qsv", "-b:v", "2000k", "-maxrate", "2000k",
-        "-g", "40", "-bf", "0",
+        "-c:v", "copy",
+        "-bsf:v", "h264_mp4toannexb",
         "-af", "aresample=async=1,volume=0",
         "-c:a", "aac", "-ar", "44100", "-b:a", "32k",
         "-f", "flv", rtmp_dst,
     ]
-    try:
-        log_path = os.environ.get("LOG_FILE", "")
-        if log_path:
-            log_dir = os.path.dirname(log_path)
-            ffmpeg_log_path = os.path.join(log_dir, f"ffmpeg_youtube_{camera_index + 1}.log")
-        else:
-            ffmpeg_log_path = None
-        if ffmpeg_log_path:
-            try:
-                os.makedirs(os.path.dirname(ffmpeg_log_path), exist_ok=True)
-                ffmpeg_log_fh = open(ffmpeg_log_path, "ab")
-            except Exception:
-                ffmpeg_log_fh = None
-        else:
-            ffmpeg_log_fh = None
-        proc = subprocess.Popen(
-            cmd,
-            stdout=ffmpeg_log_fh or subprocess.DEVNULL,
-            stderr=ffmpeg_log_fh or subprocess.DEVNULL,
-        )
-        _youtube_processes[camera_index] = proc
-        logger.info("youtube_start camera%d pid=%d", camera_index + 1, proc.pid)
-        return _youtube_json_response(handler, {"success": True})
-    except Exception as exc:
-        logger.error("youtube_start error: %s", exc)
-        return _youtube_json_response(handler, {"success": False, "error": str(exc)}, 502)
+
+    log_path = os.environ.get("LOG_FILE", "")
+    if log_path:
+        ffmpeg_log_path = os.path.join(os.path.dirname(log_path), f"ffmpeg_youtube_{camera_index + 1}.log")
+    else:
+        ffmpeg_log_path = None
+
+    _youtube_active[camera_index] = True
+    thread = threading.Thread(
+        target=_youtube_loop,
+        args=(camera_index, cmd, ffmpeg_log_path),
+        daemon=True,
+        name=f"youtube-{camera_index + 1}",
+    )
+    _youtube_threads[camera_index] = thread
+    thread.start()
+    logger.info("youtube_start camera%d loop started", camera_index + 1)
+    return _youtube_json_response(handler, {"success": True})
 
 
 def _stop_youtube_process(camera_index: int) -> None:
-    """ffmpegサブプロセスを停止する"""
+    """自動再接続ループを停止しffmpegプロセスを終了する"""
+    _youtube_active[camera_index] = False
     proc = _youtube_processes.pop(camera_index, None)
-    if proc is None:
-        return
-    try:
-        proc.terminate()
-        proc.wait(timeout=5)
-        logger.info("youtube_stop camera%d pid=%d terminated", camera_index + 1, proc.pid)
-    except Exception:
-        proc.kill()
+    if proc is not None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+            logger.info("youtube_stop camera%d pid=%d terminated", camera_index + 1, proc.pid)
+        except Exception:
+            proc.kill()
+    thread = _youtube_threads.pop(camera_index, None)
+    if thread is not None:
+        thread.join(timeout=10)
 
 
 def handle_youtube_stop(handler, cameras, go2rtc_api_url, parse_index, request_cls, urlopen_fn):
@@ -498,6 +536,10 @@ def handle_youtube_status(handler, cameras, go2rtc_api_url, parse_index, request
     if not cam.get("youtube_key"):
         return _youtube_json_response(handler, {"streaming": False})
 
-    proc = _youtube_processes.get(camera_index)
-    streaming = proc is not None and proc.poll() is None
+    thread = _youtube_threads.get(camera_index)
+    streaming = (
+        _youtube_active.get(camera_index, False)
+        and thread is not None
+        and thread.is_alive()
+    )
     return _youtube_json_response(handler, {"streaming": streaming})

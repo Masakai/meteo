@@ -254,8 +254,6 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     volumes:
       - ./detections:/output
       - ./logs:/logs
-    devices:
-      - /dev/dri:/dev/dri
     networks:
       - meteor-net
     depends_on:
