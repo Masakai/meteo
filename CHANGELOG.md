@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-04-03
+### Fixed
+- YouTube Live 配信が頻繁に切断される問題を修正。
+  - libx264 再エンコードによる CPU 過負荷（speed < 0.1x）が原因で YouTube 側から切断されていた。
+  - エンコード設定を `libx264 ultrafast + 720p + 2000kbps` に変更し、CPU 負荷を大幅に削減。
+  - `-c:v copy` モードでは ATOMCAM2 のネイティブビットレート（〜500kbps）が低すぎて YouTube が切断するため再エンコード方式を採用。
+
 ## [3.4.0] - 2026-04-02
 ### Added
 - 多地点流星三角測量システムを追加（`triangulation/`, `triangulation_server.py`, `station_reporter.py`）。
