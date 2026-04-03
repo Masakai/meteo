@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.4] - 2026-04-03
+### Changed
+- YouTube 配信エンコードをマルチプラットフォーム対応に変更。
+  - 起動時に Intel QSV が使用可能か自動検出し、利用可能なら `h264_qsv`、そうでなければ `libx264 ultrafast 720p` にフォールバック。
+  - Apple Silicon (M2以降) / QSV非対応環境では libx264 ultrafast で動作。
+  - `Dockerfile.dashboard` の Intel QSV パッケージインストールを amd64 のみに限定（arm64 環境でのビルドエラーを解消）。
+  - `generate_compose.py` の `/dev/dri` デバイスマッピングを `/dev/dri` が存在する環境のみ追加するよう変更。
+
 ## [3.4.3] - 2026-04-03
 ### Fixed
 - YouTube Live 配信を Intel QSV ハードウェアエンコードで安定化。

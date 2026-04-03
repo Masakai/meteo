@@ -7,12 +7,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# ffmpeg・Intel QSV(oneVPL)ドライバーをインストール
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    intel-media-va-driver-non-free \
-    libmfx-gen1.2 \
-    && rm -rf /var/lib/apt/lists/*
+# ffmpegをインストール（全アーキテクチャ共通）
+# Intel QSV用ドライバーはamd64のみ（Apple Silicon / ARM環境ではスキップ）
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && \
+    arch=$(dpkg --print-architecture) && \
+    if [ "$arch" = "amd64" ]; then \
+        apt-get install -y --no-install-recommends \
+            intel-media-va-driver-non-free \
+            libmfx-gen1.2 \
+            libmfx1; \
+    fi && \
+    rm -rf /var/lib/apt/lists/*
 COPY requirements-docker.txt .
 RUN pip install --no-cache-dir -r requirements-docker.txt
 

@@ -232,6 +232,13 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     camera_env_str = "\n".join(camera_envs)
     depends_str = "\n      - ".join(depends)
 
+    # Intel QSV用: /dev/dri が存在する環境のみデバイスマッピングを追加
+    import os
+    if os.path.exists("/dev/dri"):
+        dri_devices_str = "    devices:\n      - /dev/dri:/dev/dri\n"
+    else:
+        dri_devices_str = ""
+
     return f"""
   # ダッシュボード（全カメラ一覧）
   dashboard:
@@ -254,9 +261,7 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     volumes:
       - ./detections:/output
       - ./logs:/logs
-    devices:
-      - /dev/dri:/dev/dri
-    networks:
+{dri_devices_str}    networks:
       - meteor-net
     depends_on:
       - {depends_str}

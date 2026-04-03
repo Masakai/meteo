@@ -410,6 +410,30 @@ def _youtube_json_response(handler, data: dict, status: int = 200) -> bool:
 
 
 _RECONNECT_DELAY = 15  # 切断後の再接続待機秒数
+_qsv_available_cache: bool | None = None  # QSV利用可否キャッシュ
+
+
+def _check_qsv_available() -> bool:
+    """Intel QSVハードウェアエンコードが使用可能か確認する（初回のみ実行）"""
+    global _qsv_available_cache
+    if _qsv_available_cache is not None:
+        return _qsv_available_cache
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner",
+                "-init_hw_device", "qsv=qsv:hw",
+                "-f", "lavfi", "-i", "nullsrc=s=64x64",
+                "-c:v", "h264_qsv", "-t", "0.1", "-f", "null", "-",
+            ],
+            capture_output=True,
+            timeout=10,
+        )
+        _qsv_available_cache = result.returncode == 0
+    except Exception:
+        _qsv_available_cache = False
+    logger.info("QSV available: %s", _qsv_available_cache)
+    return _qsv_available_cache
 
 
 def _youtube_loop(camera_index: int, cmd: list, ffmpeg_log_path: str | None) -> None:
@@ -463,13 +487,30 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
 
     rtsp_src = f"rtsp://go2rtc:8554/camera{camera_index + 1}"
     rtmp_dst = _youtube_rtmp_dst(youtube_key)
+
+    if _check_qsv_available():
+        # Intel QSVハードウェアエンコード（N100 / i5 Gen12以降）
+        logger.info("youtube camera%d using h264_qsv", camera_index + 1)
+        video_opts = [
+            "-c:v", "h264_qsv", "-b:v", "2000k", "-maxrate", "2000k",
+            "-g", "40", "-bf", "0",
+        ]
+    else:
+        # ソフトウェアエンコード（Apple Silicon / QSV非対応環境）
+        logger.info("youtube camera%d QSV unavailable, using libx264 ultrafast", camera_index + 1)
+        video_opts = [
+            "-vf", "scale=1280:720",
+            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
+            "-b:v", "2000k", "-maxrate", "2000k", "-bufsize", "4000k",
+            "-g", "40", "-bf", "0", "-pix_fmt", "yuv420p",
+        ]
+
     cmd = [
         "ffmpeg", "-re",
         "-rtsp_transport", "tcp",
         "-thread_queue_size", "4096",
         "-i", rtsp_src,
-        "-c:v", "h264_qsv", "-b:v", "2000k", "-maxrate", "2000k",
-        "-g", "40", "-bf", "0",
+        *video_opts,
         "-af", "aresample=async=1,volume=0",
         "-c:a", "aac", "-ar", "44100", "-b:a", "32k",
         "-f", "flv", rtmp_dst,
