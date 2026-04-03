@@ -492,6 +492,7 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
         # Intel QSVハードウェアエンコード（N100 / i5 Gen12以降）
         logger.info("youtube camera%d using h264_qsv", camera_index + 1)
         video_opts = [
+            "-vf", "scale=1280:720",
             "-c:v", "h264_qsv", "-b:v", "2000k", "-maxrate", "2000k",
             "-g", "40", "-bf", "0",
         ]
