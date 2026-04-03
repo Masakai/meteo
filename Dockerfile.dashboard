@@ -10,12 +10,18 @@ WORKDIR /app
 # ffmpegをインストール（全アーキテクチャ共通）
 # Intel QSV用ドライバーはamd64のみ（Apple Silicon / ARM環境ではスキップ）
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && \
-    arch=$(dpkg --print-architecture) && \
-    if [ "$arch" = "amd64" ]; then \
-        apt-get install -y --no-install-recommends \
-            intel-media-va-driver-non-free \
+    if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+        # Debianの非フリーリポジトリを有効化（.sources形式とlegacy形式の両方に対応）
+        sed -i 's/^Components: main$/Components: main contrib non-free non-free-firmware/' \
+            /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+        sed -i 's/ main$/ main contrib non-free non-free-firmware/' \
+            /etc/apt/sources.list 2>/dev/null || true; \
+        apt-get update && apt-get install -y --no-install-recommends \
             libmfx-gen1.2 \
-            libmfx1; \
+            intel-media-va-driver-non-free || \
+        apt-get install -y --no-install-recommends \
+            libmfx-gen1.2 \
+            intel-media-va-driver; \
     fi && \
     rm -rf /var/lib/apt/lists/*
 COPY requirements-docker.txt .
