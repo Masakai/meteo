@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.3] - 2026-04-03
+### Fixed
+- YouTube Live 配信を Intel QSV ハードウェアエンコードで安定化。
+  - `libmfx-gen1.2` と `intel-media-va-driver-non-free` のインストールで N100 の QSV が動作するようになった。
+  - `Dockerfile.dashboard` に QSV ドライバーパッケージを追加。
+  - `generate_compose.py` の dashboard コンテナに `/dev/dri` デバイスマッピングを追加。
+  - h264_qsv (2000kbps) でエンコードし YouTube 推奨ビットレートを満たしつつ CPU 負荷をほぼゼロに。
+
 ## [3.4.2] - 2026-04-03
 ### Fixed
 - YouTube Live 配信が切断後に自動復帰しない問題を修正。
