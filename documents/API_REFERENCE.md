@@ -27,6 +27,13 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.4.5 - YouTube配信エンコーダ3段階フォールバック・Dockerfile修正
+- **変更**: YouTube 配信エンコーダを QSV → VAAPI → libx264 の3段階フォールバックに拡張
+  - Intel QSV 利用可能時: `h264_qsv` 720p 2000kbps
+  - QSV 不可・VAAPI 利用可能時: `h264_vaapi` 720p 2000kbps（旧世代 Intel / AMD GPU）
+  - どちらも不可: `libx264 ultrafast` 720p 2000kbps
+- **変更**: `Dockerfile.dashboard` を `python:3.11-slim-bookworm` (Debian 12) ベースに変更（Mac 上の GPG エラー解消）
+
 ### v3.4.4 - YouTube配信のマルチプラットフォーム対応
 - **変更**: Intel QSV ハードウェアエンコードを自動検出し、利用可能な場合は `h264_qsv`、非対応環境は `libx264 ultrafast` に自動フォールバック
 - **変更**: YouTube 配信に自動再接続ループを追加（ffmpeg 終了後 15 秒待機して再接続）

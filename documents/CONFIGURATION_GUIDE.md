@@ -1,6 +1,6 @@
 # 設定ガイド (Configuration Guide)
 
-**バージョン: v3.4.4**
+**バージョン: v3.4.5**
 
 ---
 
@@ -1108,6 +1108,19 @@ python generate_compose.py --buffer 10
 ---
 
 ## バージョン別新機能
+
+### v3.4.5 - YouTube配信エンコーダ3段階フォールバック・Dockerfile修正
+
+**変更点**:
+- YouTube 配信エンコーダを QSV → VAAPI → libx264 の3段階フォールバックに拡張
+  - Intel QSV 利用可能時: `h264_qsv` 720p 2000kbps（N100 等最新 Intel）
+  - QSV 不可・VAAPI 利用可能時: `h264_vaapi` 720p 2000kbps（旧世代 Intel / AMD GPU）
+  - どちらも不可: `libx264 ultrafast` 720p 2000kbps（CPU エンコード）
+- `Dockerfile.dashboard` を `python:3.11-slim-bookworm` (Debian 12) ベースに変更
+  - Docker Desktop for Mac の時刻ずれによる GPG 署名エラーを解消
+  - Ubuntu 専用の `libmfx-gen1.2` パッケージを削除
+
+---
 
 ### v3.4.4 - YouTube配信のマルチプラットフォーム対応
 
