@@ -27,12 +27,18 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.4.4 - YouTube配信のマルチプラットフォーム対応
+- **変更**: Intel QSV ハードウェアエンコードを自動検出し、利用可能な場合は `h264_qsv`、非対応環境は `libx264 ultrafast` に自動フォールバック
+- **変更**: YouTube 配信に自動再接続ループを追加（ffmpeg 終了後 15 秒待機して再接続）
+- **変更**: 映像解像度を 1280×720 に統一（CPU/GPU 負荷軽減）
+- **変更**: Dockerfile.dashboard を Ubuntu 24.04 ベースに変更
+
 ### v3.3.0 - YouTube Live配信
 - **追加**: `POST /youtube_start/{index}` — カメラのYouTube Live配信を開始
 - **追加**: `POST /youtube_stop/{index}` — カメラのYouTube Live配信を停止
 - **追加**: `GET /youtube_status/{index}` — カメラのYouTube Live配信状態を取得
 - **追加**: ダッシュボード環境変数 `CAMERA{i}_YOUTUBE_KEY`、`CAMERA{i}_RTSP_URL`、`GO2RTC_API_URL`
-- **変更**: go2rtc ボリュームマウントを読み書き可能に変更（DELETE APIによる配信停止に必要）
+- **変更**: YouTube 配信停止は dashboard コンテナ内の ffmpeg プロセスを terminate/kill で終了
 
 ### v3.2.5 - メンテナンスアップデート
 - **変更**: ダッシュボードのバージョンを 3.2.5 へ更新
@@ -67,7 +73,7 @@ Licensed under the MIT License
 ### v1.24.1 - ダッシュボードの Flask アプリ運用整備
 - **新規エンドポイント**: `GET /health`
   - ダッシュボードのヘルスチェックを返却
-  - レスポンス例: `{ "status": "ok", "version": "3.3.0", "camera_count": 3 }`
+  - レスポンス例: `{ "status": "ok", "version": "3.4.4", "camera_count": 3 }`
 - **変更**: `dashboard.py` を Flask のアプリファクトリ構成へ整理し、WSGI 配備やコンテナ運用時でも監視スレッドが初回リクエストで起動するよう改善
 
 ### v1.24.0 - 検出 ID 管理と運用制御の拡張
@@ -175,7 +181,7 @@ Licensed under the MIT License
 ```json
 {
   "status": "ok",
-  "version": "3.3.0",
+  "version": "3.4.4",
   "camera_count": 3
 }
 ```

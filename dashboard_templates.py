@@ -857,6 +857,78 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             opacity: 0.6;
             cursor: wait;
         }}
+        .select-mode-btn {{
+            background: #3a6f4f;
+            border: 1px solid #2a9f6f;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }}
+        .select-mode-btn:hover {{
+            background: #2a9f6f;
+        }}
+        .select-mode-btn.active {{
+            background: #1a7f5f;
+            border-color: #00ff88;
+        }}
+        .select-all-btn {{
+            background: #2a4f8f;
+            border: 1px solid #4488cc;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.82em;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }}
+        .select-all-btn:hover {{
+            background: #4488cc;
+        }}
+        .select-delete-btn {{
+            background: #cc3333;
+            border: 1px solid #ff4444;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: bold;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }}
+        .select-delete-btn:hover {{
+            background: #ff4444;
+        }}
+        .select-delete-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .detection-item.sel-selected {{
+            background: #1a3a6a;
+            outline: 2px solid #00d4ff;
+        }}
+        .detection-item-select-wrap {{
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }}
+        .detection-select-cb {{
+            margin-top: 3px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+            accent-color: #00d4ff;
+        }}
+        .detection-item-body {{
+            flex: 1;
+            min-width: 0;
+        }}
         .detection-group-grid {{
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -2482,6 +2554,90 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }});
         }}
 
+        // --- 選択モード ---
+        function toggleSelectionMode() {{
+            selectionMode = !selectionMode;
+            if (!selectionMode) {{
+                selectedDetectionIds.clear();
+            }}
+            renderSelectedDetections();
+        }}
+
+        function toggleSelectItem(key, checked) {{
+            if (checked) {{
+                selectedDetectionIds.add(key);
+            }} else {{
+                selectedDetectionIds.delete(key);
+            }}
+            updateSelectDeleteButton();
+        }}
+
+        function updateSelectDeleteButton() {{
+            const btn = document.getElementById('select-delete-btn');
+            if (!btn) return;
+            const n = selectedDetectionIds.size;
+            btn.textContent = `選択した ${{n}} 件を削除`;
+            btn.disabled = n === 0;
+        }}
+
+        function selectAll() {{
+            const cbs = document.querySelectorAll('.detection-select-cb');
+            const allChecked = cbs.length > 0 && [...cbs].every(cb => cb.checked);
+            cbs.forEach(cb => {{
+                cb.checked = !allChecked;
+                const key = cb.dataset.key;
+                if (!allChecked) {{
+                    selectedDetectionIds.add(key);
+                }} else {{
+                    selectedDetectionIds.delete(key);
+                }}
+                const item = cb.closest('.detection-item');
+                if (item) item.classList.toggle('sel-selected', !allChecked);
+            }});
+            updateSelectDeleteButton();
+        }}
+
+        async function deleteSelected() {{
+            const n = selectedDetectionIds.size;
+            if (n === 0) return;
+            if (!confirm(`選択した ${{n}} 件を削除しますか?\n\nこの操作は取り消せません。`)) return;
+
+            const btn = document.getElementById('select-delete-btn');
+            if (btn) {{ btn.disabled = true; btn.textContent = '削除中...'; }}
+
+            const ids = [...selectedDetectionIds];
+            let failed = 0;
+            for (const key of ids) {{
+                try {{
+                    let url;
+                    if (key.startsWith('manual::')) {{
+                        url = `/manual_recording/${{encodeURI(key.slice(8))}}`;
+                    }} else {{
+                        const sep = key.indexOf('::');
+                        const camera = key.slice(0, sep);
+                        const id = key.slice(sep + 2);
+                        url = `/detection/${{encodeURIComponent(camera)}}/${{encodeURIComponent(id)}}`;
+                    }}
+                    const r = await fetch(url, {{ method: 'DELETE' }});
+                    const data = await r.json();
+                    if (data.success) {{
+                        selectedDetectionIds.delete(key);
+                    }} else {{
+                        failed++;
+                    }}
+                }} catch (e) {{
+                    failed++;
+                }}
+            }}
+
+            if (failed > 0) {{
+                alert(`${{failed}} 件の削除に失敗しました。`);
+            }}
+            selectionMode = false;
+            selectedDetectionIds.clear();
+            updateDetections();
+        }}
+
         // それ以外を一括削除
         function bulkDeleteNonMeteor(camera, event) {{
             event.stopPropagation();
@@ -2591,6 +2747,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         let detectionAvailableYears = [];
         let detectionCalendarRange = 'current';
         let selectedDetectionDate = '';
+        let selectionMode = false;
+        let selectedDetectionIds = new Set(); // "camera::id" または "manual::path" 形式
         let detectionCalendarYear = new Date().getFullYear();
         const detectionPollBaseDelay = 5000;
         const detectionPollMaxDelay = 30000;
@@ -2788,6 +2946,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 const cameraKey = d.camera;
                 const cameraLabel = d.camera_display || d.camera;
                 const isManualRecording = d.source_type === 'manual_recording';
+                const selKey = isManualRecording ? `manual::${{d.mp4}}` : `${{cameraKey}}::${{d.id}}`;
+                const isSelected = selectedDetectionIds.has(selKey);
                 const thumb = d.image
                     ? `<img class="detection-thumb" src="/image/${{encodeURI(d.image)}}" alt="${{cameraLabel}}" loading="lazy" onclick="showImage('${{d.image}}', '${{d.time}}', '${{cameraLabel}}', '${{d.confidence}}')">`
                     : '';
@@ -2824,8 +2984,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
                             </div>
                 `;
-                return `
-                    <div class="detection-item">
+                const cbHtml = selectionMode
+                    ? `<input type="checkbox" class="detection-select-cb" data-key="${{selKey}}" ${{isSelected ? 'checked' : ''}}
+                           onchange="toggleSelectItem('${{selKey}}', this.checked); this.closest('.detection-item').classList.toggle('sel-selected', this.checked)">`
+                    : '';
+                const bodyContent = `
                         <div class="time">${{d.time}} | ${{cameraLabel}}</div>
                         ${{thumb}}
                         <div>${{metaText}}</div>
@@ -2835,18 +2998,45 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 ${{imageAction}}
                                 ${{originalAction}}
                             </div>
-                            ${{manageActions}}
+                            ${{selectionMode ? '' : manageActions}}
                         </div>
+                `;
+                if (selectionMode) {{
+                    return `
+                    <div class="detection-item${{isSelected ? ' sel-selected' : ''}}">
+                        <div class="detection-item-select-wrap">
+                            ${{cbHtml}}
+                            <div class="detection-item-body">${{bodyContent}}</div>
+                        </div>
+                    </div>
+                    `;
+                }}
+                return `
+                    <div class="detection-item">
+                        ${{bodyContent}}
                     </div>
                 `;
             }}).join('');
+
+            const selModeLabel = selectionMode ? 'キャンセル' : '選択削除';
+            const selModeClass = selectionMode ? 'select-mode-btn active' : 'select-mode-btn';
+            const selectionToolbar = selectionMode ? `
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
+                    <button class="select-all-btn" onclick="selectAll()">全選択 / 全解除</button>
+                    <button class="select-delete-btn" id="select-delete-btn" onclick="deleteSelected()" disabled>選択した 0 件を削除</button>
+                </div>
+            ` : '';
 
             listEl.innerHTML = `
                 <div class="date-group">
                     <div class="date-group-header">
                         <span>${{dateLabel(selectedDetectionDate)}}</span>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">${{bulkDeleteButtons}}</div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items:center;">
+                            ${{bulkDeleteButtons}}
+                            <button class="${{selModeClass}}" onclick="toggleSelectionMode()">${{selModeLabel}}</button>
+                        </div>
                     </div>
+                    ${{selectionToolbar}}
                     <div class="detection-group-grid">
                         ${{items}}
                     </div>

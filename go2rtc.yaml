@@ -3,7 +3,7 @@ api:
 
 webrtc:
   candidates:
-    - 10.0.1.58:8555
+    - 10.0.1.35:8555
 
 streams:
   camera1:

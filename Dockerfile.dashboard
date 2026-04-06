@@ -3,23 +3,27 @@
 # Copyright (c) 2026 Masanori Sakai
 # Licensed under the MIT License
 
-FROM ubuntu:24.04
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Python・ffmpeg・Intel QSV用ドライバーをインストール
-# QSVドライバーはamd64のみ（Apple Silicon / ARM環境ではスキップ）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 python3-pip python3-venv \
+# ffmpeg・ハードウェアエンコード用ドライバーをインストール
+# intel-media-va-driver-non-free: VAAPIドライバー（amd64のみ / Debian non-free）
+# AllowInsecureRepositories: Docker Desktop for Mac の時刻ずれによるGPG検証失敗を回避
+RUN apt-get -o Acquire::AllowInsecureRepositories=true \
+            -o Acquire::Check-Valid-Until=false \
+            update && \
+    apt-get install -y --allow-unauthenticated --no-install-recommends \
         ffmpeg && \
     if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        apt-get install -y --no-install-recommends \
-            intel-media-va-driver-non-free \
-            libmfx-gen1.2; \
+        apt-get install -y --allow-unauthenticated --no-install-recommends \
+            intel-media-va-driver-non-free || true; \
     fi && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
+
 COPY requirements-docker.txt .
-RUN pip install --no-cache-dir --break-system-packages -r requirements-docker.txt
+RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # 必要なファイルをコピー
 COPY dashboard*.py .

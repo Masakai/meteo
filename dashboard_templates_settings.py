@@ -201,7 +201,7 @@ def render_settings_html(cameras, version):
                         <tr><td>min_speed</td><td>最低速度</td><td>下げると遅い見かけ速度も通る</td></tr>
                         <tr><td>min_linearity</td><td>直線性の下限</td><td>下げると多少ぶれた軌跡も通る</td></tr>
                         <tr><td>exclude_bottom_ratio</td><td>画面下部の除外率</td><td>下げると低空の流星を拾いやすい</td></tr>
-                        <tr><td>exclude_edge_ratio</td><td>画面周辺（四辺）の除外率</td><td>上げると周辺ノイズを抑制しやすい</td></tr>
+                        <tr><td>exclude_edge_ratio (px)</td><td>画面四辺からの除外幅（px）。例: 20 → 上下左右それぞれ20pxを検出対象外にする</td><td>大きすぎると検出領域がゼロになる（1080p・スケール0.7では上限約378px）。通常は0〜30px程度</td></tr>
                     </tbody>
                 </table>
             </details>
@@ -216,7 +216,7 @@ def render_settings_html(cameras, version):
                 <div><label>最小速度(px/秒)（min_speed）</label><input id="min_speed" type="number" step="0.1"></div>
                 <div><label>最小直線性（min_linearity）</label><input id="min_linearity" type="number" step="0.01"></div>
                 <div><label>画面下部除外率（exclude_bottom_ratio）</label><input id="exclude_bottom_ratio" type="number" step="0.01"></div>
-                <div><label>画面周辺除外率（exclude_edge_ratio）</label><input id="exclude_edge_ratio" type="number" step="0.001"></div>
+                <div><label>画面四辺除外幅 px（exclude_edge_ratio）</label><input id="exclude_edge_ratio" type="number" step="1" min="0"></div>
             </div>
         </div>
 
@@ -259,7 +259,7 @@ def render_settings_html(cameras, version):
                         <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td>exclude_edge_ratio</td><td>画面周辺（四辺）の除外率</td><td>上げると端の固定ノイズを抑制しやすい</td></tr>
+                        <tr><td>exclude_edge_ratio (px)</td><td>画面四辺からの除外幅（px）。上下左右それぞれ指定pxを検出対象外にする</td><td>通常は0〜30px。大きすぎると検出領域がゼロになるため注意</td></tr>
                         <tr><td>nuisance_overlap_threshold</td><td>小領域がノイズ帯に重なる許容率</td><td>下げると電線起因の誤検出を強く抑える</td></tr>
                         <tr><td>nuisance_path_overlap_threshold</td><td>軌跡全体のノイズ帯重なり許容率</td><td>下げるとノイズ帯沿いの誤検出を抑える</td></tr>
                         <tr><td>min_track_points</td><td>確定に必要な追跡点数</td><td>上げると誤検出減、下げると見逃し減</td></tr>
@@ -289,6 +289,8 @@ def render_settings_html(cameras, version):
         <div class="status" id="status">準備完了</div>
     </div>
     <script>
+        let processMinDim = 0;  // カメラの処理解像度 min(幅, 高さ)。exclude_edge_ratio の px 変換に使用
+
         const fields = [
             'sensitivity', 'scale', 'buffer', 'extract_clips',
             'clip_margin_before', 'clip_margin_after',
@@ -319,7 +321,7 @@ def render_settings_html(cameras, version):
             min_speed: 50.0,
             min_linearity: 0.7,
             exclude_bottom_ratio: 0.0625,
-            exclude_edge_ratio: 0.0,
+            exclude_edge_ratio: 0,
             min_area: 5,
             max_area: 10000,
             max_gap_time: 2.0,
@@ -351,6 +353,9 @@ def render_settings_html(cameras, version):
                 if (Object.prototype.hasOwnProperty.call(data, name) && data[name] !== null && data[name] !== undefined) {{
                     if (el.type === 'checkbox') {{
                         el.checked = data[name] === true || String(data[name]).toLowerCase() === 'true';
+                    }} else if (name === 'exclude_edge_ratio') {{
+                        const dim = processMinDim > 0 ? processMinDim : 0;
+                        el.value = dim > 0 ? Math.round(parseFloat(data[name]) * dim) : Math.round(parseFloat(data[name]) * 100);
                     }} else {{
                         el.value = data[name];
                     }}
@@ -395,7 +400,12 @@ def render_settings_html(cameras, version):
                 }}
                 const value = String(el.value ?? '').trim();
                 if (value !== '') {{
-                    payload[name] = value;
+                    if (name === 'exclude_edge_ratio') {{
+                        const dim = processMinDim > 0 ? processMinDim : 100;
+                        payload[name] = parseFloat(value) / dim;
+                    }} else {{
+                        payload[name] = value;
+                    }}
                 }}
             }});
             return payload;
@@ -429,6 +439,7 @@ def render_settings_html(cameras, version):
                 if (!res.ok || data.success === false) {{
                     throw new Error(extractApiError(data, '現在値の取得に失敗しました'));
                 }}
+                if (data.process_min_dim > 0) processMinDim = data.process_min_dim;
                 fillForm(data.settings || {{}});
                 setStatus('現在値を取得しました');
             }} catch (e) {{

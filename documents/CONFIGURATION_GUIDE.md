@@ -1,6 +1,6 @@
 # 設定ガイド (Configuration Guide)
 
-**バージョン: v3.3.0**
+**バージョン: v3.4.4**
 
 ---
 
@@ -75,7 +75,7 @@ docker-compose.ymlで設定される環境変数:
 | `LATITUDE` | `35.3606` | 観測地の緯度 |
 | `LONGITUDE` | `138.7274` | 観測地の経度 |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
-| `ENABLE_TIME_WINDOW` | `true` | 天文薄暮時間帯制限 |
+| `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限（カメラコンテナ側のデフォルトは `true`） |
 | `CAMERA1_NAME` | - | カメラ1の内部名（ディレクトリ名・識別子） |
 | `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名（UI専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
 | `CAMERA1_URL` | - | カメラ1のURL |
@@ -85,8 +85,13 @@ docker-compose.ymlで設定される環境変数:
 | `CAMERA1_YOUTUBE_KEY` | - | カメラ1のYouTubeストリームキー（設定時のみYouTube配信ボタン表示） |
 | `CAMERA1_RTSP_URL` | - | カメラ1のRTSP URL（YouTube配信用。ffmpegでAAC変換に使用） |
 | `GO2RTC_API_URL` | `http://localhost:1984` | go2rtc APIのURL（Docker内では自動的に `http://go2rtc:1984` に変換） |
-| `CAMERA_HEALTH_INTERVAL` | `10` | カメラ生存確認間隔（秒） |
-| `CAMERA_TIMEOUT` | `5` | カメラ応答タイムアウト（秒） |
+| `CAMERA_MONITOR_ENABLED` | `true` | カメラ監視有効化 |
+| `CAMERA_MONITOR_INTERVAL` | `2.0` | カメラ監視間隔（秒） |
+| `CAMERA_MONITOR_TIMEOUT` | `6.0` | 監視タイムアウト（秒） |
+| `CAMERA_RESTART_TIMEOUT` | `5.0` | 再起動リクエストのタイムアウト（秒） |
+| `CAMERA_RESTART_COOLDOWN_SEC` | `120` | 再起動クールダウン（秒） |
+| `CAMERA_MONITOR_FAIL_THRESHOLD` | `12` | 監視失敗閾値（連続N回失敗で再起動） |
+| `DETECTION_MONITOR_INTERVAL` | `2.0` | 検出結果ファイル監視間隔（秒） |
 
 ### 環境変数の設定方法
 
@@ -1103,6 +1108,17 @@ python generate_compose.py --buffer 10
 ---
 
 ## バージョン別新機能
+
+### v3.4.4 - YouTube配信のマルチプラットフォーム対応
+
+**新機能・変更点**:
+- Intel QSV ハードウェアエンコードを自動検出し利用可能な場合は `h264_qsv` でエンコード
+- QSV 非対応環境（Apple Silicon 等）は `libx264 ultrafast` に自動フォールバック
+- YouTube 配信に自動再接続ループを追加（切断後 15 秒待機して再接続）
+- 映像解像度を 1280×720 に統一（CPU/GPU 負荷軽減）
+- Dockerfile.dashboard を Ubuntu 24.04 ベースに変更し Intel QSV パッケージを整備
+
+---
 
 ### v3.3.0 - YouTube Live配信
 

@@ -701,12 +701,14 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 has_pending_mask = current_pending_exclusion_mask is not None
             with current_recording_lock:
                 recording = _recording_snapshot_locked()
+            proc_w, proc_h = current_proc_size
             stats = {
                 "detections": detection_count,
                 "elapsed": round(elapsed, 1),
                 "camera": camera_name,
                 "settings": current_settings,
                 "runtime_fps": round(current_runtime_fps, 2),
+                "process_min_dim": min(proc_w, proc_h) if proc_w > 0 and proc_h > 0 else 0,
                 "stream_alive": is_stream_alive,
                 "time_since_last_frame": round(time_since_last_frame, 1),
                 "is_detecting": is_detecting_now,
@@ -1090,7 +1092,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 ("merge_max_distance", 0.0, None),
                 ("merge_max_speed_ratio", 0.0, 1.0),
                 ("exclude_bottom_ratio", 0.0, 1.0),
-                ("exclude_edge_ratio", 0.0, 0.5),
+                ("exclude_edge_ratio", 0.0, 0.5),  # UI入力は%（0〜50）→ /100 変換後の値
                 ("nuisance_overlap_threshold", 0.0, 1.0),
                 ("nuisance_path_overlap_threshold", 0.0, 1.0),
                 ("max_stationary_ratio", 0.0, 1.0),

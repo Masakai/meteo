@@ -290,6 +290,7 @@ def handle_camera_settings_current(handler, cameras, camera_stats_target, reques
 
     results = []
     first_settings = {}
+    first_process_min_dim = 0
 
     for camera_index, cam in enumerate(cameras):
         target_url = camera_stats_target(camera_index)
@@ -301,6 +302,7 @@ def handle_camera_settings_current(handler, cameras, camera_stats_target, reques
             settings = data.get("settings", {}) if isinstance(data, dict) else {}
             if not first_settings and isinstance(settings, dict) and settings:
                 first_settings = settings
+                first_process_min_dim = int(data.get("process_min_dim", 0)) if isinstance(data, dict) else 0
             results.append({
                 "camera": cam["name"],
                 "success": True,
@@ -323,6 +325,7 @@ def handle_camera_settings_current(handler, cameras, camera_stats_target, reques
             {
                 "success": ok_count > 0,
                 "settings": first_settings,
+                "process_min_dim": first_process_min_dim,
                 "results": results,
                 "ok_count": ok_count,
                 "total": len(cameras),
@@ -410,7 +413,8 @@ def _youtube_json_response(handler, data: dict, status: int = 200) -> bool:
 
 
 _RECONNECT_DELAY = 15  # 切断後の再接続待機秒数
-_qsv_available_cache: bool | None = None  # QSV利用可否キャッシュ
+_qsv_available_cache: bool | None = None   # QSV利用可否キャッシュ
+_vaapi_available_cache: bool | None = None  # VAAPI利用可否キャッシュ
 
 
 def _check_qsv_available() -> bool:
@@ -434,6 +438,30 @@ def _check_qsv_available() -> bool:
         _qsv_available_cache = False
     logger.info("QSV available: %s", _qsv_available_cache)
     return _qsv_available_cache
+
+
+def _check_vaapi_available() -> bool:
+    """VAAPIハードウェアエンコードが使用可能か確認する（初回のみ実行）"""
+    global _vaapi_available_cache
+    if _vaapi_available_cache is not None:
+        return _vaapi_available_cache
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner",
+                "-init_hw_device", "vaapi=vaapi:/dev/dri/renderD128",
+                "-f", "lavfi", "-i", "nullsrc=s=64x64",
+                "-vf", "format=nv12,hwupload",
+                "-c:v", "h264_vaapi", "-t", "0.1", "-f", "null", "-",
+            ],
+            capture_output=True,
+            timeout=10,
+        )
+        _vaapi_available_cache = result.returncode == 0
+    except Exception:
+        _vaapi_available_cache = False
+    logger.info("VAAPI available: %s", _vaapi_available_cache)
+    return _vaapi_available_cache
 
 
 def _youtube_loop(camera_index: int, cmd: list, ffmpeg_log_path: str | None) -> None:
@@ -496,9 +524,19 @@ def handle_youtube_start(handler, cameras, go2rtc_api_url, parse_index, request_
             "-c:v", "h264_qsv", "-b:v", "2000k", "-maxrate", "2000k",
             "-g", "40", "-bf", "0",
         ]
+    elif _check_vaapi_available():
+        # VAAPIハードウェアエンコード（Intel旧世代・AMD GPU）
+        logger.info("youtube camera%d using h264_vaapi", camera_index + 1)
+        video_opts = [
+            "-init_hw_device", "vaapi=vaapi:/dev/dri/renderD128",
+            "-filter_hw_device", "vaapi",
+            "-vf", "scale=1280:720,format=nv12,hwupload",
+            "-c:v", "h264_vaapi", "-b:v", "2000k", "-maxrate", "2000k",
+            "-g", "40", "-bf", "0",
+        ]
     else:
-        # ソフトウェアエンコード（Apple Silicon / QSV非対応環境）
-        logger.info("youtube camera%d QSV unavailable, using libx264 ultrafast", camera_index + 1)
+        # ソフトウェアエンコード（ハードウェアエンコード非対応環境）
+        logger.info("youtube camera%d no HW encoder available, using libx264 ultrafast", camera_index + 1)
         video_opts = [
             "-vf", "scale=1280:720",
             "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",

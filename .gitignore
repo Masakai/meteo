@@ -50,3 +50,6 @@ demo_triangulation.db
 
 # 外部ツール
 .junie/
+
+# Claude Code
+CLAUDE.md

@@ -15,6 +15,7 @@ import ipaddress
 import re
 import socket
 import subprocess
+import sys
 from pathlib import Path
 
 try:
@@ -383,6 +384,10 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
             web_port = base_port + i  # 8081, 8082, 8083, ...
             mask_image = ""
             if parsed["mask_path"]:
+                if cv2 is None:
+                    print("エラー: マスク画像が指定されていますが OpenCV が利用できません。")
+                    print("  pip install opencv-python  を実行してから再度お試しください。")
+                    sys.exit(1)
                 mask_src = Path(parsed["mask_path"])
                 if not mask_src.is_absolute():
                     mask_src = (streamers_path.parent / mask_src).resolve()
@@ -399,8 +404,8 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
                     except ValueError:
                         pass
                 except RuntimeError as exc:
-                    print("警告: OpenCVがないためマスク生成をスキップしました")
-                    mask_image = ""
+                    print(f"エラー: マスク生成に失敗しました: {exc}")
+                    sys.exit(1)
             services.append(generate_service(i, info, settings, web_port, mask_image))
         else:
             print(f"警告: 無効なURL (行{i}): {parsed['url']}")

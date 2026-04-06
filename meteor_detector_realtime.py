@@ -293,7 +293,7 @@ class DetectionParams:
     merge_max_distance: float = 80
     merge_max_speed_ratio: float = 0.5
     exclude_bottom_ratio: float = 1 / 16
-    exclude_edge_ratio: float = 0.0
+    exclude_edge_ratio: float = 0.0  # 四辺から除外する割合（0.0〜0.5）。UIからはpx指定→ratio変換で設定される。例: 20px / min(幅,高さ)
     nuisance_overlap_threshold: float = 0.60
     nuisance_path_overlap_threshold: float = 0.70
     min_track_points: int = 4

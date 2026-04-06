@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.5] - 2026-04-06
+### Changed
+- YouTube 配信エンコーダのフォールバックを3段階に拡張（QSV → VAAPI → libx264）。
+  - Intel QSV 利用可能時: `h264_qsv` 720p 2000kbps（N100 等最新 Intel 向け）。
+  - QSV 不可・VAAPI 利用可能時: `h264_vaapi` 720p 2000kbps（旧世代 Intel / AMD GPU 向け）。
+  - どちらも不可の場合: `libx264 ultrafast` 720p 2000kbps（CPU エンコード）。
+  - VAAPI 判定は `/dev/dri/renderD128` への初回アクセス時にのみ実行し、結果をキャッシュ。
+- `generate_compose.py`: OpenCV が利用できない状態でマスク画像を指定した場合、`sys.exit(1)` で即時終了するよう変更。
+
+### Fixed
+- `Dockerfile.dashboard` を `ubuntu:24.04` から `python:3.11-slim-bookworm` (Debian 12) ベースに変更。
+  - Docker Desktop for Mac の時刻ずれによる GPG 署名検証エラーを `AllowInsecureRepositories` / `--allow-unauthenticated` でバイパス。
+  - Ubuntu 専用の `libmfx-gen1.2` パッケージを削除。
+  - Python ランタイムをベースイメージから流用しインストール手順を簡略化。
+
 ## [3.4.4] - 2026-04-03
 ### Changed
 - YouTube 配信エンコードをマルチプラットフォーム対応に変更。
