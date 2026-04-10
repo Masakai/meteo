@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.6] - 2026-04-10
+### Changed
+- 検出結果一覧の全選択UIを常時表示化。
+  - 選択モードのトグルボタン（「選択削除」/「キャンセル」）を廃止。
+  - チェックボックス・「全選択/全解除」ボタン・「選択した N 件を削除」ボタンを日付選択直後から表示。
+  - 誤検出が多い際に選択モードを有効化する手順が不要になった。
+
+### Fixed
+- `Dockerfile.dashboard` の apt インストールを改善。
+  - BuildKit キャッシュマウント（`--mount=type=cache`）を使用し、並列ビルド時のディスク枯渇を回避。
+  - 不要だった `AllowInsecureRepositories` / `--allow-unauthenticated` フラグを削除。
+
 ## [3.4.5] - 2026-04-06
 ### Changed
 - YouTube 配信エンコーダのフォールバックを3段階に拡張（QSV → VAAPI → libx264）。

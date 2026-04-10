@@ -857,24 +857,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             opacity: 0.6;
             cursor: wait;
         }}
-        .select-mode-btn {{
-            background: #3a6f4f;
-            border: 1px solid #2a9f6f;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85em;
-            transition: background 0.2s;
-            white-space: nowrap;
-        }}
-        .select-mode-btn:hover {{
-            background: #2a9f6f;
-        }}
-        .select-mode-btn.active {{
-            background: #1a7f5f;
-            border-color: #00ff88;
-        }}
+
         .select-all-btn {{
             background: #2a4f8f;
             border: 1px solid #4488cc;
@@ -2554,15 +2537,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }});
         }}
 
-        // --- 選択モード ---
-        function toggleSelectionMode() {{
-            selectionMode = !selectionMode;
-            if (!selectionMode) {{
-                selectedDetectionIds.clear();
-            }}
-            renderSelectedDetections();
-        }}
-
+        // --- 選択 ---
         function toggleSelectItem(key, checked) {{
             if (checked) {{
                 selectedDetectionIds.add(key);
@@ -2633,7 +2608,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             if (failed > 0) {{
                 alert(`${{failed}} 件の削除に失敗しました。`);
             }}
-            selectionMode = false;
             selectedDetectionIds.clear();
             updateDetections();
         }}
@@ -2747,7 +2721,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         let detectionAvailableYears = [];
         let detectionCalendarRange = 'current';
         let selectedDetectionDate = '';
-        let selectionMode = false;
         let selectedDetectionIds = new Set(); // "camera::id" または "manual::path" 形式
         let detectionCalendarYear = new Date().getFullYear();
         const detectionPollBaseDelay = 5000;
@@ -2984,10 +2957,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
                             </div>
                 `;
-                const cbHtml = selectionMode
-                    ? `<input type="checkbox" class="detection-select-cb" data-key="${{selKey}}" ${{isSelected ? 'checked' : ''}}
-                           onchange="toggleSelectItem('${{selKey}}', this.checked); this.closest('.detection-item').classList.toggle('sel-selected', this.checked)">`
-                    : '';
+                const cbHtml = `<input type="checkbox" class="detection-select-cb" data-key="${{selKey}}" ${{isSelected ? 'checked' : ''}}
+                           onchange="toggleSelectItem('${{selKey}}', this.checked); this.closest('.detection-item').classList.toggle('sel-selected', this.checked)">`;
                 const bodyContent = `
                         <div class="time">${{d.time}} | ${{cameraLabel}}</div>
                         ${{thumb}}
@@ -2998,34 +2969,25 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 ${{imageAction}}
                                 ${{originalAction}}
                             </div>
-                            ${{selectionMode ? '' : manageActions}}
+                            ${{manageActions}}
                         </div>
                 `;
-                if (selectionMode) {{
-                    return `
+                return `
                     <div class="detection-item${{isSelected ? ' sel-selected' : ''}}">
                         <div class="detection-item-select-wrap">
                             ${{cbHtml}}
                             <div class="detection-item-body">${{bodyContent}}</div>
                         </div>
                     </div>
-                    `;
-                }}
-                return `
-                    <div class="detection-item">
-                        ${{bodyContent}}
-                    </div>
                 `;
             }}).join('');
 
-            const selModeLabel = selectionMode ? 'キャンセル' : '選択削除';
-            const selModeClass = selectionMode ? 'select-mode-btn active' : 'select-mode-btn';
-            const selectionToolbar = selectionMode ? `
+            const selectionToolbar = `
                 <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
                     <button class="select-all-btn" onclick="selectAll()">全選択 / 全解除</button>
                     <button class="select-delete-btn" id="select-delete-btn" onclick="deleteSelected()" disabled>選択した 0 件を削除</button>
                 </div>
-            ` : '';
+            `;
 
             listEl.innerHTML = `
                 <div class="date-group">
@@ -3033,7 +2995,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         <span>${{dateLabel(selectedDetectionDate)}}</span>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items:center;">
                             ${{bulkDeleteButtons}}
-                            <button class="${{selModeClass}}" onclick="toggleSelectionMode()">${{selModeLabel}}</button>
                         </div>
                     </div>
                     ${{selectionToolbar}}

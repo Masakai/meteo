@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ダッシュボード用Dockerイメージ（軽量）
 #
 # Copyright (c) 2026 Masanori Sakai
@@ -9,18 +10,14 @@ WORKDIR /app
 
 # ffmpeg・ハードウェアエンコード用ドライバーをインストール
 # intel-media-va-driver-non-free: VAAPIドライバー（amd64のみ / Debian non-free）
-# AllowInsecureRepositories: Docker Desktop for Mac の時刻ずれによるGPG検証失敗を回避
-RUN apt-get -o Acquire::AllowInsecureRepositories=true \
-            -o Acquire::Check-Valid-Until=false \
-            update && \
-    apt-get install -y --allow-unauthenticated --no-install-recommends \
-        ffmpeg && \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update --allow-releaseinfo-change && \
+    apt-get install -y --no-install-recommends ffmpeg && \
     if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        apt-get install -y --allow-unauthenticated --no-install-recommends \
+        apt-get install -y --no-install-recommends \
             intel-media-va-driver-non-free || true; \
-    fi && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
+    fi
 
 COPY requirements-docker.txt .
 RUN pip install --no-cache-dir -r requirements-docker.txt

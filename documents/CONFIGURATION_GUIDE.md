@@ -1,6 +1,6 @@
 # 設定ガイド (Configuration Guide)
 
-**バージョン: v3.4.5**
+**バージョン: v3.4.6**
 
 ---
 
@@ -1108,6 +1108,12 @@ python generate_compose.py --buffer 10
 ---
 
 ## バージョン別新機能
+
+### v3.4.6 - 全選択UI常時表示・Dockerfile.dashboard改善
+
+**変更点**:
+- 検出結果一覧の全選択UIを常時表示化（選択モードトグル廃止）。日付選択直後からチェックボックス・「全選択/全解除」・「選択した N 件を削除」ボタンが利用可能。
+- `Dockerfile.dashboard` の apt インストールを BuildKit cache mount 方式に変更。並列ビルド時のディスク枯渇を解消。
 
 ### v3.4.5 - YouTube配信エンコーダ3段階フォールバック・Dockerfile修正
 

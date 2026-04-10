@@ -27,6 +27,10 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.4.6 - 全選択UI常時表示・Dockerfile.dashboard改善
+- **変更**: 検出結果一覧の全選択UIを常時表示化（選択モードトグル廃止）
+- **修正**: `Dockerfile.dashboard` の apt インストールを BuildKit cache mount 方式に変更
+
 ### v3.4.5 - YouTube配信エンコーダ3段階フォールバック・Dockerfile修正
 - **変更**: YouTube 配信エンコーダを QSV → VAAPI → libx264 の3段階フォールバックに拡張
   - Intel QSV 利用可能時: `h264_qsv` 720p 2000kbps
