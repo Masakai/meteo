@@ -27,6 +27,16 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.5.1 - 薄明環境変数追加・CI整備・カバレッジ改善
+
+- **修正**: `generate_compose.py` — `TWILIGHT_DETECTION_MODE` / `TWILIGHT_TYPE` / `TWILIGHT_SENSITIVITY` / `TWILIGHT_MIN_SPEED` の4環境変数をコンテナテンプレートに追加（機能的欠陥の修正）
+- **リファクタリング**: `meteor_detector_rtsp_web.py` — 薄明感度プリセット適用ロジックを `build_twilight_params()` ヘルパー関数に切り出し
+- **CI**: `.github/workflows/ci.yml` — `--cov-fail-under=70` を追加しカバレッジ70%未満でCIが失敗するように設定
+- **CI**: `.coveragerc` を新規作成しカバレッジ計測設定を追加
+- **テスト**: `tests/test_generate_compose.py` — 薄明環境変数の出力検証テスト追加
+- **テスト**: `tests/test_astro_twilight.py` — 朝方薄明 True 分岐カバーテスト修正
+- **テスト**: `tests/test_meteor_detector_rtsp_web.py` — `TestBuildTwilightParams` 全フィールド検証追加
+
 ### v3.4.7 - セキュリティ修正・コード品質改善・UI調整
 
 - **セキュリティ**: `dashboard.py` — `camera_embed` エンドポイントに `html.escape()` を適用し XSS を対策

@@ -1,6 +1,12 @@
 import pytest
 import generate_compose as gc
-from generate_compose import generate_compose, generate_go2rtc_config
+from generate_compose import (
+    generate_compose,
+    generate_go2rtc_config,
+    _is_usable_candidate_ip,
+    generate_service,
+    generate_station_reporter,
+)
 
 
 def test_generate_compose_includes_webrtc_dashboard_and_go2rtc(tmp_path):
@@ -128,6 +134,136 @@ def test_generate_compose_no_exit_when_no_mask_and_cv2_unavailable(tmp_path, mon
 
     compose = generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
     assert "meteor-camera1" in compose
+
+
+def test_is_usable_candidate_ip_rejects_invalid_string():
+    assert _is_usable_candidate_ip("not-an-ip") is False
+
+
+def test_is_usable_candidate_ip_rejects_loopback():
+    assert _is_usable_candidate_ip("127.0.0.1") is False
+
+
+def test_is_usable_candidate_ip_accepts_private_ip():
+    assert _is_usable_candidate_ip("192.168.0.1") is True
+
+
+def test_generate_service_debug_tools_arg(tmp_path):
+    """debug_tools=True のとき DEBUG_TOOLS が出力されること"""
+    settings = {
+        **_BASE_SETTINGS,
+        "debug_tools": True,
+        "mask_dilate": "5",
+        "mask_save": "",
+    }
+    rtsp_info = {"host": "192.168.0.11", "url": "rtsp://user:pass@192.168.0.11/live", "display_name": "East"}
+    result = generate_service(1, rtsp_info, settings, 8081, "")
+    assert 'DEBUG_TOOLS: "true"' in result
+
+
+def test_generate_compose_mjpeg_mode(tmp_path):
+    """mjpeg モードでは CAMERA*_STREAM_KIND=mjpeg になること"""
+    streamers = tmp_path / "streamers"
+    streamers.write_text("rtsp://user:pass@192.168.0.11/live\n", encoding="utf-8")
+
+    settings = {**_BASE_SETTINGS, "streaming_mode": "mjpeg"}
+    compose = generate_compose(str(streamers), settings, base_port=8080)
+
+    assert "CAMERA1_STREAM_KIND=mjpeg" in compose
+    assert "meteor-go2rtc" not in compose
+
+
+def test_generate_compose_youtube_key(tmp_path):
+    """youtube_key が指定されたとき CAMERA*_YOUTUBE_KEY が出力されること"""
+    streamers = tmp_path / "streamers"
+    streamers.write_text("rtsp://user:pass@192.168.0.11/live|||youtube:mykey-xxxx\n", encoding="utf-8")
+
+    compose = generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
+
+    assert "CAMERA1_YOUTUBE_KEY=mykey-xxxx" in compose
+    assert "CAMERA1_RTSP_URL=" in compose
+
+
+def test_generate_station_reporter_contains_config_path():
+    result = generate_station_reporter("station.json")
+    assert "station.json" in result
+    assert "meteor-station-reporter" in result
+
+
+def test_generate_compose_invalid_url_no_password(tmp_path, capsys):
+    """無効URLでパスワードなしの場合、netloc がそのまま警告に出力されること"""
+    streamers = tmp_path / "streamers"
+    # パスワードなしの無効URL（http:// スキームは parse_rtsp_url が None を返す）
+    streamers.write_text("http://host/path\n", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
+
+    captured = capsys.readouterr()
+    assert "host" in captured.out
+    assert "***" not in captured.out
+
+
+def test_generate_compose_with_station_config(tmp_path):
+    """station_config が存在する場合、station-reporter サービスが含まれること"""
+    streamers = tmp_path / "streamers"
+    streamers.write_text("rtsp://user:pass@192.168.0.11/live\n", encoding="utf-8")
+
+    station_json = tmp_path / "station.json"
+    station_json.write_text('{"id": "test"}', encoding="utf-8")
+
+    settings = {**_BASE_SETTINGS, "station_config": str(station_json)}
+    compose = generate_compose(str(streamers), settings, base_port=8080)
+
+    assert "meteor-station-reporter" in compose
+
+
+def test_generate_compose_mask_path_success(tmp_path, monkeypatch):
+    """マスク画像が正常に生成される場合、compose にマスクパスが含まれること"""
+    mask_file = tmp_path / "mask.jpg"
+    mask_file.write_bytes(b"dummy")
+
+    streamers = tmp_path / "streamers"
+    streamers.write_text(f"rtsp://user:pass@192.168.0.11/live|{mask_file}|East\n", encoding="utf-8")
+
+    import generate_compose as gc_module
+    monkeypatch.setattr(gc_module, "cv2", object())  # cv2 が None でないようにする
+    monkeypatch.setattr(gc_module, "generate_mask_file", lambda *a, **kw: str(tmp_path / "masks/camera1_mask.png"))
+
+    compose = generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
+    assert "mask_image.png" in compose
+
+
+def test_generate_compose_mask_path_failure(tmp_path, monkeypatch, capsys):
+    """マスク生成が RuntimeError を送出した場合は sys.exit(1) すること"""
+    mask_file = tmp_path / "mask.jpg"
+    mask_file.write_bytes(b"dummy")
+
+    streamers = tmp_path / "streamers"
+    streamers.write_text(f"rtsp://user:pass@192.168.0.11/live|{mask_file}|East\n", encoding="utf-8")
+
+    import generate_compose as gc_module
+    monkeypatch.setattr(gc_module, "cv2", object())
+    monkeypatch.setattr(gc_module, "generate_mask_file", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("failed")))
+
+    with pytest.raises(SystemExit) as exc_info:
+        generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
+
+    assert exc_info.value.code == 1
+    assert "マスク生成に失敗" in capsys.readouterr().out
+
+
+def test_generate_compose_includes_twilight_env_vars(tmp_path):
+    """生成された compose に TWILIGHT_* 環境変数が含まれること"""
+    streamers = tmp_path / "streamers"
+    streamers.write_text("rtsp://user:pass@192.168.0.11/live||東側\n", encoding="utf-8")
+
+    compose = generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
+
+    assert "TWILIGHT_DETECTION_MODE=reduce" in compose
+    assert "TWILIGHT_TYPE=nautical" in compose
+    assert "TWILIGHT_SENSITIVITY=low" in compose
+    assert "TWILIGHT_MIN_SPEED=200" in compose
 
 
 def test_generate_compose_invalid_url_masks_password(tmp_path, capsys):

@@ -83,9 +83,7 @@ jobs:
 
       - name: Run pytest
         # pytest.ini の testpaths=tests / pythonpath=. を自動で参照する。
-        # --co (collect-only) を事前に実行しない: pytest.ini 設定が正しければ
-        # そのまま 129 件が収集される。
-        run: pytest -q --tb=short --cov=. --cov-report=term-missing
+        run: pytest -q --tb=short --cov=. --cov-report=term-missing --cov-fail-under=70
 
   # ------------------------------------------------------------------ #
   # Job 4: Dependency audit (pip-audit)                                  #

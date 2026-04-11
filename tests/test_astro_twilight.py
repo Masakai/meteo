@@ -128,6 +128,38 @@ class TestIsTwilightActive:
 
         assert result is True, "前日の朝方薄明ウィンドウ（日またぎ）でも薄明アクティブであること"
 
+    def test_morning_twilight_line112_is_active(self):
+        """is_twilight_active の朝方薄明 True 分岐（line 112）を直接カバーする。
+
+        get_twilight_window をモックして、today のウィンドウの morning 区間が
+        now と同日に収まるよう設定することで line 112 に到達させる。
+        """
+        import unittest.mock as mock
+        from zoneinfo import ZoneInfo
+
+        tz = ZoneInfo(TIMEZONE)
+        # now を 2026-04-12 04:30:00 JST（TARGET_DATE + 1日の早朝）に固定
+        # now.date() = 2026-04-12 = "today" として is_twilight_active が使う
+        now = datetime.datetime(2026, 4, 12, 4, 30, 0, tzinfo=tz)
+
+        # get_twilight_window(today=2026-04-12) が返す morning window が
+        # now を含むようにモックする（今日付で早朝の時刻帯）
+        morn_start = datetime.datetime(2026, 4, 12, 4, 0, 0, tzinfo=tz)
+        morn_end = datetime.datetime(2026, 4, 12, 5, 0, 0, tzinfo=tz)
+        eve_start = datetime.datetime(2026, 4, 12, 18, 0, 0, tzinfo=tz)
+        eve_end = datetime.datetime(2026, 4, 12, 19, 0, 0, tzinfo=tz)
+
+        with mock.patch("astro_twilight_utils.datetime") as mock_dt, \
+             mock.patch("astro_twilight_utils.get_twilight_window") as mock_gtw:
+            mock_dt.datetime.now.return_value = now
+            mock_dt.date = datetime.date
+            mock_dt.timedelta = datetime.timedelta
+            mock_gtw.return_value = ((eve_start, eve_end), (morn_start, morn_end))
+
+            result = is_twilight_active(LATITUDE, LONGITUDE, TIMEZONE, "nautical")
+
+        assert result is True, "朝方薄明ウィンドウ内（line 112）で True を返すこと"
+
     def test_invalid_twilight_type_raises(self):
         """不正な twilight_type は ValueError を発生させる"""
         with pytest.raises(ValueError):

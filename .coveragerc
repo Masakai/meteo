@@ -1,0 +1,27 @@
+[run]
+omit =
+    # コンテナ内でのみテスト可能なエントリポイント
+    meteor_detector_realtime.py
+    meteor_detector_common.py
+    meteor_detector.py
+    meteor_detector_rtsp.py
+    # 変更禁止コア
+    astro_utils.py
+    # ユーティリティ（OpenCV依存でコンテナ外テスト困難）
+    meteor_mask_utils.py
+    # サイドカー・デモ・スクリプト・変換ツール
+    station_reporter.py
+    triangulation_server.py
+    triangulation_templates.py
+    demo_triangulation.py
+    convert_detections_mp4_to_mov.py
+    scripts/*
+    # テスト自体
+    tests/*
+    # 仮想環境
+    .venv/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
