@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ------------------------------------------------------------------ #
+  # Job 1: Lint (flake8)                                                 #
+  # Docker不要。ホスト上の仮想環境で高速実行する。                       #
+  # ------------------------------------------------------------------ #
+  lint:
+    name: Lint (flake8)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install lint dependencies
+        run: pip install flake8
+
+      - name: Run flake8
+        # 設定はプロジェクトルートの .flake8 を自動参照する。
+        # 既存コードの文体ルール (E128, F401 等) は .flake8 で管理済み。
+        run: flake8 .
+
+  # ------------------------------------------------------------------ #
+  # Job 2: Security scan (bandit)                                        #
+  # パストラバーサル対策・認証情報ハードコードを自動検出する。            #
+  # ------------------------------------------------------------------ #
+  security:
+    name: Security scan (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit
+        # B104 (bind all interfaces) は Docker 運用上の意図的な設定のため除外。
+        # B310 (urlopen) は go2rtc プロキシの意図的な実装のため除外。
+        # B324 (sha1) は ID 生成用途 (非セキュリティ) で変更禁止コアが含まれるため除外。
+        # B603/B607 (subprocess without shell) は generate_compose.py で使用している既知のパターン。
+        # severity=medium 以上のみ失敗とする。
+        run: |
+          bandit \
+            --recursive \
+            --skip B104,B310,B324,B603,B607 \
+            --severity-level medium \
+            --confidence-level medium \
+            --exclude ./.venv,./.claude \
+            .
+
+  # ------------------------------------------------------------------ #
+  # Job 3: Unit tests (pytest)                                           #
+  # コンテナ非依存のテストのみ。pytest.ini の testpaths=tests を使用。   #
+  # ------------------------------------------------------------------ #
+  unit-tests:
+    name: Unit tests (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run pytest
+        # pytest.ini の testpaths=tests / pythonpath=. を自動で参照する。
+        # --co (collect-only) を事前に実行しない: pytest.ini 設定が正しければ
+        # そのまま 129 件が収集される。
+        run: pytest -q --tb=short --cov=. --cov-report=term-missing
+
+  # ------------------------------------------------------------------ #
+  # Job 4: Dependency audit (pip-audit)                                  #
+  # 既知の脆弱性を持つパッケージを検出する。                             #
+  # ------------------------------------------------------------------ #
+  dep-audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt

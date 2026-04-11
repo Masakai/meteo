@@ -1,0 +1,38 @@
+[flake8]
+max-line-length = 120
+extend-ignore =
+    # 行の折り返しスタイル (Black / 既存コードスタイルに合わせて緩和)
+    E501,
+    W503,
+    E128,
+    E127,
+    # 2行空行ルール (既存コードで広く使われているスタイル)
+    E302,
+    E303,
+    # 未使用 import (既存コードに多数存在; 別途 cleanup タスクとして管理)
+    F401,
+    # 未使用変数 (既存コードに存在)
+    F841,
+    # f-string placeholder なし (既存コードに存在)
+    F541,
+    # モジュール先頭以外の import (既存コードのパターン)
+    E402,
+    # whitespace before/after brackets (triangulation/ の numpy スライス記法)
+    E201,
+    E202,
+    E203,
+    # 複数 import on 1行 (既存テストコード)
+    E401
+
+per-file-ignores =
+    # 変更禁止コア: F824 (未使用 global 宣言) を除外
+    meteor_detector_rtsp_web.py: F824
+    # scripts は品質ゲート対象外
+    scripts/*: E741
+
+exclude =
+    .venv,
+    __pycache__,
+    site,
+    .claude,
+    .git

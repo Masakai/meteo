@@ -150,7 +150,7 @@ def _make_detection_id(camera_name, record):
         "start_point": record.get("start_point", ""),
         "end_point": record.get("end_point", ""),
     }
-    digest = hashlib.sha1(json.dumps(source, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    digest = hashlib.sha1(json.dumps(source, sort_keys=True, ensure_ascii=False).encode("utf-8"), usedforsecurity=False).hexdigest()
     return f"det_{digest[:20]}"
 
 

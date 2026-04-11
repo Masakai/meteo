@@ -152,7 +152,7 @@ def triangulate_meteor(
 
     # 一意なID生成
     id_source = f"{det_a.detection_id}_{det_b.detection_id}"
-    meteor_id = "tri_" + hashlib.sha1(id_source.encode()).hexdigest()[:16]
+    meteor_id = "tri_" + hashlib.sha1(id_source.encode(), usedforsecurity=False).hexdigest()[:16]
 
     # タイムスタンプは2つの検出の平均
     avg_ts = det_a.timestamp.timestamp() + (
