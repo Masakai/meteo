@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-04-12
+### Fixed
+- `meteor_detector_rtsp_web.py`: flake8 E221（複数スペース）エラーを修正。
+
+### Changed
+- `generate_compose.py`: 薄明設定環境変数（`TWILIGHT_DETECTION_MODE` / `TWILIGHT_TYPE` / `TWILIGHT_SENSITIVITY` / `TWILIGHT_MIN_SPEED`）をコンテナテンプレートに追加。未設定でも機能が動作しなかった欠陥を修正。
+- `meteor_detector_rtsp_web.py`: 薄明パラメータ切り替えロジックを `build_twilight_params()` ヘルパー関数として切り出し。
+- `.coveragerc`: カバレッジ計測設定を追加。`build_twilight_params()` がカバレッジ対象になるよう調整。
+
+### Added
+- `.github/workflows/ci.yml`: カバレッジ閾値 `--cov-fail-under=70` を追加。
+- `tests/`: `TestBuildTwilightParams`・朝方薄明 True 分岐・薄明環境変数出力検証など18件のテストを追加（合計157件）。
+
+## [3.5.0] - 2026-04-12
+### Added
+- 薄明時の鳥誤認識抑制機能を追加（`astro_twilight_utils.py`）。
+  - 薄明期間（civil / nautical / astronomical）を自動判定し、検出感度を自動切り替え。
+  - `TWILIGHT_DETECTION_MODE=reduce`: 薄明時に厳しい感度プリセットで検出継続（鳥の低速移動を排除）。
+  - `TWILIGHT_DETECTION_MODE=skip`: 薄明時に検出を完全停止。
+  - 60秒キャッシュで薄明判定のコストを最小化。
+  - `/stats` レスポンスに `twilight_active` / `twilight_detection_mode` / `twilight_type` を追加。
+- 薄明設定UIパネルを設定画面（`/settings`）に追加。
+- `.github/workflows/ci.yml`: lint / security / unit-tests / dep-audit の4ジョブ構成CIを追加。
+- `tests/test_astro_twilight.py`: 薄明計算ユニットテスト10件を追加。
+
+### Changed
+- `documents/CONFIGURATION_GUIDE.md`: 薄明設定環境変数4つ（`TWILIGHT_DETECTION_MODE` / `TWILIGHT_TYPE` / `TWILIGHT_SENSITIVITY` / `TWILIGHT_MIN_SPEED`）を追記。
+- `documents/API_REFERENCE.md`: `/stats` レスポンス例・`TWILIGHT_SKIP` ステータスを追記。
+
+## [3.4.7] - 2026-04-12
+### Security
+- `dashboard.py`: `camera_embed` エンドポイントの `display_name` を `html.escape()` でエスケープ（XSS対策）。
+- `dashboard_camera_handlers.py`: YouTube ffmpeg エラーログから RTMP URL（ストリームキー）が漏洩しないよう、例外の型名のみをログ出力するよう変更。
+- `generate_compose.py`: 無効URL警告ログの RTSP 認証情報をマスク（`***` に置換）。
+
+### Fixed
+- `dashboard.py`: `go2rtc_asset` エンドポイントで `URLError` / `ValueError` / `TimeoutError` 発生時に503を返すよう修正。
+- `generate_compose.py`: `_replace()` プライベートAPI使用を `urlunparse()` タプル形式に変更。
+- `dashboard_templates.py`: 削除ボタンの表示制御を改善。
+- `go2rtc.yaml` を git 管理から除外（`.gitignore` 対象だったが追跡が残っていた）。
+
+### Changed
+- `generate_compose.py`: 関数内 `import os` をモジュールレベルに移動（PEP 8準拠）。
+- `pytest.ini`: `testpaths = tests` を明示し、不要なディレクトリの収集エラーを解消。
+
+### Added
+- `tests/`: セキュリティ修正に対応するテスト5件を追加（503エラーハンドリング×3・XSSエスケープ・URLマスク）。
+
 ## [3.4.6] - 2026-04-10
 ### Changed
 - 検出結果一覧の全選択UIを常時表示化。
