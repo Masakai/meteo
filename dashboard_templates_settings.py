@@ -185,6 +185,52 @@ def render_settings_html(cameras, version):
         </div>
 
         <div class="panel">
+            <h2>薄明時の検出設定</h2>
+            <details class="help">
+                <summary>HELP</summary>
+                <p class="help-note">薄明（日の出・日の入り前後）に飛翔する鳥など移動が遅い物体の誤認識を抑制します。</p>
+                <table class="help-table">
+                    <thead>
+                        <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>TWILIGHT_DETECTION_MODE</td><td>薄明時の動作</td><td>reduce: 感度を下げて検出継続 / skip: 検出を停止</td></tr>
+                        <tr><td>TWILIGHT_TYPE</td><td>薄明の種類（太陽の沈み角）</td><td>civil=6° / nautical=12° / astronomical=18°。深いほど薄明期間が長くなる</td></tr>
+                        <tr><td>TWILIGHT_SENSITIVITY</td><td>reduce モード時の感度プリセット</td><td>lowが推奨（鳥など遅い物体の誤認識を減らす）</td></tr>
+                        <tr><td>TWILIGHT_MIN_SPEED</td><td>reduce モード時の最小速度(px/秒)</td><td>鳥は遅いため高めに設定すると誤認識を抑制できる</td></tr>
+                    </tbody>
+                </table>
+            </details>
+            <div class="grid">
+                <div>
+                    <label>薄明時の動作モード（TWILIGHT_DETECTION_MODE）</label>
+                    <select id="twilight_detection_mode">
+                        <option value="reduce">reduce（感度を下げて検出継続）</option>
+                        <option value="skip">skip（薄明中は検出を停止）</option>
+                    </select>
+                </div>
+                <div>
+                    <label>薄明の種類（TWILIGHT_TYPE）</label>
+                    <select id="twilight_type">
+                        <option value="civil">civil（太陽高度 -6°）</option>
+                        <option value="nautical">nautical（太陽高度 -12°）</option>
+                        <option value="astronomical">astronomical（太陽高度 -18°）</option>
+                    </select>
+                </div>
+                <div>
+                    <label>reduce モード時の感度（TWILIGHT_SENSITIVITY）</label>
+                    <select id="twilight_sensitivity">
+                        <option value="low">low</option>
+                        <option value="medium">medium</option>
+                        <option value="high">high</option>
+                        <option value="faint">faint</option>
+                    </select>
+                </div>
+                <div><label>reduce モード時の最小速度 px/秒（TWILIGHT_MIN_SPEED）</label><input id="twilight_min_speed" type="number" step="1" min="0"></div>
+            </div>
+        </div>
+
+        <div class="panel">
             <h2>基本検出</h2>
             <details class="help">
                 <summary>HELP</summary>
@@ -294,6 +340,7 @@ def render_settings_html(cameras, version):
         const fields = [
             'sensitivity', 'scale', 'buffer', 'extract_clips',
             'clip_margin_before', 'clip_margin_after',
+            'twilight_detection_mode', 'twilight_type', 'twilight_sensitivity', 'twilight_min_speed',
             'diff_threshold', 'min_brightness', 'min_brightness_tracking',
             'min_length', 'max_length', 'min_duration', 'max_duration', 'min_speed',
             'min_linearity', 'exclude_bottom_ratio', 'exclude_edge_ratio',
@@ -339,7 +386,11 @@ def render_settings_html(cameras, version):
             mask_image: '',
             mask_from_day: '',
             nuisance_mask_image: '',
-            nuisance_from_night: ''
+            nuisance_from_night: '',
+            twilight_detection_mode: 'reduce',
+            twilight_type: 'nautical',
+            twilight_sensitivity: 'low',
+            twilight_min_speed: 200
         }};
 
         function setStatus(message) {{

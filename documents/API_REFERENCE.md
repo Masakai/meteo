@@ -1245,6 +1245,9 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
   "detection_window_active": true,
   "detection_window_start": "2026-03-09 17:46:53",
   "detection_window_end": "2026-03-10 06:03:38",
+  "twilight_active": false,
+  "twilight_detection_mode": "reduce",
+  "twilight_type": "nautical",
   "recording": {
     "supported": true,
     "state": "scheduled",
@@ -1290,11 +1293,14 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `stream_alive` | boolean | ストリーム生存確認 |
 | `time_since_last_frame` | float | 最終フレームからの経過時間（秒） |
 | `is_detecting` | boolean | 現在検出処理中か |
-| `detection_status` | string | 検出状態詳細。`DETECTING` / `OUT_OF_WINDOW` / `WAITING_FRAME` / `STREAM_LOST` |
+| `detection_status` | string | 検出状態詳細。`DETECTING` / `OUT_OF_WINDOW` / `TWILIGHT_SKIP` / `WAITING_FRAME` / `STREAM_LOST` |
 | `detection_window_enabled` | boolean | 検出時間帯制限が有効か |
 | `detection_window_active` | boolean | 現在が検出時間帯内か |
 | `detection_window_start` | string | 現在参照中の検出開始時刻 |
 | `detection_window_end` | string | 現在参照中の検出終了時刻 |
+| `twilight_active` | boolean | 現在が薄明期間内か |
+| `twilight_detection_mode` | string | 薄明時の検出モード。`reduce`（感度低下）/ `skip`（検出停止） |
+| `twilight_type` | string | 薄明種別。`civil` / `nautical` / `astronomical` |
 | `recording` | object | 手動録画状態 |
 | `recording.supported` | boolean | 手動録画機能が利用可能か |
 | `recording.state` | string | `idle` / `scheduled` / `recording` / `completed` / `failed` / `stopped` |

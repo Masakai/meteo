@@ -25,6 +25,7 @@ import signal
 import sys
 import os
 import socket
+import copy
 import subprocess
 import shutil
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -55,6 +56,11 @@ try:
     from astro_utils import is_detection_active
 except ImportError:
     is_detection_active = None
+
+try:
+    from astro_twilight_utils import is_twilight_active
+except ImportError:
+    is_twilight_active = None
 
 
 # グローバル変数（Webサーバー用）
@@ -94,6 +100,9 @@ current_pending_mask_save_path = None
 current_pending_mask_lock = Lock()
 current_recording_lock = RLock()
 current_recording_job = None
+current_twilight_active = False
+current_twilight_detection_mode = "reduce"
+current_twilight_type = "nautical"
 try:
     STREAM_JPEG_QUALITY = max(30, min(95, int(os.environ.get("STREAM_JPEG_QUALITY", "60"))))
 except ValueError:
@@ -689,6 +698,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):
             self.end_headers()
             global current_detection_window_enabled, current_detection_window_active
             global current_detection_window_start, current_detection_window_end, current_detection_status
+            global current_twilight_active, current_twilight_detection_mode, current_twilight_type
             elapsed = time.time() - start_time_global if start_time_global else 0
             current_time = time.time()
             time_since_last_frame = current_time - last_frame_time if last_frame_time > 0 else 0
@@ -721,6 +731,9 @@ class MJPEGHandler(BaseHTTPRequestHandler):
                 "mask_active": mask_active,
                 "mask_update_pending": has_pending_mask,
                 "recording": recording,
+                "twilight_active": current_twilight_active,
+                "twilight_detection_mode": current_twilight_detection_mode,
+                "twilight_type": current_twilight_type,
             }
             self.wfile.write(json.dumps(stats).encode())
         elif path == '/recording/status':
@@ -1420,6 +1433,10 @@ def detection_thread_worker(
     latitude=35.3606,
     longitude=138.7274,
     timezone="Asia/Tokyo",
+    twilight_detection_mode="reduce",
+    twilight_type="nautical",
+    twilight_sensitivity="low",
+    twilight_min_speed=200.0,
 ):
     """検出処理を行うワーカースレッド"""
     global current_frame, current_frame_seq, current_stream_jpeg, current_stream_jpeg_seq
@@ -1432,6 +1449,7 @@ def detection_thread_worker(
     global current_detection_window_enabled, current_detection_window_active
     global current_detection_window_start, current_detection_window_end, current_detection_status
     global current_detection_enabled
+    global current_twilight_active, current_twilight_detection_mode, current_twilight_type
 
     width, height = reader.frame_size
     proc_width = int(width * process_scale)
@@ -1525,6 +1543,12 @@ def detection_thread_worker(
         current_detection_window_end = ""
     current_detection_status = "WAITING_FRAME"
 
+    # 薄明判定キャッシュ（60秒ごとに更新）
+    last_twilight_check = 0.0
+    cached_twilight = False
+    current_twilight_detection_mode = twilight_detection_mode
+    current_twilight_type = twilight_type
+
     while not stop_flag.is_set():
         ret, timestamp, frame = reader.read()
         if not ret:
@@ -1567,6 +1591,16 @@ def detection_thread_worker(
             current_detection_window_start = detection_start.strftime("%Y-%m-%d %H:%M:%S")
             current_detection_window_end = detection_end.strftime("%Y-%m-%d %H:%M:%S")
 
+        # 薄明判定（60秒キャッシュ）
+        now_mono = time.time()
+        if is_twilight_active is not None and now_mono - last_twilight_check >= 60.0:
+            try:
+                cached_twilight = is_twilight_active(latitude, longitude, timezone, twilight_type)
+            except Exception:
+                cached_twilight = False
+            current_twilight_active = cached_twilight
+            last_twilight_check = now_mono
+
         objects = []
         if prev_gray is not None:
             # 検出期間内の場合のみ検出処理を実行
@@ -1575,11 +1609,52 @@ def detection_thread_worker(
                 is_detecting_now = False
                 current_detection_status = "DISABLED"
             elif is_detection_time:
-                # アクティブなトラックがある場合は追跡モードを有効化
-                tracking_mode = len(detector.active_tracks) > 0
-                objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
-                is_detecting_now = True
-                current_detection_status = "DETECTING"
+                if cached_twilight and is_twilight_active is not None:
+                    if twilight_detection_mode == "skip":
+                        objects = []
+                        is_detecting_now = False
+                        current_detection_status = "TWILIGHT_SKIP"
+                    else:
+                        # reduce モード: 感度プリセットと min_speed を上書きした params で検出
+                        twilight_params = copy.copy(params)
+                        if twilight_sensitivity == "low":
+                            twilight_params.diff_threshold = 40
+                            twilight_params.min_brightness = 220
+                            twilight_params.min_speed = twilight_min_speed
+                        elif twilight_sensitivity == "medium":
+                            twilight_params.diff_threshold = 30
+                            twilight_params.min_brightness = 210
+                            twilight_params.min_speed = twilight_min_speed
+                        elif twilight_sensitivity == "high":
+                            twilight_params.diff_threshold = 20
+                            twilight_params.min_brightness = 180
+                            twilight_params.min_speed = twilight_min_speed
+                        elif twilight_sensitivity == "faint":
+                            twilight_params.diff_threshold = 16
+                            twilight_params.min_brightness = 150
+                            twilight_params.min_length = 10
+                            twilight_params.min_duration = 0.06
+                            twilight_params.min_speed = 10.0
+                            twilight_params.min_linearity = 0.55
+                            twilight_params.min_track_points = 3
+                            twilight_params.min_area = 5
+                            twilight_params.max_distance = 90
+                        # detector の params を一時差し替えて検出し、元に戻す
+                        orig_params = detector.params
+                        detector.params = twilight_params
+                        try:
+                            tracking_mode = len(detector.active_tracks) > 0
+                            objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
+                        finally:
+                            detector.params = orig_params
+                        is_detecting_now = True
+                        current_detection_status = "DETECTING"
+                else:
+                    # アクティブなトラックがある場合は追跡モードを有効化
+                    tracking_mode = len(detector.active_tracks) > 0
+                    objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
+                    is_detecting_now = True
+                    current_detection_status = "DETECTING"
             else:
                 objects = []
                 is_detecting_now = False
@@ -1930,6 +2005,41 @@ def process_rtsp_stream(
     longitude = float(os.environ.get('LONGITUDE', '138.7274'))
     timezone = os.environ.get('TIMEZONE', 'Asia/Tokyo')
 
+    TWILIGHT_DETECTION_MODE = os.environ.get("TWILIGHT_DETECTION_MODE", "reduce")  # "reduce" or "skip"
+    TWILIGHT_TYPE           = os.environ.get("TWILIGHT_TYPE", "nautical")           # "civil"/"nautical"/"astronomical"
+    TWILIGHT_SENSITIVITY    = os.environ.get("TWILIGHT_SENSITIVITY", "low")         # sensitivity preset
+    try:
+        TWILIGHT_MIN_SPEED = float(os.environ.get("TWILIGHT_MIN_SPEED", "200"))
+    except ValueError:
+        TWILIGHT_MIN_SPEED = 200.0
+
+    _valid_twilight_modes = {"reduce", "skip"}
+    if TWILIGHT_DETECTION_MODE not in _valid_twilight_modes:
+        print(
+            f"WARNING: TWILIGHT_DETECTION_MODE={TWILIGHT_DETECTION_MODE!r} は無効です。"
+            " デフォルト 'reduce' を使用します。",
+            flush=True,
+        )
+        TWILIGHT_DETECTION_MODE = "reduce"
+
+    _valid_twilight_sensitivities = {"low", "medium", "high", "faint"}
+    if TWILIGHT_SENSITIVITY not in _valid_twilight_sensitivities:
+        print(
+            f"WARNING: TWILIGHT_SENSITIVITY={TWILIGHT_SENSITIVITY!r} は無効です。"
+            " デフォルト 'low' を使用します。",
+            flush=True,
+        )
+        TWILIGHT_SENSITIVITY = "low"
+
+    _valid_twilight_types = {"civil", "nautical", "astronomical"}
+    if TWILIGHT_TYPE not in _valid_twilight_types:
+        print(
+            f"WARNING: TWILIGHT_TYPE={TWILIGHT_TYPE!r} は無効です。"
+            " デフォルト 'nautical' を使用します。",
+            flush=True,
+        )
+        TWILIGHT_TYPE = "nautical"
+
     if enable_time_window:
         print(f"検出時間制限: 有効（緯度: {latitude}, 経度: {longitude}）", flush=True)
     else:
@@ -1953,6 +2063,10 @@ def process_rtsp_stream(
             'latitude': latitude,
             'longitude': longitude,
             'timezone': timezone,
+            'twilight_detection_mode': TWILIGHT_DETECTION_MODE,
+            'twilight_type': TWILIGHT_TYPE,
+            'twilight_sensitivity': TWILIGHT_SENSITIVITY,
+            'twilight_min_speed': TWILIGHT_MIN_SPEED,
         },
         daemon=False,
     )

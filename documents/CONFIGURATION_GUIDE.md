@@ -66,6 +66,10 @@ docker-compose.ymlで設定される環境変数:
 | `NUISANCE_DILATE` | `3` | ノイズ帯マスク拡張ピクセル数（v1.12.0+） | `2` / `5` |
 | `NUISANCE_OVERLAP_THRESHOLD` | `0.3` | ノイズ帯重複率閾値（v1.12.0+） | `0.2` ~ `0.5` |
 | `EXCLUDE_EDGE_RATIO` | `0.0` | 画面四辺除外率（v1.16.0+） | `0.0` ~ `0.2` |
+| `TWILIGHT_DETECTION_MODE` | `reduce` | 薄明時の検出動作（v3.5.0+） | `reduce`（感度を下げて継続）/ `skip`（停止） |
+| `TWILIGHT_TYPE` | `nautical` | 薄明の種類・太陽沈み角（v3.5.0+） | `civil`(6°) / `nautical`(12°) / `astronomical`(18°) |
+| `TWILIGHT_SENSITIVITY` | `low` | `reduce` モード時の感度プリセット（v3.5.0+） | `low` / `medium` / `high` / `faint` |
+| `TWILIGHT_MIN_SPEED` | `200` | `reduce` モード時の最小速度 px/秒（v3.5.0+）。鳥など遅い物体の誤認識を抑制 | `100` ~ `500` |
 
 ### ダッシュボードの環境変数
 
