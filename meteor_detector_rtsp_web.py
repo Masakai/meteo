@@ -2021,8 +2021,8 @@ def process_rtsp_stream(  # pragma: no cover
     timezone = os.environ.get('TIMEZONE', 'Asia/Tokyo')
 
     TWILIGHT_DETECTION_MODE = os.environ.get("TWILIGHT_DETECTION_MODE", "reduce")  # "reduce" or "skip"
-    TWILIGHT_TYPE           = os.environ.get("TWILIGHT_TYPE", "nautical")           # "civil"/"nautical"/"astronomical"
-    TWILIGHT_SENSITIVITY    = os.environ.get("TWILIGHT_SENSITIVITY", "low")         # sensitivity preset
+    TWILIGHT_TYPE = os.environ.get("TWILIGHT_TYPE", "nautical")  # "civil"/"nautical"/"astronomical"
+    TWILIGHT_SENSITIVITY = os.environ.get("TWILIGHT_SENSITIVITY", "low")  # sensitivity preset
     try:
         TWILIGHT_MIN_SPEED = float(os.environ.get("TWILIGHT_MIN_SPEED", "200"))
     except ValueError:
