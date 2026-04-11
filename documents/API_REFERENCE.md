@@ -27,6 +27,18 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.4.7 - セキュリティ修正・コード品質改善・UI調整
+
+- **セキュリティ**: `dashboard.py` — `camera_embed` エンドポイントに `html.escape()` を適用し XSS を対策
+- **セキュリティ**: `dashboard_camera_handlers.py` — YouTube ストリームキーのログ漏洩を防止
+- **セキュリティ**: `generate_compose.py` — 無効URL警告ログの RTSP 認証情報をマスク
+- **品質**: `dashboard.py` — `go2rtc_asset` エンドポイントのエラーハンドリング追加
+- **品質**: `generate_compose.py` — 関数内 `import os` 解消・非推奨の `_replace()` 除去
+- **品質**: `pytest.ini` — `testpaths` 設定追加
+- **テスト**: セキュリティ修正に対応するテスト5件追加
+- **UI**: `dashboard_templates.py` — 削除ボタンの表示制御変更
+- **管理**: `go2rtc.yaml` を git 管理下から除外
+
 ### v3.4.6 - 全選択UI常時表示・Dockerfile.dashboard改善
 - **変更**: 検出結果一覧の全選択UIを常時表示化（選択モードトグル廃止）
 - **修正**: `Dockerfile.dashboard` の apt インストールを BuildKit cache mount 方式に変更

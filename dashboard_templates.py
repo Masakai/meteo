@@ -2692,6 +2692,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             const normalized = label === 'post_detected' ? 'post_detected' : 'detected';
             const previous = groupEl.dataset.label || 'detected';
             setDetectionLabelSelection(groupEl, normalized);
+            const manageEl = groupEl.closest('.detection-manage-actions');
+            const deleteBtn = manageEl ? manageEl.querySelector('.delete-btn') : null;
+            if (deleteBtn) deleteBtn.style.display = normalized === 'detected' ? 'none' : '';
             fetch('/detection_label', {{
                 method: 'POST',
                 headers: {{
@@ -2711,6 +2714,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             .catch((err) => {{
                 alert('ラベル更新に失敗しました: ' + err.message);
                 setDetectionLabelSelection(groupEl, previous);
+                if (deleteBtn) deleteBtn.style.display = previous === 'detected' ? 'none' : '';
             }});
         }}
 
@@ -2954,7 +2958,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                         <span>それ以外</span>
                                     </label>
                                 </div>
-                                <button class="delete-btn" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
+                                <button class="delete-btn" style="${{normalizedLabel === 'detected' ? 'display:none' : ''}}" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
                             </div>
                 `;
                 const cbHtml = `<input type="checkbox" class="detection-select-cb" data-key="${{selKey}}" ${{isSelected ? 'checked' : ''}}
@@ -2982,22 +2986,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 `;
             }}).join('');
 
-            const selectionToolbar = `
-                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
-                    <button class="select-all-btn" onclick="selectAll()">全選択 / 全解除</button>
-                    <button class="select-delete-btn" id="select-delete-btn" onclick="deleteSelected()" disabled>選択した 0 件を削除</button>
-                </div>
-            `;
-
             listEl.innerHTML = `
                 <div class="date-group">
                     <div class="date-group-header">
                         <span>${{dateLabel(selectedDetectionDate)}}</span>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items:center;">
+                            <button class="select-all-btn" onclick="selectAll()">全選択 / 全解除</button>
+                            <button class="select-delete-btn" id="select-delete-btn" onclick="deleteSelected()" disabled>選択した 0 件を削除</button>
                             ${{bulkDeleteButtons}}
                         </div>
                     </div>
-                    ${{selectionToolbar}}
                     <div class="detection-group-grid">
                         ${{items}}
                     </div>

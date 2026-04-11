@@ -151,6 +151,89 @@ def test_create_app_go2rtc_asset_proxy(monkeypatch):
     assert response.get_data(as_text=True) == "console.log('ok');"
 
 
+_GO2RTC_CAMERAS = [
+    {
+        "name": "cam1",
+        "url": "http://localhost:8081",
+        "display_name": "東側",
+        "stream_kind": "webrtc",
+        "stream_url": "http://localhost:1984/stream.html?src=camera1&mode=webrtc",
+    }
+]
+
+
+def test_go2rtc_asset_returns_503_on_url_error(monkeypatch):
+    from urllib.error import URLError
+
+    monkeypatch.setattr(dashboard, "_started", True)
+    monkeypatch.setattr(dashboard, "CAMERAS", _GO2RTC_CAMERAS)
+
+    def _raise_url_error(req, timeout=0):
+        raise URLError("connection refused")
+
+    monkeypatch.setattr(dashboard, "urlopen", _raise_url_error)
+
+    app = dashboard.create_app()
+    response = app.test_client().get("/go2rtc_asset/video-stream.js")
+
+    assert response.status_code == 503
+
+
+def test_go2rtc_asset_returns_503_on_value_error(monkeypatch):
+    monkeypatch.setattr(dashboard, "_started", True)
+    monkeypatch.setattr(dashboard, "CAMERAS", _GO2RTC_CAMERAS)
+
+    def _raise_value_error(req, timeout=0):
+        raise ValueError("invalid url")
+
+    monkeypatch.setattr(dashboard, "urlopen", _raise_value_error)
+
+    app = dashboard.create_app()
+    response = app.test_client().get("/go2rtc_asset/video-stream.js")
+
+    assert response.status_code == 503
+
+
+def test_go2rtc_asset_returns_503_on_timeout_error(monkeypatch):
+    monkeypatch.setattr(dashboard, "_started", True)
+    monkeypatch.setattr(dashboard, "CAMERAS", _GO2RTC_CAMERAS)
+
+    def _raise_timeout_error(req, timeout=0):
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(dashboard, "urlopen", _raise_timeout_error)
+
+    app = dashboard.create_app()
+    response = app.test_client().get("/go2rtc_asset/video-stream.js")
+
+    assert response.status_code == 503
+
+
+def test_camera_embed_xss_display_name_is_escaped(monkeypatch):
+    monkeypatch.setattr(dashboard, "_started", True)
+    monkeypatch.setattr(
+        dashboard,
+        "CAMERAS",
+        [
+            {
+                "name": "cam1",
+                "url": "http://localhost:8081",
+                "display_name": "<script>alert(1)</script>",
+                "stream_kind": "webrtc",
+                "stream_url": "http://localhost:1984/stream.html?src=camera1&mode=webrtc",
+            }
+        ],
+    )
+
+    app = dashboard.create_app()
+    response = app.test_client().get("/camera_embed/0")
+
+    body = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "<script>alert(1)</script>" not in body
+    assert "&lt;script&gt;" in body
+
+
 def test_create_app_go2rtc_asset_proxy_uses_container_host_inside_docker(monkeypatch):
     monkeypatch.setattr(dashboard, "_started", True)
     monkeypatch.setattr(

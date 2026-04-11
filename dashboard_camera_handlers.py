@@ -488,7 +488,7 @@ def _youtube_loop(camera_index: int, cmd: list, ffmpeg_log_path: str | None) -> 
             _youtube_processes.pop(camera_index, None)
             logger.info("youtube camera%d ffmpeg exited (rc=%d)", camera_index + 1, proc.returncode)
         except Exception as exc:
-            logger.error("youtube camera%d error: %s", camera_index + 1, exc)
+            logger.error("youtube camera%d error: %s", camera_index + 1, type(exc).__name__)
 
         if not _youtube_active.get(camera_index, False):
             break

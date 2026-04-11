@@ -12,11 +12,13 @@ Licensed under the MIT License
 
 import argparse
 import ipaddress
+import os
 import re
 import socket
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 try:
     import cv2
@@ -234,7 +236,6 @@ def generate_dashboard(cameras: list, base_port: int, settings: dict) -> str:
     depends_str = "\n      - ".join(depends)
 
     # Intel QSV用: /dev/dri が存在する環境のみデバイスマッピングを追加
-    import os
     if os.path.exists("/dev/dri"):
         dri_devices_str = "    devices:\n      - /dev/dri:/dev/dri\n"
     else:
@@ -408,7 +409,14 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
                     sys.exit(1)
             services.append(generate_service(i, info, settings, web_port, mask_image))
         else:
-            print(f"警告: 無効なURL (行{i}): {parsed['url']}")
+            _u = urlparse(parsed['url'])
+            if _u.password:
+                _host_port = f"{_u.hostname}:{_u.port}" if _u.port else _u.hostname or ""
+                _netloc = f"{_u.username}:***@{_host_port}"
+            else:
+                _netloc = _u.netloc
+            _masked = urlunparse((_u.scheme, _netloc, _u.path, _u.params, _u.query, _u.fragment))
+            print(f"警告: 無効なURL (行{i}): {_masked}")
 
     if not services:
         raise ValueError("有効なRTSPストリームが見つかりません")

@@ -128,3 +128,17 @@ def test_generate_compose_no_exit_when_no_mask_and_cv2_unavailable(tmp_path, mon
 
     compose = generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
     assert "meteor-camera1" in compose
+
+
+def test_generate_compose_invalid_url_masks_password(tmp_path, capsys):
+    """無効URLの警告出力でパスワードが *** に置換されること"""
+    streamers = tmp_path / "streamers"
+    # http:// スキームは parse_rtsp_url が無効と判定するため警告ブランチに入る
+    streamers.write_text("http://user:secretpass@host/path\n", encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        generate_compose(str(streamers), _BASE_SETTINGS, base_port=8080)
+
+    captured = capsys.readouterr()
+    assert "secretpass" not in captured.out
+    assert "***" in captured.out

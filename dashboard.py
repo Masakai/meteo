@@ -10,11 +10,13 @@ Licensed under the MIT License
 from __future__ import annotations
 
 import atexit
+import html
 import logging
 import os
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from flask import Flask, Response, jsonify, request
@@ -265,8 +267,8 @@ def create_app() -> Flask:
         info = _camera_embed_info(camera_index)
         if info is None:
             return Response("camera embed not available", status=404, content_type="text/plain; charset=utf-8")
-        display_name = info["camera"].get("display_name", info["camera"]["name"])
-        html = f"""<!DOCTYPE html>
+        display_name = html.escape(info["camera"].get("display_name", info["camera"]["name"]))
+        body = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -322,7 +324,7 @@ def create_app() -> Flask:
     </script>
 </body>
 </html>"""
-        return _apply_no_cache_headers(Response(html, content_type="text/html; charset=utf-8"))
+        return _apply_no_cache_headers(Response(body, content_type="text/html; charset=utf-8"))
 
     @app.get("/go2rtc_asset/<path:asset_name>")
     def go2rtc_asset(asset_name: str) -> Response:
@@ -333,8 +335,11 @@ def create_app() -> Flask:
             return Response("go2rtc asset unavailable", status=503, content_type="text/plain; charset=utf-8")
         target_url = f"{info['proxy_http_base']}/{asset_name}"
         req = Request(target_url, headers={"Accept": "application/javascript, text/javascript, */*"})
-        with urlopen(req, timeout=5) as upstream:
-            payload = upstream.read()
+        try:
+            with urlopen(req, timeout=5) as upstream:
+                payload = upstream.read()
+        except (ValueError, URLError, TimeoutError):
+            return Response("go2rtc asset unavailable", status=503, content_type="text/plain; charset=utf-8")
         return _apply_no_cache_headers(Response(payload, content_type="application/javascript; charset=utf-8"))
 
     @app.get("/image/<path:subpath>")
