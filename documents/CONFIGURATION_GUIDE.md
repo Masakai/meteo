@@ -202,6 +202,34 @@ environment:
 
 ---
 
+## SQLite 検出データベース（v3.6.0+）
+
+### 概要
+
+ダッシュボードは `$DETECTIONS_DIR/detections.db`（SQLite）を検出データの正本として使用する。
+検出エンジンは引き続き各カメラの `detections.jsonl` に追記し、ダッシュボードが増分同期で SQLite へ取り込む。
+
+### 自動生成
+
+`$DETECTIONS_DIR/detections.db` はダッシュボード起動時に自動生成される。手動での作成は不要。
+
+### 初回移行
+
+既存の `detections.jsonl` を SQLite へ移行するには、初回のみ以下を実行する：
+
+```bash
+source .venv/bin/activate
+python scripts/migrate_jsonl_to_sqlite.py
+```
+
+`DETECTIONS_DIR` 環境変数が設定されていない場合、カレントディレクトリの `detections/` が対象になる。
+
+### ロールバック
+
+既存の JSONL ファイルは移行後も削除されない。SQLite を使わない状態に戻す場合は `detections.db` を削除するだけでよい。
+
+---
+
 ## マスク設定（固定カメラ向け）
 
 ### streamers ファイルの書式

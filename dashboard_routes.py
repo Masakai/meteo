@@ -16,13 +16,13 @@ from urllib.error import URLError
 import dashboard_camera_handlers as camera_handlers
 from dashboard_config import CAMERAS, DETECTIONS_DIR, GO2RTC_API_URL, VERSION, get_detection_window
 from dashboard_templates import render_dashboard_html, render_settings_html
+import detection_store
 
 logger = logging.getLogger(__name__)
 
 
 _IN_DOCKER = os.path.exists("/.dockerenv")
 _SERVER_START_TIME = time()
-_LABELS_FILENAME = "detection_labels.json"
 _DETECTION_MONITOR_INTERVAL = float(os.environ.get("DETECTION_MONITOR_INTERVAL", "2.0"))
 _CAMERA_MONITOR_INTERVAL = float(os.environ.get("CAMERA_MONITOR_INTERVAL", "2.0"))
 _CAMERA_MONITOR_TIMEOUT = float(os.environ.get("CAMERA_MONITOR_TIMEOUT", "6.0"))
@@ -33,7 +33,6 @@ _CAMERA_MONITOR_FAIL_THRESHOLD = int(os.environ.get("CAMERA_MONITOR_FAIL_THRESHO
 _detection_cache_lock = Lock()
 _detection_cache = {
     "detections_dir": "",
-    "mtime": 0.0,
     "total": 0,
     "recent": [],
 }
@@ -108,33 +107,6 @@ def _parse_camera_index(path):
 
 def _camera_url_for_proxy(raw_url, camera_index=None):
     return camera_handlers.camera_url_for_proxy(raw_url, _IN_DOCKER, camera_index)
-
-
-def _labels_path():
-    return Path(DETECTIONS_DIR) / _LABELS_FILENAME
-
-
-def _load_detection_labels():
-    path = _labels_path()
-    if not path.exists():
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
-    return {}
-
-
-def _save_detection_labels(labels):
-    path = _labels_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(labels, f, ensure_ascii=False, sort_keys=True)
-    tmp_path.replace(path)
 
 
 def _detection_label_key(camera_name, detection_time):
@@ -348,194 +320,111 @@ def _camera_display_name(camera_name):
     return camera_name
 
 
-def _compute_latest_mtime():
-    latest_mtime = 0.0
-    detections_root = Path(DETECTIONS_DIR)
-    try:
-        for cam_dir in detections_root.iterdir():
-            if cam_dir.is_dir():
-                jsonl_file = cam_dir / "detections.jsonl"
-                if jsonl_file.exists():
-                    mtime = jsonl_file.stat().st_mtime
-                    if mtime > latest_mtime:
-                        latest_mtime = mtime
-                manual_dir = cam_dir / "manual_recordings"
-                if manual_dir.exists() and manual_dir.is_dir():
-                    for clip_path in manual_dir.rglob("*.mp4"):
-                        try:
-                            mtime = clip_path.stat().st_mtime
-                            if mtime > latest_mtime:
-                                latest_mtime = mtime
-                        except Exception:
-                            continue
-    except Exception:
-        pass
-
-    try:
-        labels_mtime = _labels_path().stat().st_mtime
-        if labels_mtime > latest_mtime:
-            latest_mtime = labels_mtime
-    except Exception:
-        pass
-    return latest_mtime
+def _db_path():
+    return str(Path(DETECTIONS_DIR) / "detections.db")
 
 
 def _build_detections_payload():
     detections = []
     total = 0
-    labels = _load_detection_labels()
-    camera_summaries = []
+    db = _db_path()
+
+    try:
+        rows = detection_store.query_detections(db)
+        for row in rows:
+            mp4_path = row.get("clip_path", "")
+            composite_path = row.get("image_path", "")
+            composite_orig_path = row.get("composite_original_path", "")
+            image_path = composite_path or composite_orig_path
+            camera_name = row["camera"]
+            display_time = row["timestamp"].replace("T", " ")[:19]
+            confidence_raw = row.get("confidence")
+            if confidence_raw is not None:
+                confidence_str = f"{float(confidence_raw):.0%}"
+            else:
+                confidence_str = "0%"
+            total += 1
+            detections.append(
+                {
+                    "id": row["id"],
+                    "time": display_time,
+                    "camera": camera_name,
+                    "camera_display": _camera_display_name(camera_name),
+                    "confidence": confidence_str,
+                    "image": image_path,
+                    "mp4": mp4_path,
+                    "composite_original": composite_orig_path,
+                    "label": _normalize_detection_label(row.get("label", "")),
+                }
+            )
+    except Exception:
+        logger.exception("Failed to query detections from SQLite: db=%s", db)
 
     try:
         for cam_dir in Path(DETECTIONS_DIR).iterdir():
-            if cam_dir.is_dir():
-                jsonl_file = cam_dir / "detections.jsonl"
-                if jsonl_file.exists():
-                    processed_lines = 0
-                    missing_composite = 0
-                    missing_original = 0
-                    missing_video = 0
-                    camera_errors = 0
-                    with open(jsonl_file, "r", encoding="utf-8") as f:
-                        for line in f:
-                            try:
-                                d = json.loads(line)
-                                normalized = _normalize_detection_record(cam_dir.name, cam_dir, d)
-                                mp4_path = normalized["clip_path"]
-                                composite_path = normalized["image_path"]
-                                composite_orig_path = normalized["composite_original_path"]
-                                image_path = composite_path or composite_orig_path
-                                if not composite_path:
-                                    missing_composite += 1
-                                if not composite_orig_path:
-                                    missing_original += 1
-                                if not mp4_path:
-                                    missing_video += 1
-
-                                total += 1
-                                processed_lines += 1
-                                display_time = normalized["time"]
-                                label_key = normalized["legacy_label_key"]
-                                detections.append(
-                                    {
-                                        "id": normalized["id"],
-                                        "time": display_time,
-                                        "camera": cam_dir.name,
-                                        "camera_display": _camera_display_name(cam_dir.name),
-                                        "confidence": f"{d.get('confidence', 0):.0%}",
-                                        "image": image_path,
-                                        "mp4": mp4_path,
-                                        "composite_original": composite_orig_path,
-                                        "label": _normalize_detection_label(
-                                            labels.get(normalized["id"], labels.get(label_key, ""))
-                                        ),
-                                    }
-                                )
-                            except Exception:
-                                camera_errors += 1
-                                logger.exception(
-                                    "Failed to parse detection entry: camera=%s line=%r",
-                                    cam_dir.name,
-                                    line.strip()[:200],
-                                )
-                    camera_summaries.append(
+            if not cam_dir.is_dir():
+                continue
+            manual_root = cam_dir / "manual_recordings"
+            if not (manual_root.exists() and manual_root.is_dir()):
+                continue
+            for clip_path in sorted(manual_root.rglob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
+                try:
+                    stat = clip_path.stat()
+                    timestamp = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    relpath = clip_path.relative_to(Path(DETECTIONS_DIR)).as_posix()
+                    thumb_path = clip_path.with_suffix(".jpg")
+                    thumb_relpath = (
+                        thumb_path.relative_to(Path(DETECTIONS_DIR)).as_posix()
+                        if thumb_path.exists()
+                        else ""
+                    )
+                    total += 1
+                    detections.append(
                         {
+                            "id": f"manual_{cam_dir.name}_{clip_path.stem}",
+                            "time": timestamp,
                             "camera": cam_dir.name,
-                            "processed": processed_lines,
-                            "missing_composite": missing_composite,
-                            "missing_original": missing_original,
-                            "missing_video": missing_video,
-                            "errors": camera_errors,
+                            "camera_display": _camera_display_name(cam_dir.name),
+                            "confidence": "手動録画",
+                            "image": thumb_relpath,
+                            "mp4": relpath,
+                            "composite_original": "",
+                            "label": "",
+                            "source_type": "manual_recording",
                         }
                     )
-                else:
-                    camera_summaries.append(
-                        {
-                            "camera": cam_dir.name,
-                            "processed": 0,
-                            "missing_composite": 0,
-                            "missing_original": 0,
-                            "missing_video": 0,
-                            "errors": 0,
-                            "note": "detections.jsonl not found",
-                        }
-                    )
-                manual_root = cam_dir / "manual_recordings"
-                processed_manual = 0
-                if manual_root.exists() and manual_root.is_dir():
-                    for clip_path in sorted(manual_root.rglob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True):
-                        try:
-                            stat = clip_path.stat()
-                            timestamp = datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-                            relpath = clip_path.relative_to(Path(DETECTIONS_DIR)).as_posix()
-                            thumb_path = clip_path.with_suffix(".jpg")
-                            thumb_relpath = (
-                                thumb_path.relative_to(Path(DETECTIONS_DIR)).as_posix()
-                                if thumb_path.exists()
-                                else ""
-                            )
-                            total += 1
-                            processed_manual += 1
-                            detections.append(
-                                {
-                                    "id": f"manual_{cam_dir.name}_{clip_path.stem}",
-                                    "time": timestamp,
-                                    "camera": cam_dir.name,
-                                    "camera_display": _camera_display_name(cam_dir.name),
-                                    "confidence": "手動録画",
-                                    "image": thumb_relpath,
-                                    "mp4": relpath,
-                                    "composite_original": "",
-                                    "label": "",
-                                    "source_type": "manual_recording",
-                                }
-                            )
-                        except Exception:
-                            logger.exception("Failed to parse manual recording entry: clip=%s", clip_path)
-                if processed_manual:
-                    camera_summaries.append(
-                        {
-                            "camera": cam_dir.name,
-                            "processed_manual_recordings": processed_manual,
-                        }
-                    )
+                except Exception:
+                    logger.exception("Failed to parse manual recording entry: clip=%s", clip_path)
     except Exception:
-        logger.exception("Failed to build detections payload: detections_dir=%s", DETECTIONS_DIR)
+        logger.exception("Failed to scan manual recordings: detections_dir=%s", DETECTIONS_DIR)
 
     detections.sort(key=lambda x: x["time"], reverse=True)
     logger.info(
-        "Detections payload rebuilt: detections_dir=%s total=%d recent=%d cameras=%s",
+        "Detections payload rebuilt: detections_dir=%s total=%d recent=%d",
         DETECTIONS_DIR,
         total,
         len(detections),
-        camera_summaries,
     )
     return {"total": total, "recent": detections}
 
 
 def _refresh_detection_cache(force=False):
-    latest_mtime = _compute_latest_mtime()
-    with _detection_cache_lock:
-        cache_dir = _detection_cache["detections_dir"]
-        cache_mtime = _detection_cache["mtime"]
     current_dir = str(Path(DETECTIONS_DIR).resolve())
+    db = _db_path()
 
-    should_rebuild = force or cache_dir != current_dir or latest_mtime != cache_mtime
-    if not should_rebuild:
-        return
+    try:
+        detection_store.init_db(db)
+        for cam_dir in Path(DETECTIONS_DIR).iterdir():
+            if cam_dir.is_dir():
+                detection_store.sync_camera_from_jsonl(
+                    cam_dir.name, cam_dir, db, _normalize_detection_record
+                )
+    except Exception:
+        logger.exception("Failed to sync JSONL to SQLite: detections_dir=%s", DETECTIONS_DIR)
 
-    logger.info(
-        "Refreshing detection cache: force=%s current_dir=%s previous_dir=%s latest_mtime=%s previous_mtime=%s",
-        force,
-        current_dir,
-        cache_dir,
-        latest_mtime,
-        cache_mtime,
-    )
     payload = _build_detections_payload()
     with _detection_cache_lock:
         _detection_cache["detections_dir"] = current_dir
-        _detection_cache["mtime"] = latest_mtime
         _detection_cache["total"] = payload["total"]
         _detection_cache["recent"] = payload["recent"]
 
@@ -544,7 +433,6 @@ def get_detection_cache_snapshot():
     _refresh_detection_cache(force=False)
     with _detection_cache_lock:
         return {
-            "mtime": _detection_cache["mtime"],
             "total": _detection_cache["total"],
             "recent": list(_detection_cache["recent"]),
         }
@@ -853,8 +741,12 @@ def handle_detections_mtime(handler):
     handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
     handler.end_headers()
 
-    snapshot = get_detection_cache_snapshot()
-    handler.wfile.write(json.dumps({"mtime": snapshot["mtime"]}).encode("utf-8"))
+    db = Path(DETECTIONS_DIR) / "detections.db"
+    try:
+        mtime = db.stat().st_mtime if db.exists() else 0
+    except OSError:
+        mtime = 0
+    handler.wfile.write(json.dumps({"mtime": mtime}).encode("utf-8"))
     return True
 
 
@@ -1037,35 +929,37 @@ def handle_delete_detection(handler):
         if len(parts) == 2:
             camera_name = unquote(parts[0])
             detection_id = unquote(parts[1])
-            match = _find_detection_record(camera_name, detection_id)
-            records = match["records"]
-            cam_dir = match["cam_dir"]
-            jsonl_file = match["jsonl_file"]
-            normalized = match["normalized"]
+            db = _db_path()
+            detection_store.init_db(db)
+            row = detection_store.get_detection_by_id(db, detection_id)
+            if row is None:
+                raise FileNotFoundError(f"detection id not found: {camera_name} {detection_id}")
 
-            deleted_files = _delete_detection_assets_if_unreferenced(records, normalized)
-            if jsonl_file.exists():
-                temp_file = cam_dir / "detections.jsonl.tmp"
+            detections_root = Path(DETECTIONS_DIR).resolve()
+            deleted_files = []
+            for key in ("clip_path", "image_path", "composite_original_path"):
+                relpath = row.get(key, "")
+                if not relpath:
+                    continue
+                if detection_store.count_asset_references(db, relpath, exclude_id=detection_id) > 0:
+                    continue
+                abs_path = (detections_root / relpath).resolve()
+                if detections_root not in abs_path.parents:
+                    continue
+                if abs_path.exists() and abs_path.is_file():
+                    abs_path.unlink()
+                    deleted_files.append(abs_path.name)
+            for relpath in row.get("alternate_clip_paths", []):
+                if detection_store.count_asset_references(db, relpath, exclude_id=detection_id) > 0:
+                    continue
+                abs_path = (detections_root / relpath).resolve()
+                if detections_root not in abs_path.parents:
+                    continue
+                if abs_path.exists() and abs_path.is_file():
+                    abs_path.unlink()
+                    deleted_files.append(abs_path.name)
 
-                with open(jsonl_file, "r", encoding="utf-8") as f_in, open(
-                    temp_file, "w", encoding="utf-8"
-                ) as f_out:
-                    for line in f_in:
-                        try:
-                            d = json.loads(line)
-                            if _normalize_detection_id(camera_name, d) != detection_id:
-                                f_out.write(line)
-                        except Exception:
-                            f_out.write(line)
-
-                temp_file.replace(jsonl_file)
-
-            labels = _load_detection_labels()
-            labels.pop(detection_id, None)
-            legacy_label_key = normalized.get("legacy_label_key", "")
-            if legacy_label_key:
-                labels.pop(legacy_label_key, None)
-            _save_detection_labels(labels)
+            detection_store.soft_delete(db, detection_id)
             _refresh_detection_cache(force=True)
 
             handler.send_response(200)
@@ -1161,17 +1055,12 @@ def handle_set_detection_label(handler):
         if not camera or not detection_id:
             raise ValueError("camera and id are required")
 
-        labels = _load_detection_labels()
-        match = _find_detection_record(camera, detection_id)
-        key = detection_id
-        if label:
-            labels[key] = label
-        else:
-            labels.pop(key, None)
-        legacy_label_key = match["normalized"].get("legacy_label_key", "")
-        if legacy_label_key:
-            labels.pop(legacy_label_key, None)
-        _save_detection_labels(labels)
+        db = _db_path()
+        detection_store.init_db(db)
+        row = detection_store.get_detection_by_id(db, detection_id)
+        if row is None:
+            raise FileNotFoundError(f"detection id not found: {camera} {detection_id}")
+        detection_store.set_label(db, detection_id, label)
         _refresh_detection_cache(force=True)
 
         handler.send_response(200)
@@ -1335,10 +1224,12 @@ def handle_bulk_delete_non_meteor(handler):
             raise ValueError("invalid path")
         camera_name = unquote(camera_part)
 
-        labels = _load_detection_labels()
         cam_dir = Path(DETECTIONS_DIR) / camera_name
         if not cam_dir.is_dir():
             raise ValueError(f"camera directory not found: {camera_name}")
+
+        db = _db_path()
+        detection_store.init_db(db)
 
         deleted_count = 0
         deleted_detections = []
@@ -1349,9 +1240,9 @@ def handle_bulk_delete_non_meteor(handler):
             records_by_id = {normalized["id"]: (line, raw, normalized) for line, raw, normalized in records}
             ids_to_delete = []
             for _, _, normalized in records:
-                label = _normalize_detection_label(
-                    labels.get(normalized["id"], labels.get(normalized.get("legacy_label_key", ""), ""))
-                )
+                db_row = detection_store.get_detection_by_id(db, normalized["id"])
+                db_label = db_row.get("label", "") if db_row else ""
+                label = _normalize_detection_label(db_label)
                 if label == "post_detected":
                     ids_to_delete.append(normalized["id"])
             remaining_records = [entry for entry in records if entry[2]["id"] not in ids_to_delete]
@@ -1367,10 +1258,7 @@ def handle_bulk_delete_non_meteor(handler):
                         if detection_id in ids_to_delete:
                             normalized = records_by_id[detection_id][2]
                             _delete_detection_assets_if_unreferenced(remaining_records, normalized)
-                            labels.pop(detection_id, None)
-                            legacy_label_key = normalized.get("legacy_label_key", "")
-                            if legacy_label_key:
-                                labels.pop(legacy_label_key, None)
+                            detection_store.soft_delete(db, detection_id)
                             deleted_count += 1
                             deleted_detections.append(normalized["time"])
                         else:
@@ -1379,8 +1267,8 @@ def handle_bulk_delete_non_meteor(handler):
                         f_out.write(line)
 
             temp_file.replace(jsonl_file)
+            detection_store.reset_sync_state(db, camera_name)
 
-        _save_detection_labels(labels)
         _refresh_detection_cache(force=True)
 
         handler.send_response(200)
