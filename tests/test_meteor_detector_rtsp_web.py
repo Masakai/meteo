@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import meteor_detector_rtsp_web as web
 from meteor_detector_realtime import DetectionParams
-from meteor_detector_rtsp_web import build_twilight_params
+from detection_filters import build_twilight_params
 
 
 def test_storage_camera_name_is_safe_identifier():

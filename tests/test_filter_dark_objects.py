@@ -3,7 +3,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from meteor_detector_rtsp_web import filter_dark_objects
+from detection_filters import filter_dark_objects
 
 
 def test_min_brightness_zero_returns_all():
