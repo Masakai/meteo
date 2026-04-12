@@ -554,6 +554,10 @@ def process_rtsp_stream(  # pragma: no cover
         "clip_margin_before": clip_margin_before,
         "clip_margin_after": clip_margin_after,
         "detection_enabled": state.current_detection_enabled,
+        "bird_filter_enabled": bird_filter_enabled,
+        "bird_min_brightness": bird_min_brightness,
+        "twilight_bird_filter_enabled": twilight_bird_filter_enabled,
+        "twilight_bird_min_brightness": twilight_bird_min_brightness,
         "diff_threshold": params.diff_threshold,
         "min_brightness": params.min_brightness,
         "min_brightness_tracking": params.min_brightness_tracking,
@@ -671,6 +675,14 @@ def process_rtsp_stream(  # pragma: no cover
         print(f"検出時間制限: 有効（緯度: {latitude}, 経度: {longitude}）", flush=True)
     else:
         print(f"検出時間制限: 無効（常時検出）", flush=True)
+
+    # twilight 設定を current_settings に反映（TWILIGHT_* 変数はここで確定済み）
+    state.current_settings.update({
+        "twilight_detection_mode": TWILIGHT_DETECTION_MODE,
+        "twilight_type": TWILIGHT_TYPE,
+        "twilight_sensitivity": TWILIGHT_SENSITIVITY,
+        "twilight_min_speed": TWILIGHT_MIN_SPEED,
+    })
 
     # 検出処理を別スレッドで実行
     detection_thread = Thread(
