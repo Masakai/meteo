@@ -787,8 +787,10 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
             startup_float_fields = [
                 ("scale", 0.05, 1.0),
                 ("buffer", 1.0, 120.0),
+                ("bird_min_brightness", 0.0, 255.0),
+                ("twilight_bird_min_brightness", 0.0, 255.0),
             ]
-            startup_bool_fields = ("extract_clips",)
+            startup_bool_fields = ("extract_clips", "bird_filter_enabled", "twilight_bird_filter_enabled")
             startup_text_fields = ("sensitivity",)
             startup_path_fields = ("mask_image", "mask_from_day", "nuisance_mask_image", "nuisance_from_night")
 
@@ -1081,6 +1083,10 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 "mask_from_day",
                 "nuisance_mask_image",
                 "nuisance_from_night",
+                "bird_filter_enabled",
+                "bird_min_brightness",
+                "twilight_bird_filter_enabled",
+                "twilight_bird_min_brightness",
             ):
                 if key in applied:
                     settings_updates[key] = applied[key]

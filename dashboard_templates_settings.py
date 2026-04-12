@@ -231,6 +231,31 @@ def render_settings_html(cameras, version):
         </div>
 
         <div class="panel">
+            <h2>鳥シルエット除外フィルタ</h2>
+            <details class="help">
+                <summary>HELP</summary>
+                <p class="help-note">移動する暗い物体（鳥のシルエット等）を輝度で除外します。流星は発光体なので高輝度、鳥は暗いシルエットなので低輝度になる性質を利用します。</p>
+                <table class="help-table">
+                    <thead>
+                        <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>BIRD_FILTER_ENABLED</td><td>通常時フィルタの有効/無効</td><td>夜間に鳥の誤認識が多い場合に有効にする</td></tr>
+                        <tr><td>BIRD_MIN_BRIGHTNESS</td><td>通常時の最小輝度しきい値</td><td>これ未満の輝度の候補を除外（0-255）。80前後が目安</td></tr>
+                        <tr><td>TWILIGHT_BIRD_FILTER_ENABLED</td><td>薄明時フィルタの有効/無効</td><td>薄明時はデフォルト有効</td></tr>
+                        <tr><td>TWILIGHT_BIRD_MIN_BRIGHTNESS</td><td>薄明時の最小輝度しきい値</td><td>薄明時は明るいので通常時より高めでも機能する</td></tr>
+                    </tbody>
+                </table>
+            </details>
+            <div class="grid">
+                <div><label><input id="bird_filter_enabled" type="checkbox"> 通常時フィルタを有効にする（BIRD_FILTER_ENABLED）</label></div>
+                <div><label>通常時の最小輝度（BIRD_MIN_BRIGHTNESS）</label><input id="bird_min_brightness" type="number" step="1" min="0" max="255"></div>
+                <div><label><input id="twilight_bird_filter_enabled" type="checkbox"> 薄明時フィルタを有効にする（TWILIGHT_BIRD_FILTER_ENABLED）</label></div>
+                <div><label>薄明時の最小輝度（TWILIGHT_BIRD_MIN_BRIGHTNESS）</label><input id="twilight_bird_min_brightness" type="number" step="1" min="0" max="255"></div>
+            </div>
+        </div>
+
+        <div class="panel">
             <h2>基本検出</h2>
             <details class="help">
                 <summary>HELP</summary>
@@ -341,6 +366,7 @@ def render_settings_html(cameras, version):
             'sensitivity', 'scale', 'buffer', 'extract_clips',
             'clip_margin_before', 'clip_margin_after',
             'twilight_detection_mode', 'twilight_type', 'twilight_sensitivity', 'twilight_min_speed',
+            'bird_filter_enabled', 'bird_min_brightness', 'twilight_bird_filter_enabled', 'twilight_bird_min_brightness',
             'diff_threshold', 'min_brightness', 'min_brightness_tracking',
             'min_length', 'max_length', 'min_duration', 'max_duration', 'min_speed',
             'min_linearity', 'exclude_bottom_ratio', 'exclude_edge_ratio',
@@ -390,7 +416,11 @@ def render_settings_html(cameras, version):
             twilight_detection_mode: 'reduce',
             twilight_type: 'nautical',
             twilight_sensitivity: 'low',
-            twilight_min_speed: 200
+            twilight_min_speed: 200,
+            bird_filter_enabled: false,
+            bird_min_brightness: 80,
+            twilight_bird_filter_enabled: true,
+            twilight_bird_min_brightness: 80
         }};
 
         function setStatus(message) {{

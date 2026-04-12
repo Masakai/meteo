@@ -430,6 +430,10 @@ def process_rtsp_stream(  # pragma: no cover
     nuisance_overlap_threshold: float = 0.60,
     clip_margin_before: float = 1.0,
     clip_margin_after: float = 1.0,
+    bird_filter_enabled: bool = False,
+    bird_min_brightness: float = 80.0,
+    twilight_bird_filter_enabled: bool = True,
+    twilight_bird_min_brightness: float = 80.0,
 ):
     params = params or DetectionParams()
     state.camera_name = _storage_camera_name(cam_name)
@@ -468,6 +472,18 @@ def process_rtsp_stream(  # pragma: no cover
     clip_margin_before = float(runtime_overrides.get("clip_margin_before", clip_margin_before))
     clip_margin_after = float(runtime_overrides.get("clip_margin_after", clip_margin_after))
     state.current_detection_enabled = _to_bool(runtime_overrides.get("detection_enabled", True), default=True)
+    bird_filter_enabled = _to_bool(
+        runtime_overrides.get("bird_filter_enabled", bird_filter_enabled),
+        default=bird_filter_enabled,
+    )
+    bird_min_brightness = float(runtime_overrides.get("bird_min_brightness", bird_min_brightness))
+    twilight_bird_filter_enabled = _to_bool(
+        runtime_overrides.get("twilight_bird_filter_enabled", twilight_bird_filter_enabled),
+        default=twilight_bird_filter_enabled,
+    )
+    twilight_bird_min_brightness = float(
+        runtime_overrides.get("twilight_bird_min_brightness", twilight_bird_min_brightness)
+    )
 
     params.exclude_bottom_ratio = float(runtime_overrides.get("exclude_bottom_ratio", params.exclude_bottom_ratio))
     params.exclude_edge_ratio = float(runtime_overrides.get("exclude_edge_ratio", params.exclude_edge_ratio))
@@ -793,6 +809,10 @@ def main():  # pragma: no cover
         nuisance_overlap_threshold=args.nuisance_overlap_threshold,
         clip_margin_before=args.clip_margin_before,
         clip_margin_after=args.clip_margin_after,
+        bird_filter_enabled=bird_filter_enabled,
+        bird_min_brightness=bird_min_brightness,
+        twilight_bird_filter_enabled=twilight_bird_filter_enabled,
+        twilight_bird_min_brightness=twilight_bird_min_brightness,
     )
 
 
