@@ -368,6 +368,56 @@ class TestGetDetectionById:
         assert result["deleted"] == 1
 
 
+class TestQueryDetectionsForStats:
+    def _insert_direct(self, db, records):
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(db)
+        for rec in records:
+            conn.execute(
+                "INSERT INTO detections (id, camera, timestamp, deleted, raw_json) VALUES (?,?,?,0,?)",
+                (rec["id"], rec["camera"], rec["timestamp"], "{}"),
+            )
+        conn.commit()
+        conn.close()
+
+    def test_returns_only_id_camera_timestamp(self, db):
+        self._insert_direct(db, [
+            {"id": "a1", "camera": "cam1", "timestamp": "2024-01-01T01:00:00"},
+        ])
+        rows = detection_store.query_detections_for_stats(db, "2024-01-01T00:00:00", "2024-01-01T06:00:00")
+        assert len(rows) == 1
+        assert set(rows[0].keys()) == {"id", "camera", "timestamp"}
+
+    def test_filters_by_timestamp_range(self, db):
+        self._insert_direct(db, [
+            {"id": "a1", "camera": "cam1", "timestamp": "2024-01-01T02:00:00"},
+            {"id": "a2", "camera": "cam1", "timestamp": "2024-01-01T08:00:00"},
+        ])
+        rows = detection_store.query_detections_for_stats(db, "2024-01-01T00:00:00", "2024-01-01T06:00:00")
+        assert len(rows) == 1
+        assert rows[0]["id"] == "a1"
+
+    def test_excludes_deleted(self, db):
+        self._insert_direct(db, [
+            {"id": "a1", "camera": "cam1", "timestamp": "2024-01-01T02:00:00"},
+        ])
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(db)
+        conn.execute("UPDATE detections SET deleted=1 WHERE id='a1'")
+        conn.commit()
+        conn.close()
+        rows = detection_store.query_detections_for_stats(db, "2024-01-01T00:00:00", "2024-01-01T06:00:00")
+        assert len(rows) == 0
+
+    def test_returns_ascending_order(self, db):
+        self._insert_direct(db, [
+            {"id": "a2", "camera": "cam1", "timestamp": "2024-01-01T03:00:00"},
+            {"id": "a1", "camera": "cam1", "timestamp": "2024-01-01T01:00:00"},
+        ])
+        rows = detection_store.query_detections_for_stats(db, "2024-01-01T00:00:00", "2024-01-01T06:00:00")
+        assert [r["id"] for r in rows] == ["a1", "a2"]
+
+
 class TestQueryDetectionsLimit:
     def test_limit_restricts_result_count(self, db, tmp_path):
         cam_dir = tmp_path / "cam1"

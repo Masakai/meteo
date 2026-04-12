@@ -1,6 +1,6 @@
 """HTTP route handlers for the dashboard."""
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import hashlib
 import logging
 from time import time
@@ -12,9 +12,15 @@ import threading
 from urllib.parse import urlparse, parse_qs, unquote
 from urllib.request import Request, urlopen
 from urllib.error import URLError
+from zoneinfo import ZoneInfo
 
 import dashboard_camera_handlers as camera_handlers
 from dashboard_config import CAMERAS, DETECTIONS_DIR, GO2RTC_API_URL, VERSION, get_detection_window
+
+try:
+    from astro_utils import get_detection_window_for_date as _get_detection_window_for_date
+except ImportError:
+    _get_detection_window_for_date = None
 from dashboard_templates import render_dashboard_html, render_settings_html
 import detection_store
 
@@ -1312,3 +1318,139 @@ def handle_youtube_status(handler):
     return camera_handlers.handle_youtube_status(
         handler, CAMERAS, GO2RTC_API_URL, _parse_camera_index, Request, urlopen,
     )
+
+
+def compute_nightly_stats(db_path, camera_display_names, days=30):
+    """カメラ別・夜別（日没〜翌日の日の出）の流星検出数を集計する。
+
+    Args:
+        db_path: SQLite DBパス
+        camera_display_names: {"camera1_10_0_1_25": "East", ...} 形式のdict
+        days: 遡る日数（デフォルト30）
+
+    Returns:
+        {
+            "nights": [{"date": "2026-04-12", "sunset": "...", "sunrise": "...",
+                        "total": 12, "by_camera": {"East": 7, "South": 5},
+                        "duplicates": 3, "ongoing": False}, ...],
+            "cameras": ["East", "South", "West"],
+            "total_events": 73,
+        }
+    """
+    latitude = float(os.environ.get("LATITUDE", "35.3606"))
+    longitude = float(os.environ.get("LONGITUDE", "138.7274"))
+    timezone = os.environ.get("TIMEZONE", "Asia/Tokyo")
+    tz = ZoneInfo(timezone)
+    now = datetime.now(tz)
+    today = now.date()
+
+    camera_names_ordered = list(dict.fromkeys(camera_display_names.values()))
+
+    nights = []
+    total_events = 0
+
+    for offset in range(days):
+        target_date = today - timedelta(days=offset)
+
+        if _get_detection_window_for_date is None:
+            continue
+
+        try:
+            sunset, sunrise = _get_detection_window_for_date(target_date, latitude, longitude, timezone)
+        except Exception:
+            logger.exception("compute_nightly_stats: failed to get window for %s", target_date)
+            continue
+
+        ongoing = now < sunrise
+
+        start_ts = sunset.astimezone(tz).strftime("%Y-%m-%dT%H:%M:%S")
+        end_ts = sunrise.astimezone(tz).strftime("%Y-%m-%dT%H:%M:%S")
+
+        try:
+            rows = detection_store.query_detections_for_stats(db_path, start_ts, end_ts)
+        except Exception:
+            logger.exception("compute_nightly_stats: query failed for %s", target_date)
+            rows = []
+
+        # 5秒グリーディー重複除去:
+        # 複数カメラが同一流星を同時に検出する場合、タイムスタンプは数百ms〜3秒程度ずれる。
+        # タイムスタンプ昇順の検出リストを走査し、直前に確定した流星から5秒以内の検出は
+        # 「同一流星の別カメラ検出」とみなしてスキップする。
+        # カメラをまたいで判定するため、同一カメラ内で5秒未満に連続した2件も重複扱いになるが、
+        # 流星の継続時間（通常1秒未満）を考慮すると実用上は問題ない。
+        last_event_ts = None
+        duplicates = 0
+        unique_count = 0
+        by_camera = {name: 0 for name in camera_names_ordered}
+
+        for row in rows:
+            ts_str = row["timestamp"]
+            try:
+                ts = datetime.fromisoformat(ts_str)
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=tz)
+            except Exception:
+                continue
+
+            if last_event_ts is not None and (ts - last_event_ts).total_seconds() <= 5:
+                duplicates += 1
+                continue
+
+            last_event_ts = ts
+            unique_count += 1
+            cam_key = row["camera"]
+            display = camera_display_names.get(cam_key, cam_key)
+            if display in by_camera:
+                by_camera[display] += 1
+            else:
+                by_camera[display] = 1
+
+        total_events += unique_count
+
+        nights.append({
+            "date": target_date.isoformat(),
+            "sunset": sunset.astimezone(tz).strftime("%Y-%m-%d %H:%M"),
+            "sunrise": sunrise.astimezone(tz).strftime("%Y-%m-%d %H:%M"),
+            "total": unique_count,
+            "by_camera": by_camera,
+            "duplicates": duplicates,
+            "ongoing": ongoing,
+        })
+
+    return {
+        "nights": nights,
+        "cameras": camera_names_ordered,
+        "total_events": total_events,
+    }
+
+
+def handle_stats_data(handler):
+    if not handler.path.startswith("/stats_data"):
+        return False
+
+    query = parse_qs(urlparse(handler.path).query)
+    try:
+        days = int(query.get("days", ["30"])[0])
+    except (ValueError, IndexError):
+        days = 30
+    days = min(max(days, 1), 365)
+
+    camera_display_names = {cam["name"]: cam.get("display_name") or cam["name"] for cam in CAMERAS}
+    db = _db_path()
+
+    try:
+        result = compute_nightly_stats(db, camera_display_names, days=days)
+    except Exception as e:
+        logger.exception("handle_stats_data: compute_nightly_stats failed")
+        handler.send_response(500)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"error": "統計データの集計に失敗しました"}).encode("utf-8"))
+        return True
+
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.end_headers()
+    handler.wfile.write(json.dumps(result, ensure_ascii=False).encode("utf-8"))
+    return True

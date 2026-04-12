@@ -143,6 +143,7 @@ def render_settings_html(cameras, version):
         <div class="sub">検出パラメータを一括適用します（対象: {len(cameras)} カメラ） / v{version}</div>
         <div class="toolbar">
             <a class="btn" href="/">ダッシュボードへ戻る</a>
+            <a class="btn" href="/stats">統計</a>
             <button class="btn" type="button" onclick="loadCurrent()">現在値を取得</button>
             <button class="btn" type="button" onclick="applyDefaults()">デフォルト値に戻す</button>
             <button class="btn" type="button" onclick="applyAll()">全カメラに適用</button>

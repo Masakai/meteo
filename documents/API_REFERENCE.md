@@ -27,6 +27,13 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.7.0 - 流星統計ビュー追加
+
+- **追加**: `dashboard_routes.py` — `GET /stats` 統計ページ（カメラ別・夜別流星数の積み重ね棒グラフ）
+- **追加**: `dashboard_routes.py` — `GET /stats_data` 夜別流星統計 JSON API（重複除去済み）
+- **追加**: `detection_store.py` — `query_detections_for_stats()` 統計ページ向けクエリメソッド
+- **テスト**: `tests/test_stats.py` — `/stats` / `/stats_data` エンドポイント単体テスト追加
+
 ### v3.6.2 - meteor_detector_rtsp_web.py リファクタリング（責務分割）
 
 - **リファクタリング**: `meteor_detector_rtsp_web.py` — 2,274行のモノリシック実装を4ファイルに分割（機能変更なし）
@@ -223,6 +230,8 @@ Licensed under the MIT License
 | `/bulk_delete_non_meteor/{camera_name}` | POST | カメラの非流星検出を一括削除 |
 | `/detection_label` | POST | 検出にラベルを設定 |
 | `/changelog` | GET | CHANGELOG表示 |
+| `/stats` | GET | 夜別流星統計ページ（HTML） |
+| `/stats_data` | GET | 夜別流星統計データ取得（JSON） |
 
 ---
 
@@ -1147,6 +1156,80 @@ fetch('/detection_label', {
 **使用例**:
 ```bash
 curl http://localhost:8080/changelog
+```
+
+---
+
+### GET /stats
+
+**説明**: カメラ別・夜別（日没〜翌日の日の出）の流星統計を表示するHTMLページ。
+ナビゲーションバーの「統計」タブから遷移する。データは `/stats_data` から非同期取得する。
+
+**レスポンス**:
+- Content-Type: `text/html; charset=utf-8`
+- Status: 200 OK
+
+**使用例**:
+```
+http://localhost:8080/stats
+```
+
+---
+
+### GET /stats_data
+
+**説明**: カメラ別・夜別（日没〜翌日の日の出）の流星統計をJSONで返す。
+複数カメラが5秒以内に同一流星を検出した場合は重複除去し1件として集計する。
+
+**クエリパラメータ**:
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|-----|---------|------|
+| `days` | integer | 30 | 遡る日数（1〜365） |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+```json
+{
+  "nights": [
+    {
+      "date": "2026-04-12",
+      "sunset": "2026-04-12 18:30",
+      "sunrise": "2026-04-13 05:20",
+      "total": 7,
+      "by_camera": {
+        "East": 4,
+        "South": 3,
+        "West": 2
+      },
+      "duplicates": 2,
+      "ongoing": false
+    }
+  ],
+  "cameras": ["East", "South", "West"],
+  "total_events": 73
+}
+```
+
+| フィールド | 説明 |
+|-----------|------|
+| `nights` | 夜ごとの集計（新しい順） |
+| `nights[].date` | 日没側の日付（YYYY-MM-DD） |
+| `nights[].total` | 重複除去後の流星数 |
+| `nights[].by_camera` | カメラ表示名ごとの検出数 |
+| `nights[].duplicates` | 重複として除去した件数 |
+| `nights[].ongoing` | 現在進行中の夜（日の出前）の場合 true |
+| `cameras` | カメラ表示名一覧 |
+| `total_events` | 全期間の流星総数（重複除去後） |
+
+**使用例**:
+```bash
+# 過去30日分を取得
+curl http://localhost:8080/stats_data
+
+# 過去90日分を取得
+curl "http://localhost:8080/stats_data?days=90"
 ```
 
 ---

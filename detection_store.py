@@ -286,6 +286,18 @@ def reset_sync_state(db_path: str, camera_name: str) -> None:
     conn.commit()
 
 
+def query_detections_for_stats(db_path: str, start_ts: str, end_ts: str) -> list:
+    """timestamp・camera・idのみ取得する軽量クエリ（統計用）"""
+    conn = _get_conn(db_path)
+    rows = conn.execute(
+        "SELECT id, camera, timestamp FROM detections"
+        " WHERE deleted=0 AND timestamp >= ? AND timestamp < ?"
+        " ORDER BY timestamp ASC",
+        (start_ts, end_ts),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_detection_by_id(db_path: str, detection_id: str) -> dict | None:
     """Return a single detection dict by id, or None if not found."""
     conn = _get_conn(db_path)

@@ -18,6 +18,409 @@ def _sanitize_cameras_for_js(cameras):
     return result
 
 
+def render_stats_html(version):
+    logotype_path = Path(__file__).parent / "documents" / "assets" / "meteo-logotype.svg"
+    logotype_src = ""
+    if logotype_path.exists():
+        logotype_bytes = logotype_path.read_bytes()
+        logotype_src = "data:image/svg+xml;base64," + base64.b64encode(logotype_bytes).decode("ascii")
+    brand_logo_html = f'<img src="{logotype_src}" alt="METEO">' if logotype_src else ""
+
+    return f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Meteor Detection Statistics</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }}
+        .header {{
+            text-align: center;
+            padding: 8px 0 30px;
+        }}
+        .brand-mark {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            margin-bottom: 14px;
+        }}
+        .brand-mark img {{
+            width: min(280px, 42vw);
+            height: auto;
+            display: block;
+            filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.28));
+        }}
+        .brand-title {{
+            color: #f4fbff;
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            line-height: 1.1;
+        }}
+        .header h1 {{
+            color: #00d4ff;
+            font-size: 2em;
+            margin-bottom: 8px;
+        }}
+        .page-kicker {{
+            color: #7ec8ff;
+            font-size: 0.82em;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }}
+        .header-actions {{
+            margin-top: 12px;
+        }}
+        .settings-link {{
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            text-decoration: none;
+            font-size: 0.9em;
+            background: transparent;
+        }}
+        .settings-link:hover {{
+            background: #00d4ff;
+            color: #10203c;
+        }}
+        .stats-summary {{
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            gap: 40px;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: rgba(0,212,255,0.1);
+            border-radius: 10px;
+        }}
+        .stats-summary .stat {{
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            text-align: center;
+            min-width: 120px;
+        }}
+        .stats-summary .stat-value {{
+            line-height: 1.1;
+            font-size: 2em;
+            font-weight: bold;
+            color: #00ff88;
+            white-space: nowrap;
+        }}
+        .stats-summary .stat-label {{
+            color: #888;
+            font-size: 0.85em;
+        }}
+        .stats-controls {{
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }}
+        .range-btn {{
+            padding: 7px 16px;
+            border-radius: 6px;
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            background: transparent;
+            font-size: 0.85em;
+            cursor: pointer;
+        }}
+        .range-btn:hover, .range-btn.active {{
+            background: #00d4ff;
+            color: #10203c;
+        }}
+        .stats-table-wrap {{
+            width: 100%;
+            overflow-x: auto;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }}
+        thead th {{
+            background: #1e2a4a;
+            color: #00d4ff;
+            padding: 10px 14px;
+            text-align: right;
+            border-bottom: 2px solid #2a4a8a;
+            white-space: nowrap;
+        }}
+        thead th:first-child {{
+            text-align: left;
+        }}
+        tbody tr {{
+            border-bottom: 1px solid #1e2a4a;
+        }}
+        tbody tr:hover {{
+            background: rgba(0, 212, 255, 0.06);
+        }}
+        tbody tr.night-zero {{
+            opacity: 0.38;
+        }}
+        tbody tr.night-ongoing td.night-date::after {{
+            content: ' (進行中)';
+            color: #f0c75e;
+            font-size: 0.85em;
+        }}
+        tbody td {{
+            padding: 9px 14px;
+            text-align: right;
+            color: #dde8ff;
+            white-space: nowrap;
+        }}
+        tbody td:first-child {{
+            text-align: left;
+            color: #9bb1d8;
+        }}
+        .count-total {{
+            font-weight: bold;
+            color: #00ff88;
+        }}
+        .loading-msg {{
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }}
+        .chart-wrap {{
+            width: 100%;
+            margin: 0 0 30px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 16px;
+            box-sizing: border-box;
+        }}
+        .footer {{
+            text-align: center;
+            padding: 30px;
+            color: #555;
+            font-size: 0.85em;
+        }}
+        @media (max-width: 720px) {{
+            .brand-mark {{
+                flex-direction: column;
+                gap: 10px;
+            }}
+            .brand-mark img {{
+                width: min(240px, 70vw);
+            }}
+        }}
+    </style>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="brand-mark">
+            {brand_logo_html}
+            <div class="brand-title">Meteor Detection Dashboard</div>
+        </div>
+        <div class="page-kicker">Statistics View</div>
+        <h1>夜別検出統計</h1>
+        <div class="header-actions">
+            <a class="settings-link" href="/">検出一覧</a>
+            <a class="settings-link" href="/cameras">カメラ表示</a>
+            <a class="settings-link" href="/settings">全カメラ設定</a>
+            <a class="settings-link" href="/stats" aria-current="page" style="background:rgba(0,212,255,0.15)">統計</a>
+        </div>
+    </div>
+
+    <div class="stats-summary">
+        <div class="stat">
+            <div class="stat-value" id="stat-total-events">-</div>
+            <div class="stat-label">総検出数（重複除去後）</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="stat-nights">-</div>
+            <div class="stat-label">集計夜数</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="stat-duplicates">-</div>
+            <div class="stat-label">重複除去数</div>
+        </div>
+    </div>
+
+    <div class="stats-controls">
+        <button class="range-btn active" data-days="30" onclick="loadStats(30, this)">30夜</button>
+        <button class="range-btn" data-days="90" onclick="loadStats(90, this)">90夜</button>
+        <button class="range-btn" data-days="180" onclick="loadStats(180, this)">180夜</button>
+        <button class="range-btn" data-days="365" onclick="loadStats(365, this)">1年</button>
+    </div>
+
+    <div class="chart-wrap" id="chart-wrap" style="display:none">
+        <div id="stats-chart" style="width:100%;"></div>
+    </div>
+
+    <div class="stats-table-wrap">
+        <div class="loading-msg" id="loading-msg">読み込み中...</div>
+        <table id="stats-table" style="display:none">
+            <thead>
+                <tr id="stats-thead-row">
+                    <th>夜（日没日）</th>
+                    <th>日没</th>
+                    <th>日の出</th>
+                    <th id="th-total">合計</th>
+                </tr>
+            </thead>
+            <tbody id="stats-tbody"></tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        Meteor Detection System v{version}
+    </div>
+
+    <script>
+        let _currentDays = 30;
+
+        function loadStats(days, btn) {{
+            _currentDays = days;
+            document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            document.getElementById('loading-msg').style.display = '';
+            document.getElementById('stats-table').style.display = 'none';
+
+            fetch('/stats_data?days=' + days, {{ cache: 'no-store' }})
+                .then(r => r.json())
+                .then(data => renderStats(data))
+                .catch(err => {{
+                    document.getElementById('loading-msg').textContent = '読み込みに失敗しました: ' + err;
+                }});
+        }}
+
+        function renderStats(data) {{
+            const nights = data.nights || [];
+            const cameras = data.cameras || [];
+            const totalEvents = data.total_events || 0;
+
+            // ヘッダー更新
+            const theadRow = document.getElementById('stats-thead-row');
+            // カメラ列を再構築
+            const fixedCols = 4; // 夜・日没・日の出・合計
+            while (theadRow.children.length > fixedCols) {{
+                theadRow.removeChild(theadRow.children[fixedCols - 1]);
+            }}
+            // 合計の前にカメラ列を挿入
+            const thTotal = document.getElementById('th-total');
+            cameras.forEach(cam => {{
+                const th = document.createElement('th');
+                th.textContent = cam;
+                theadRow.insertBefore(th, thTotal);
+            }});
+
+            // サマリー
+            const totalDups = nights.reduce((s, n) => s + (n.duplicates || 0), 0);
+            document.getElementById('stat-total-events').textContent = totalEvents;
+            document.getElementById('stat-nights').textContent = nights.length;
+            document.getElementById('stat-duplicates').textContent = totalDups;
+
+            // 行生成
+            const tbody = document.getElementById('stats-tbody');
+            tbody.innerHTML = '';
+            nights.forEach(night => {{
+                const tr = document.createElement('tr');
+                if (night.total === 0) tr.classList.add('night-zero');
+                if (night.ongoing) tr.classList.add('night-ongoing');
+
+                const tdDate = document.createElement('td');
+                tdDate.className = 'night-date';
+                tdDate.textContent = night.date;
+                tr.appendChild(tdDate);
+
+                const tdSunset = document.createElement('td');
+                tdSunset.textContent = night.sunset ? night.sunset.slice(11) : '';
+                tr.appendChild(tdSunset);
+
+                const tdSunrise = document.createElement('td');
+                tdSunrise.textContent = night.sunrise ? night.sunrise.slice(11) : '';
+                tr.appendChild(tdSunrise);
+
+                cameras.forEach(cam => {{
+                    const td = document.createElement('td');
+                    td.textContent = (night.by_camera && night.by_camera[cam] != null)
+                        ? night.by_camera[cam] : 0;
+                    tr.appendChild(td);
+                }});
+
+                const tdTotal = document.createElement('td');
+                tdTotal.className = 'count-total';
+                tdTotal.textContent = night.total;
+                tr.appendChild(tdTotal);
+
+                tbody.appendChild(tr);
+            }});
+
+            document.getElementById('loading-msg').style.display = 'none';
+            document.getElementById('stats-table').style.display = '';
+
+            // Plotly 積み重ねグラフ
+            renderChart(nights, cameras);
+        }}
+
+        const CAMERA_COLORS = ['#00d4ff', '#00ff88', '#f0c75e', '#ff7f7f', '#bf7fff'];
+
+        function renderChart(nights, cameras) {{
+            const chartEl = document.getElementById('stats-chart');
+            // 日付昇順（左が古い）
+            const sorted = nights.slice().reverse();
+            const dates = sorted.map(n => n.date);
+
+            const traces = cameras.map((cam, i) => ({{
+                x: dates,
+                y: sorted.map(n => (n.by_camera && n.by_camera[cam] != null) ? n.by_camera[cam] : 0),
+                name: cam,
+                type: 'bar',
+                marker: {{ color: CAMERA_COLORS[i % CAMERA_COLORS.length] }},
+            }}));
+
+            const layout = {{
+                barmode: 'stack',
+                autosize: true,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: {{ color: '#ccc', size: 12 }},
+                xaxis: {{
+                    type: 'category',
+                    tickangle: -45,
+                    tickfont: {{ size: 11 }},
+                    gridcolor: '#2a3a5a',
+                    linecolor: '#2a3a5a',
+                }},
+                yaxis: {{
+                    title: '検出数',
+                    gridcolor: '#2a3a5a',
+                    linecolor: '#2a3a5a',
+                    dtick: 1,
+                }},
+                legend: {{ orientation: 'h', x: 0, y: 1.12 }},
+                margin: {{ t: 40, b: 80, l: 50, r: 20 }},
+                height: 280,
+            }};
+
+            Plotly.react(chartEl, traces, layout, {{ responsive: true, useResizeHandler: true, displayModeBar: false }});
+            Plotly.Plots.resize(chartEl);
+            document.getElementById('chart-wrap').style.display = '';
+        }}
+
+        loadStats(30, document.querySelector('.range-btn[data-days="30"]'));
+    </script>
+</body>
+</html>'''
+
+
 def render_dashboard_html(cameras, version, server_start_time, page_mode="detections"):
     fps_warning_ratio = 0.8
     is_camera_page = page_mode == "cameras"
@@ -100,6 +503,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     page_heading = "カメラライブ" if is_camera_page else "最近の検出"
     nav_links = ['<a class="settings-link" href="/">検出一覧</a>' if is_camera_page else '<a class="settings-link" href="/cameras">カメラ表示</a>']
     nav_links.append('<a class="settings-link" href="/settings">全カメラ設定</a>')
+    nav_links.append('<a class="settings-link" href="/stats">統計</a>')
     nav_links.append('<button class="settings-link action-button" type="button" onclick="setGlobalDetectionEnabled(false)">検出停止</button>')
     nav_links.append('<button class="settings-link action-button" type="button" onclick="setGlobalDetectionEnabled(true)">検出再開</button>')
     header_actions = "\n            ".join(nav_links)

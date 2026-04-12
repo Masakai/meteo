@@ -24,7 +24,7 @@ import markdown
 
 import dashboard_routes as routes
 from dashboard_config import CAMERAS, PORT, VERSION
-from dashboard_templates import render_dashboard_html, render_settings_html
+from dashboard_templates import render_dashboard_html, render_settings_html, render_stats_html
 
 _log_handlers: list[logging.Handler] = [logging.StreamHandler()]
 _log_file = os.environ.get("LOG_FILE", "/logs/dashboard.log")
@@ -157,6 +157,15 @@ def create_app() -> Flask:
     def settings() -> Response:
         html = render_settings_html(CAMERAS, VERSION)
         return _apply_no_cache_headers(Response(html, content_type="text/html; charset=utf-8"))
+
+    @app.get("/stats")
+    def stats_page() -> Response:
+        html = render_stats_html(VERSION)
+        return _apply_no_cache_headers(Response(html, content_type="text/html; charset=utf-8"))
+
+    @app.get("/stats_data")
+    def stats_data() -> Response:
+        return _dispatch(routes.handle_stats_data)
 
     @app.get("/detection_window")
     def detection_window() -> Response:

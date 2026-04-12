@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-04-13
+### Added
+- `/stats` ページ: カメラ別・夜別（日没〜翌日の日の出）の流星統計ビューを追加。Plotly.js による積み重ね棒グラフをコンテナ幅フルで表示。
+- `/stats_data` API: 重複除去済みの夜別流星統計を JSON で返す新エンドポイントを追加。
+- `detection_store.query_detections_for_stats()`: 統計ページ向けクエリメソッドを追加。
+- `tests/test_stats.py` 新規作成: `/stats` および `/stats_data` エンドポイントの単体テスト。
+- `documents/API_REFERENCE.md`: `/stats` および `/stats_data` エンドポイント仕様を追記。
+
 ## [3.6.2] - 2026-04-12
 ### Changed
 - `meteor_detector_rtsp_web.py`: 2,274行のモノリシック実装を責務単位で4ファイルに分割するリファクタリング（機能変更なし）。
