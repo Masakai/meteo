@@ -27,6 +27,14 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.6.0 - SQLite移行（パフォーマンス改善・アーキテクチャ変更）
+
+- **追加**: `detection_store.py` — スレッドセーフSQLite操作モジュール（WALモード・JSONL増分同期）
+- **追加**: `scripts/migrate_jsonl_to_sqlite.py` — 既存JSONLデータのSQLite移行スクリプト
+- **変更**: `dashboard_routes.py` — 検出結果のJSONL全行読み込みをSQLiteクエリに置換。削除・ラベル操作もSQLiteベースに変更
+- **テスト**: `tests/test_detection_store.py` — `detection_store` 単体テスト追加
+- **テスト**: `tests/test_dashboard_routes.py` — SQLite対応フィクスチャを追加
+
 ### v3.5.1 - 薄明環境変数追加・CI整備・カバレッジ改善
 
 - **修正**: `generate_compose.py` — `TWILIGHT_DETECTION_MODE` / `TWILIGHT_TYPE` / `TWILIGHT_SENSITIVITY` / `TWILIGHT_MIN_SPEED` の4環境変数をコンテナテンプレートに追加（機能的欠陥の修正）

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-04-12
+### Added
+- `detection_store.py` 新規作成: スレッドセーフSQLite操作モジュール（WALモード・JSONL増分同期）。
+- `scripts/migrate_jsonl_to_sqlite.py` 新規作成: 既存JSONLデータのSQLite移行スクリプト。
+- `tests/test_detection_store.py` 新規作成: `detection_store` の単体テスト。
+
+### Changed
+- `dashboard_routes.py`: JSONL全行読み込みをSQLiteクエリに置換。削除・ラベル操作もSQLiteベースに変更。
+- `tests/test_dashboard_routes.py`: SQLite対応フィクスチャを追加。
+- `documents/ARCHITECTURE.md`: SQLiteストレージアーキテクチャを追記。
+- `documents/CONFIGURATION_GUIDE.md`: SQLite関連環境変数・設定項目を追記。
+- `documents/API_REFERENCE.md`: SQLite移行に伴うAPI変更点を追記。
+
 ## [3.5.1] - 2026-04-12
 ### Fixed
 - `meteor_detector_rtsp_web.py`: flake8 E221（複数スペース）エラーを修正。
