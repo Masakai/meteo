@@ -160,7 +160,7 @@ Licensed under the MIT License
 - **新規エンドポイント**: `POST /detection_label`
   - 検出に任意ラベル（`meteor`, `non-meteor` など）を設定
 - **機能追加**: `/detections` レスポンスに `label` フィールド追加
-- **機能追加**: `/detections_mtime` がラベルファイル（`detection_labels.json`）も監視対象に
+- **機能追加**: `/detections_mtime` がラベルファイル（`detection_labels.json`）も監視対象に（SQLite移行後は `detections.db` の更新時刻を返す）
 
 ---
 
@@ -433,7 +433,7 @@ fetch('/detections')
 
 ### GET /detections_mtime
 
-**説明**: 各カメラの `detections.jsonl` および `detection_labels.json` の更新時刻（UNIXエポック秒）を取得（v1.10.0以降、ラベルファイルも監視対象）
+**説明**: `$DETECTIONS_DIR/detections.db` の更新時刻（UNIXエポック秒）を取得
 
 **レスポンス**:
 - Content-Type: `application/json`

@@ -265,12 +265,28 @@ sequenceDiagram
 
 ## データフロー
 
+### SQLite 同期フロー（v3.6.0+）
+
+検出エンジンは引き続き JSONL ファイルへ追記する。ダッシュボードは `detection_store.py` を通じて新規行だけを SQLite へ取り込み、読み取りは SQLite を正とする。
+
+```
+検出エンジン → detections.jsonl 追記
+                        ↓ 増分同期（detection_store.sync_camera_from_jsonl）
+                  detections.db（SQLite）
+                        ↓
+               ダッシュボード（dashboard.py）
+```
+
+- JSONL ファイルはロールバック用に残す（自動削除されない）
+- 初回導入時は `python scripts/migrate_jsonl_to_sqlite.py` で既存 JSONL を移行する
+
 ### 検出結果の保存形式
 
 ```
 /output/
+  ├── detections.db                          # SQLite DB（検出データ正本 v3.6.0+）
   ├── camera1_10_0_1_25/
-  │   ├── detections.jsonl                   # 検出ログ (1行1イベント)
+  │   ├── detections.jsonl                   # 検出ログ (1行1イベント、検出エンジン書き込み)
   │   ├── meteor_20260202_065533.mp4
   │   ├── meteor_20260202_065533_composite.jpg
   │   ├── meteor_20260202_065533_composite_original.jpg
@@ -481,6 +497,7 @@ sequenceDiagram
 - `dashboard_routes.py`: ルートハンドラ（検出監視・カメラ監視を含む）
 - `dashboard_camera_handlers.py`: カメラ操作系ハンドラ（スナップショット・マスク・再起動・YouTube配信）
 - `dashboard_templates.py`: HTMLテンプレート生成
+- `detection_store.py`: SQLite操作・JSONL増分同期
 - `CHANGELOG.md`: バージョン履歴
 - `API_REFERENCE.md`: API 仕様の詳細ドキュメント
 - `DETECTOR_COMPONENTS.md`: 検出エンジンの内部構造詳細

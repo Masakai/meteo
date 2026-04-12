@@ -1,6 +1,27 @@
 import dashboard_routes as dr
+import detection_store
 import io
 import json
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def reset_detection_cache(monkeypatch):
+    """Reset _detection_cache before each test to avoid cross-test contamination."""
+    monkeypatch.setattr(
+        dr,
+        "_detection_cache",
+        {"detections_dir": "", "total": 0, "recent": []},
+    )
+
+
+@pytest.fixture()
+def sqlite_db(tmp_path, monkeypatch):
+    """Create a fresh SQLite DB in tmp_path and patch _db_path."""
+    db = str(tmp_path / "detections.db")
+    detection_store.init_db(db)
+    monkeypatch.setattr(dr, "_db_path", lambda: db)
+    return db
 
 
 class _DummyResponse:
@@ -160,16 +181,23 @@ def test_handle_camera_recording_status_success(monkeypatch):
     assert payload["recording"]["state"] == "idle"
 
 
-def test_handle_set_detection_label_success(monkeypatch, tmp_path):
+def test_handle_set_detection_label_success(monkeypatch, tmp_path, sqlite_db):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"
     cam_dir.mkdir(parents=True, exist_ok=True)
+    raw = {"id": "det_001", "timestamp": "2026-02-07T22:00:00", "confidence": 0.9}
     (cam_dir / "detections.jsonl").write_text(
-        json.dumps({"id": "det_001", "timestamp": "2026-02-07T22:00:00", "confidence": 0.9}) + "\n",
+        json.dumps(raw) + "\n",
         encoding="utf-8",
     )
+    # Pre-populate SQLite so set_label can find the record
+    normalized = dr._normalize_detection_record("camera1", cam_dir, raw)
+    detection_store.sync_camera_from_jsonl(
+        "camera1", cam_dir, sqlite_db, dr._normalize_detection_record
+    )
+
     body = json.dumps(
-        {"camera": "camera1", "id": "det_001", "label": "post_detected"}
+        {"camera": "camera1", "id": normalized["id"], "label": "post_detected"}
     ).encode("utf-8")
     handler = _DummyHandler("/detection_label", body=body, headers={"Content-Type": "application/json"})
 
@@ -177,22 +205,24 @@ def test_handle_set_detection_label_success(monkeypatch, tmp_path):
     assert handler.status == 200
     payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
     assert payload["success"] is True
-    saved = json.loads((tmp_path / "detection_labels.json").read_text(encoding="utf-8"))
-    assert saved["det_001"] == "post_detected"
+    db_row = detection_store.get_detection_by_id(sqlite_db, normalized["id"])
+    assert db_row["label"] == "post_detected"
 
 
-def test_handle_detections_includes_label(monkeypatch, tmp_path):
+def test_handle_detections_includes_label(monkeypatch, tmp_path, sqlite_db):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"
     cam_dir.mkdir(parents=True, exist_ok=True)
+    raw = {"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}
     (cam_dir / "detections.jsonl").write_text(
-        json.dumps({"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}) + "\n",
+        json.dumps(raw) + "\n",
         encoding="utf-8",
     )
-    (tmp_path / "detection_labels.json").write_text(
-        json.dumps({"camera1|2026-02-07 22:00:00": "post_detected"}),
-        encoding="utf-8",
+    detection_store.sync_camera_from_jsonl(
+        "camera1", cam_dir, sqlite_db, dr._normalize_detection_record
     )
+    normalized = dr._normalize_detection_record("camera1", cam_dir, raw)
+    detection_store.set_label(sqlite_db, normalized["id"], "post_detected")
 
     handler = _DummyHandler("/detections")
     assert dr.handle_detections(handler) is None
@@ -202,18 +232,21 @@ def test_handle_detections_includes_label(monkeypatch, tmp_path):
     assert payload["recent"][0]["label"] == "post_detected"
 
 
-def test_handle_detections_normalizes_legacy_label(monkeypatch, tmp_path):
+def test_handle_detections_normalizes_legacy_label(monkeypatch, tmp_path, sqlite_db):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"
     cam_dir.mkdir(parents=True, exist_ok=True)
+    raw = {"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}
     (cam_dir / "detections.jsonl").write_text(
-        json.dumps({"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}) + "\n",
+        json.dumps(raw) + "\n",
         encoding="utf-8",
     )
-    (tmp_path / "detection_labels.json").write_text(
-        json.dumps({"camera1|2026-02-07 22:00:00": "review"}),
-        encoding="utf-8",
+    detection_store.sync_camera_from_jsonl(
+        "camera1", cam_dir, sqlite_db, dr._normalize_detection_record
     )
+    normalized = dr._normalize_detection_record("camera1", cam_dir, raw)
+    # "review" is not a valid label — _normalize_detection_label maps it to "detected"
+    detection_store.set_label(sqlite_db, normalized["id"], "review")
 
     handler = _DummyHandler("/detections")
     assert dr.handle_detections(handler) is None
@@ -355,29 +388,24 @@ def test_handle_camera_settings_apply_all(monkeypatch):
     assert payload["applied_count"] == 1
 
 
-def test_handle_bulk_delete_non_meteor_success(monkeypatch, tmp_path):
+def test_handle_bulk_delete_non_meteor_success(monkeypatch, tmp_path, sqlite_db):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"
     cam_dir.mkdir(parents=True, exist_ok=True)
+    raw0 = {"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}
+    raw1 = {"timestamp": "2026-02-07T22:00:01", "confidence": 0.8}
     (cam_dir / "detections.jsonl").write_text(
-        "\n".join(
-            [
-                json.dumps({"timestamp": "2026-02-07T22:00:00", "confidence": 0.9}),
-                json.dumps({"timestamp": "2026-02-07T22:00:01", "confidence": 0.8}),
-            ]
-        )
-        + "\n",
+        json.dumps(raw0) + "\n" + json.dumps(raw1) + "\n",
         encoding="utf-8",
     )
-    (tmp_path / "detection_labels.json").write_text(
-        json.dumps(
-            {
-                "camera1|2026-02-07 22:00:00": "post_detected",
-                "camera1|2026-02-07 22:00:01": "detected",
-            }
-        ),
-        encoding="utf-8",
+    detection_store.sync_camera_from_jsonl(
+        "camera1", cam_dir, sqlite_db, dr._normalize_detection_record
     )
+    norm0 = dr._normalize_detection_record("camera1", cam_dir, raw0)
+    norm1 = dr._normalize_detection_record("camera1", cam_dir, raw1)
+    detection_store.set_label(sqlite_db, norm0["id"], "post_detected")
+    detection_store.set_label(sqlite_db, norm1["id"], "detected")
+
     (cam_dir / "meteor_20260207_220000.mov").write_bytes(b"mov")
     (cam_dir / "meteor_20260207_220000_composite.jpg").write_bytes(b"jpg")
 
@@ -394,7 +422,7 @@ def test_handle_bulk_delete_non_meteor_success(monkeypatch, tmp_path):
     assert item["timestamp"] == "2026-02-07T22:00:01"
 
 
-def test_handle_delete_detection_keeps_shared_files_for_other_record(monkeypatch, tmp_path):
+def test_handle_delete_detection_keeps_shared_files_for_other_record(monkeypatch, tmp_path, sqlite_db):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"
     cam_dir.mkdir(parents=True, exist_ok=True)
@@ -424,13 +452,14 @@ def test_handle_delete_detection_keeps_shared_files_for_other_record(monkeypatch
         "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records),
         encoding="utf-8",
     )
+    detection_store.sync_camera_from_jsonl(
+        "camera1", cam_dir, sqlite_db, dr._normalize_detection_record
+    )
 
     handler = _DummyHandler("/detection/camera1/det_a")
     assert dr.handle_delete_detection(handler) is True
     assert handler.status == 200
 
-    remaining = (cam_dir / "detections.jsonl").read_text(encoding="utf-8")
-    assert '"id": "det_b"' in remaining
     assert shared_mp4.exists()
     assert shared_img.exists()
     assert shared_orig.exists()
