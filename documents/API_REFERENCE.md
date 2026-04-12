@@ -27,6 +27,15 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.6.2 - meteor_detector_rtsp_web.py リファクタリング（責務分割）
+
+- **リファクタリング**: `meteor_detector_rtsp_web.py` — 2,274行のモノリシック実装を4ファイルに分割（機能変更なし）
+- **追加**: `detection_state.py` — グローバル変数60個を `DetectionState` dataclass に集約
+- **追加**: `detection_filters.py` — フィルタ・パラメータ関数群（純粋関数）
+- **追加**: `recording_manager.py` — 録画ジョブ管理・ffmpegプロセス制御
+- **追加**: `http_handlers.py` — `MJPEGHandler` クラス・`ThreadedHTTPServer`
+- **テスト**: `tests/test_detection_state.py` / `tests/test_detection_filters.py` 追加
+
 ### v3.6.1 - 移動する黒点（鳥シルエット）除外フィルタ追加
 
 - **追加**: `meteor_detector_rtsp_web.py` — `filter_dark_objects()` 関数。輝度が閾値未満のオブジェクト（鳥シルエット等）を除外

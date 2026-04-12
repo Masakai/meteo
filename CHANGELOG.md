@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.2] - 2026-04-12
+### Changed
+- `meteor_detector_rtsp_web.py`: 2,274行のモノリシック実装を責務単位で4ファイルに分割するリファクタリング（機能変更なし）。
+- `detection_state.py` 新規作成: グローバル変数60個を `DetectionState` dataclass に集約。
+- `detection_filters.py` 新規作成: フィルタ・パラメータ関数群（純粋関数）を分離。
+- `recording_manager.py` 新規作成: 録画ジョブ管理・ffmpegプロセス制御を分離。
+- `http_handlers.py` 新規作成: `MJPEGHandler` クラス・`ThreadedHTTPServer` を分離。
+- `meteor_detector_rtsp_web.py`: エントリポイント・検出ループのみに縮小（2,274行 → 849行）。
+- `Dockerfile`: 新規4ファイルの `COPY` を追加。
+
+### Added
+- `tests/test_detection_state.py` 新規作成: `DetectionState` の単体テスト。
+- `tests/test_detection_filters.py` 新規作成: フィルタ関数群の単体テスト。
+
 ## [3.6.1] - 2026-04-12
 ### Added
 - `meteor_detector_rtsp_web.py`: `filter_dark_objects()` 関数を追加。輝度が閾値未満のオブジェクト（鳥シルエット等）を除外する。

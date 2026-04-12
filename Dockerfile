@@ -34,10 +34,15 @@ RUN if [ "$DEBUG_TOOLS" = "true" ]; then \
 
 # アプリケーションコード
 COPY meteor_detector_rtsp_web.py .
+COPY detection_state.py .
+COPY detection_filters.py .
+COPY recording_manager.py .
+COPY http_handlers.py .
 COPY meteor_detector_realtime.py .
 COPY meteor_detector_common.py .
 COPY meteor_mask_utils.py .
 COPY astro_utils.py .
+COPY astro_twilight_utils.py .
 
 # マスク画像（デフォルトは空ファイル）
 ARG MASK_FROM_DAY=mask_none.jpg
