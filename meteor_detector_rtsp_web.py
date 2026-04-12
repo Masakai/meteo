@@ -640,17 +640,6 @@ def process_rtsp_stream(  # pragma: no cover
     except ValueError:
         TWILIGHT_MIN_SPEED = 200.0
 
-    bird_filter_enabled = os.environ.get("BIRD_FILTER_ENABLED", "false").lower() in ("1", "true", "yes")
-    try:
-        bird_min_brightness = float(os.environ.get("BIRD_MIN_BRIGHTNESS", "80"))
-    except ValueError:
-        bird_min_brightness = 80.0
-    twilight_bird_filter_enabled = os.environ.get("TWILIGHT_BIRD_FILTER_ENABLED", "true").lower() in ("1", "true", "yes")
-    try:
-        twilight_bird_min_brightness = float(os.environ.get("TWILIGHT_BIRD_MIN_BRIGHTNESS", "80"))
-    except ValueError:
-        twilight_bird_min_brightness = 80.0
-
     _valid_twilight_modes = {"reduce", "skip"}
     if TWILIGHT_DETECTION_MODE not in _valid_twilight_modes:
         print(
@@ -777,6 +766,17 @@ def main():  # pragma: no cover
     # クリップ抽出の判定（--no-clips または環境変数 EXTRACT_CLIPS=false で無効化）
     env_extract = os.environ.get("EXTRACT_CLIPS", "true").lower()
     extract_clips = not args.no_clips and env_extract not in ("false", "0", "no")
+
+    bird_filter_enabled = os.environ.get("BIRD_FILTER_ENABLED", "false").lower() in ("1", "true", "yes")
+    try:
+        bird_min_brightness = float(os.environ.get("BIRD_MIN_BRIGHTNESS", "80"))
+    except ValueError:
+        bird_min_brightness = 80.0
+    twilight_bird_filter_enabled = os.environ.get("TWILIGHT_BIRD_FILTER_ENABLED", "true").lower() in ("1", "true", "yes")
+    try:
+        twilight_bird_min_brightness = float(os.environ.get("TWILIGHT_BIRD_MIN_BRIGHTNESS", "80"))
+    except ValueError:
+        twilight_bird_min_brightness = 80.0
 
     mask_image = args.mask_image.strip() if args.mask_image else None
     mask_image = mask_image if mask_image else None
