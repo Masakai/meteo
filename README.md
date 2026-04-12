@@ -575,6 +575,29 @@ detections/camera1/
 pytest -q
 ```
 
+## アップグレード
+
+### v3.5.x → v3.6.0（SQLite移行）
+
+v3.6.0 から検出データの管理に SQLite を使用するようになった。
+既存の JSONL データを移行するため、アップグレード後に以下を実行すること。
+
+```bash
+# 1. コンテナを停止
+./meteor-docker.sh stop
+
+# 2. 移行スクリプトを実行（既存 JSONL → detections.db）
+source .venv/bin/activate
+python scripts/migrate_jsonl_to_sqlite.py
+
+# 3. コンテナを再起動
+./meteor-docker.sh start
+```
+
+- 既存の `detections.jsonl` と `detection_labels.json` は削除されない（ロールバック用に保持）
+- ロールバックする場合は `detections.db` を削除してコンテナを再起動するだけでよい
+- 詳細は `documents/CONFIGURATION_GUIDE.md` の「SQLite 検出データベース」セクションを参照
+
 ## トラブルシューティング
 
 ### 誤検出が多い場合
@@ -869,6 +892,7 @@ All rights reserved.
 
 ## 更新履歴
 
+- 2026-04-12: v3.6.0 検出データストアを SQLite に移行（パフォーマンス改善・クロスカメラ管理）
 - 2026-04-02: 多地点流星三角測量システム追加（`triangulation/`, `triangulation_server.py`, `station_reporter.py`）
 - 2026-03-31: YouTube Live配信機能追加（ダッシュボードからカメラ単位で配信開始/停止）
 - 2024-02-02: --extract-clips / --no-clips オプション追加
