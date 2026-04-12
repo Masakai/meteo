@@ -27,6 +27,13 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.6.1 - 移動する黒点（鳥シルエット）除外フィルタ追加
+
+- **追加**: `meteor_detector_rtsp_web.py` — `filter_dark_objects()` 関数。輝度が閾値未満のオブジェクト（鳥シルエット等）を除外
+- **追加**: 環境変数 `BIRD_FILTER_ENABLED` / `BIRD_MIN_BRIGHTNESS` — 通常時の黒点フィルタ設定（デフォルト無効）
+- **追加**: 環境変数 `TWILIGHT_BIRD_FILTER_ENABLED` / `TWILIGHT_BIRD_MIN_BRIGHTNESS` — 薄明時の黒点フィルタ設定（デフォルト有効）
+- **テスト**: `tests/test_filter_dark_objects.py` — `filter_dark_objects()` 単体テスト8ケース追加
+
 ### v3.6.0 - SQLite移行（パフォーマンス改善・アーキテクチャ変更）
 
 - **追加**: `detection_store.py` — スレッドセーフSQLite操作モジュール（WALモード・JSONL増分同期）

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-04-12
+### Added
+- `meteor_detector_rtsp_web.py`: `filter_dark_objects()` 関数を追加。輝度が閾値未満のオブジェクト（鳥シルエット等）を除外する。
+- 環境変数 `BIRD_FILTER_ENABLED`（通常時黒点フィルタ、デフォルト無効）を追加。
+- 環境変数 `BIRD_MIN_BRIGHTNESS`（通常時除外輝度閾値、デフォルト 80）を追加。
+- 環境変数 `TWILIGHT_BIRD_FILTER_ENABLED`（薄明時黒点フィルタ、デフォルト有効）を追加。
+- 環境変数 `TWILIGHT_BIRD_MIN_BRIGHTNESS`（薄明時除外輝度閾値、デフォルト 80）を追加。
+- `tests/test_filter_dark_objects.py` 新規作成: `filter_dark_objects()` の単体テスト8ケース。
+- `documents/CONFIGURATION_GUIDE.md`: 新規環境変数4件の説明を追記。
+- `documents/DETECTOR_COMPONENTS.md`: 黒点フィルタを含むフローチャートに更新。
+
 ## [3.6.0] - 2026-04-12
 ### Added
 - `detection_store.py` 新規作成: スレッドセーフSQLite操作モジュール（WALモード・JSONL増分同期）。
