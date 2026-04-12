@@ -1,6 +1,6 @@
 # 設定ガイド (Configuration Guide)
 
-**バージョン: v3.4.6**
+**バージョン: v3.6.0**
 
 ---
 
@@ -70,6 +70,12 @@ docker-compose.ymlで設定される環境変数:
 | `TWILIGHT_TYPE` | `nautical` | 薄明の種類・太陽沈み角（v3.5.0+） | `civil`(6°) / `nautical`(12°) / `astronomical`(18°) |
 | `TWILIGHT_SENSITIVITY` | `low` | `reduce` モード時の感度プリセット（v3.5.0+） | `low` / `medium` / `high` / `faint` |
 | `TWILIGHT_MIN_SPEED` | `200` | `reduce` モード時の最小速度 px/秒（v3.5.0+）。鳥など遅い物体の誤認識を抑制 | `100` ~ `500` |
+| `TWILIGHT_BIRD_FILTER_ENABLED` | `true` | 薄明時の黒点フィルタ（鳥シルエット除外） | `true` / `false` |
+| `TWILIGHT_BIRD_MIN_BRIGHTNESS` | `80` | 薄明時の除外輝度閾値（0-255、これ未満を除外） | `40` ~ `120` |
+| `BIRD_FILTER_ENABLED` | `false` | 通常時の黒点フィルタ（opt-in） | `true` / `false` |
+| `BIRD_MIN_BRIGHTNESS` | `80` | 通常時の除外輝度閾値 | `40` ~ `120` |
+
+> **注意**: `BIRD_MIN_BRIGHTNESS` および `TWILIGHT_BIRD_MIN_BRIGHTNESS` を 120 以上に設定すると暗い流星を誤除外するリスクがある。`faint` プリセット使用時は特に注意。
 
 ### ダッシュボードの環境変数
 

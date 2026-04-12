@@ -176,6 +176,24 @@ def build_twilight_params(sensitivity: str, min_speed: float, base_params):
     return p
 
 
+def filter_dark_objects(objects: list, min_brightness: float) -> list:
+    """輝度が閾値未満のオブジェクト（鳥シルエット等の暗い物体）を除外する。
+
+    detect_bright_objects() が返す objects の brightness キー（現フレームの
+    輪郭内平均輝度）を使用。流星は発光体なので高輝度、鳥は暗いシルエットなので低輝度。
+
+    Args:
+        objects: detect_bright_objects() の戻り値
+        min_brightness: これ未満の brightness を持つ候補を除外する閾値 (0-255)
+
+    Returns:
+        フィルタ後の objects リスト
+    """
+    if min_brightness <= 0:
+        return objects
+    return [o for o in objects if o.get("brightness", 0) >= min_brightness]
+
+
 def _storage_camera_name(cam_name: str) -> str:
     """保存先・永続化ファイル名に使うカメラ識別子。表示名は使わない。"""
     safe = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in str(cam_name)).strip("_")
@@ -1474,6 +1492,10 @@ def detection_thread_worker(  # pragma: no cover
     twilight_type="nautical",
     twilight_sensitivity="low",
     twilight_min_speed=200.0,
+    bird_filter_enabled=False,
+    bird_min_brightness=80.0,
+    twilight_bird_filter_enabled=True,
+    twilight_bird_min_brightness=80.0,
 ):
     """検出処理を行うワーカースレッド"""
     global current_frame, current_frame_seq, current_stream_jpeg, current_stream_jpeg_seq
@@ -1662,12 +1684,16 @@ def detection_thread_worker(  # pragma: no cover
                             objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
                         finally:
                             detector.params = orig_params
+                        if twilight_bird_filter_enabled:
+                            objects = filter_dark_objects(objects, twilight_bird_min_brightness)
                         is_detecting_now = True
                         current_detection_status = "DETECTING"
                 else:
                     # アクティブなトラックがある場合は追跡モードを有効化
                     tracking_mode = len(detector.active_tracks) > 0
                     objects = detector.detect_bright_objects(gray, prev_gray, tracking_mode=tracking_mode)
+                    if bird_filter_enabled:
+                        objects = filter_dark_objects(objects, bird_min_brightness)
                     is_detecting_now = True
                     current_detection_status = "DETECTING"
             else:
@@ -2028,6 +2054,17 @@ def process_rtsp_stream(  # pragma: no cover
     except ValueError:
         TWILIGHT_MIN_SPEED = 200.0
 
+    bird_filter_enabled = os.environ.get("BIRD_FILTER_ENABLED", "false").lower() in ("1", "true", "yes")
+    try:
+        bird_min_brightness = float(os.environ.get("BIRD_MIN_BRIGHTNESS", "80"))
+    except ValueError:
+        bird_min_brightness = 80.0
+    twilight_bird_filter_enabled = os.environ.get("TWILIGHT_BIRD_FILTER_ENABLED", "true").lower() in ("1", "true", "yes")
+    try:
+        twilight_bird_min_brightness = float(os.environ.get("TWILIGHT_BIRD_MIN_BRIGHTNESS", "80"))
+    except ValueError:
+        twilight_bird_min_brightness = 80.0
+
     _valid_twilight_modes = {"reduce", "skip"}
     if TWILIGHT_DETECTION_MODE not in _valid_twilight_modes:
         print(
@@ -2082,6 +2119,10 @@ def process_rtsp_stream(  # pragma: no cover
             'twilight_type': TWILIGHT_TYPE,
             'twilight_sensitivity': TWILIGHT_SENSITIVITY,
             'twilight_min_speed': TWILIGHT_MIN_SPEED,
+            'bird_filter_enabled': bird_filter_enabled,
+            'bird_min_brightness': bird_min_brightness,
+            'twilight_bird_filter_enabled': twilight_bird_filter_enabled,
+            'twilight_bird_min_brightness': twilight_bird_min_brightness,
         },
         daemon=False,
     )
