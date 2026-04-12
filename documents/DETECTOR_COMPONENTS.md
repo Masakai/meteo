@@ -507,6 +507,12 @@ flowchart TD
     Gray["グレースケール変換"]
 
     Detect["detect_bright_objects()"]
+    CheckTwilightMode{"twilight_mode<br/>?"}
+    SkipObjects["objects = []<br/>（全オブジェクト除外）"]
+    CheckTwilightFilter{"twilight_bird_filter<br/>_enabled?"}
+    FilterDarkTwilight["filter_dark_objects()<br/>twilight_bird_min_brightness"]
+    CheckNormalFilter{"bird_filter<br/>_enabled?"}
+    FilterDarkNormal["filter_dark_objects()<br/>bird_min_brightness"]
     Track["track_objects()"]
 
     CheckEvent{"MeteorEvent<br/>発生?"}
@@ -526,10 +532,23 @@ flowchart TD
     Resize --> Gray
     Gray --> CheckTime
 
-    CheckTime -->|"Yes"| Detect
-    CheckTime -->|"No"| UpdatePreview
+    CheckTime -->|"薄明時間帯"| Detect
+    CheckTime -->|"通常時間帯"| Detect
 
-    Detect --> Track
+    Detect --> CheckTwilightMode
+    CheckTwilightMode -->|"skip"| SkipObjects
+    CheckTwilightMode -->|"reduce（薄明）"| CheckTwilightFilter
+    CheckTwilightMode -->|"通常"| CheckNormalFilter
+
+    CheckTwilightFilter -->|"Yes"| FilterDarkTwilight
+    CheckTwilightFilter -->|"No"| Track
+    FilterDarkTwilight --> Track
+
+    CheckNormalFilter -->|"Yes"| FilterDarkNormal
+    CheckNormalFilter -->|"No"| Track
+    FilterDarkNormal --> Track
+
+    SkipObjects --> Track
     Track --> CheckEvent
     CheckEvent -->|"Yes"| SaveEvent
     CheckEvent -->|"No"| UpdatePreview
@@ -543,6 +562,7 @@ flowchart TD
     style Start fill:#e2eafc
     style SaveEvent fill:#dce6ff
     style CheckTime fill:#ffe3c4
+    style CheckTwilightMode fill:#ffe3c4
     style End fill:#e2eafc
 ```
 
