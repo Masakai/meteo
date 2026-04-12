@@ -24,6 +24,7 @@ RUN pip install --no-cache-dir -r requirements-docker.txt
 
 # 必要なファイルをコピー
 COPY dashboard*.py .
+COPY detection_store.py .
 COPY astro_utils.py .
 COPY CHANGELOG.md .
 COPY documents/assets/meteo-logotype.svg ./documents/assets/meteo-logotype.svg
