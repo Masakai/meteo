@@ -89,7 +89,46 @@ jobs:
         run: pytest -q --tb=short --cov=. --cov-report=term-missing --cov-fail-under=70
 
   # ------------------------------------------------------------------ #
-  # Job 4: Dependency audit (pip-audit)                                  #
+  # Job 4: Docker build check                                            #
+  # 全 Dockerfile をビルドして COPY 漏れ・構文エラーを早期検出する。    #
+  # streamers ファイルは .gitignore 対象だが COPY 対象外のため問題なし。 #
+  # ビルドのみ（push なし）。fail-fast: false で全 Dockerfile を並列実行。#
+  # ------------------------------------------------------------------ #
+  docker-build:
+    name: Docker build (${{ matrix.dockerfile }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dockerfile: Dockerfile
+            tag: meteor-detector:ci
+            # MASK_* ARG にデフォルト値 (mask_none.jpg) があるため build-arg 不要。
+          - dockerfile: Dockerfile.dashboard
+            tag: meteor-dashboard:ci
+          - dockerfile: Dockerfile.reporter
+            tag: meteor-reporter:ci
+          - dockerfile: Dockerfile.triangulation
+            tag: meteor-triangulation:ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.dockerfile }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          tags: ${{ matrix.tag }}
+          # GitHub Actions のレイヤーキャッシュを活用してビルド時間を短縮する。
+          cache-from: type=gha,scope=${{ matrix.dockerfile }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.dockerfile }}
+
+  # ------------------------------------------------------------------ #
+  # Job 5: Dependency audit (pip-audit)                                  #
   # 既知の脆弱性を持つパッケージを検出する。                             #
   # ------------------------------------------------------------------ #
   dep-audit:
