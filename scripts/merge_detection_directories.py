@@ -152,7 +152,8 @@ def main() -> None:
     target_dir = detections_dir / args.target
 
     if not source_dir.exists():
-        raise SystemExit(f"source dir not found: {source_dir}")
+        print(f"source dir not found, skipping: {source_dir}")
+        return
     if not target_dir.exists():
         raise SystemExit(f"target dir not found: {target_dir}")
     if source_dir.resolve() == target_dir.resolve():
