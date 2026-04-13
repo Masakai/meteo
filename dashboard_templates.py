@@ -27,10 +27,11 @@ def render_stats_html(version):
     brand_logo_html = f'<img src="{logotype_src}" alt="METEO">' if logotype_src else ""
 
     return f'''<!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Meteor Detection Statistics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>流星検出ダッシュボード - 統計</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
@@ -39,6 +40,7 @@ def render_stats_html(version):
             color: #eee;
             min-height: 100vh;
             padding: 20px;
+            line-height: 1.6;
         }}
         .header {{
             text-align: center;
@@ -92,6 +94,7 @@ def render_stats_html(version):
         .settings-link:hover {{
             background: #00d4ff;
             color: #10203c;
+            transition: background 0.2s, color 0.2s;
         }}
         .stats-summary {{
             display: flex;
@@ -119,7 +122,7 @@ def render_stats_html(version):
             white-space: nowrap;
         }}
         .stats-summary .stat-label {{
-            color: #888;
+            color: #94a3b8;
             font-size: 0.85em;
         }}
         .stats-controls {{
@@ -137,6 +140,7 @@ def render_stats_html(version):
             background: transparent;
             font-size: 0.85em;
             cursor: pointer;
+            min-height: 44px;
         }}
         .range-btn:hover, .range-btn.active {{
             background: #00d4ff;
@@ -193,7 +197,7 @@ def render_stats_html(version):
         .loading-msg {{
             text-align: center;
             padding: 40px;
-            color: #888;
+            color: #94a3b8;
         }}
         .chart-wrap {{
             width: 100%;
@@ -206,7 +210,7 @@ def render_stats_html(version):
         .footer {{
             text-align: center;
             padding: 30px;
-            color: #555;
+            color: #64748b;
             font-size: 0.85em;
         }}
         @media (max-width: 720px) {{
@@ -217,6 +221,11 @@ def render_stats_html(version):
             .brand-mark img {{
                 width: min(240px, 70vw);
             }}
+        }}
+        :focus-visible {{
+            outline: 2px solid #00d4ff;
+            outline-offset: 2px;
+            border-radius: 3px;
         }}
     </style>
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
@@ -237,6 +246,7 @@ def render_stats_html(version):
         </div>
     </div>
 
+    <main>
     <div class="stats-summary">
         <div class="stat">
             <div class="stat-value" id="stat-total-events">-</div>
@@ -417,6 +427,7 @@ def render_stats_html(version):
 
         loadStats(30, document.querySelector('.range-btn[data-days="30"]'));
     </script>
+    </main>
 </body>
 </html>'''
 
@@ -449,10 +460,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                     <div class="camera-header">
                         <span class="camera-name">{display_name}</span>
                         <div class="status-indicators">
-                            <span class="camera-status indicator-help" id="status{i}" title="ストリーム接続" data-help="ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）">●</span>
-                            <span class="server-status unknown indicator-help" id="server-status{i}" title="カメラサーバ生存" data-help="カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）">●</span>
-                            <span class="detection-status indicator-help" id="detection{i}" title="検出処理" data-help="検出処理状態（赤点滅: 検出中 / 緑: 期間外 / 黄: 期間内だが停止疑い / 灰: 状態確認中）">●</span>
-                            <span class="mask-status indicator-help" id="mask-status{i}" title="マスク適用" data-help="マスク適用状態（赤: マスク有効 / 灰: マスク無効）">MASK</span>
+                            <span class="camera-status indicator-help" id="status{i}" role="img" aria-label="ストリーム接続状態" title="ストリーム接続" data-help="ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）">●</span>
+                            <span class="server-status unknown indicator-help" id="server-status{i}" role="img" aria-label="カメラサーバ状態" title="カメラサーバ生存" data-help="カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）">●</span>
+                            <span class="detection-status indicator-help" id="detection{i}" role="img" aria-label="検出処理状態" title="検出処理" data-help="検出処理状態（赤点滅: 検出中 / 緑: 期間外 / 黄: 期間内だが停止疑い / 灰: 状態確認中）">●</span>
+                            <span class="mask-status indicator-help" id="mask-status{i}" role="img" aria-label="マスク適用状態" title="マスク適用" data-help="マスク適用状態（赤: マスク有効 / 灰: マスク無効）">MASK</span>
                         </div>
                     </div>
                     <div class="camera-actions">
@@ -499,7 +510,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 </div>
                 '''
 
-    page_title = "Meteor Detection Cameras" if is_camera_page else "Meteor Detection Detections"
+    page_title = "流星検出ダッシュボード - カメラ" if is_camera_page else "流星検出ダッシュボード - 検出一覧"
     page_heading = "カメラライブ" if is_camera_page else "最近の検出"
     nav_links = ['<a class="settings-link" href="/">検出一覧</a>' if is_camera_page else '<a class="settings-link" href="/cameras">カメラ表示</a>']
     nav_links.append('<a class="settings-link" href="/settings">全カメラ設定</a>')
@@ -553,7 +564,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         <div class="calendar-grid" id="detection-calendar-grid"></div>
         <h4 class="selected-date-title" id="selected-date-title">日付を選択してください</h4>
         <div class="detection-list" id="detection-list">
-            <div class="detection-item" style="color:#666">検出待機中...</div>
+            <div class="detection-item" style="color:#94a3b8">検出待機中...</div>
         </div>
     </div>
         '''
@@ -562,9 +573,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     )
 
     return f'''<!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{page_title}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -574,6 +586,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #eee;
             min-height: 100vh;
             padding: 20px;
+            line-height: 1.6;
         }}
         .header {{
             text-align: center;
@@ -605,7 +618,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             margin-bottom: 8px;
         }}
         .header .subtitle {{
-            color: #888;
+            color: #94a3b8;
             font-size: 0.9em;
         }}
         .hero-clock {{
@@ -638,6 +651,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         .settings-link:hover {{
             background: #00d4ff;
             color: #10203c;
+            transition: background 0.2s, color 0.2s;
         }}
         .action-button {{
             cursor: pointer;
@@ -674,7 +688,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-width: 200px;
         }}
         .stats-bar .stat-label {{
-            color: #888;
+            color: #94a3b8;
             font-size: 0.85em;
         }}
         .camera-grid {{
@@ -737,7 +751,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #ff4444;
         }}
         .camera-status.paused {{
-            color: #888;
+            color: #94a3b8;
         }}
         .server-status {{
             color: #00ff88;
@@ -747,10 +761,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #ff4444;
         }}
         .server-status.unknown {{
-            color: #888;
+            color: #94a3b8;
         }}
         .detection-status {{
-            color: #666;
+            color: #94a3b8;
             font-size: 0.8em;
         }}
         .detection-status.detecting {{
@@ -767,7 +781,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #f4d03f;
         }}
         .detection-status.unknown {{
-            color: #888;
+            color: #94a3b8;
         }}
         @keyframes blink {{
             0%, 50% {{ opacity: 1; }}
@@ -804,10 +818,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             background: #2a3f6f;
             border: 1px solid #00d4ff;
             color: #00d4ff;
-            padding: 4px 10px;
+            padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.8em;
+            min-height: 44px;
         }}
         .mask-btn:hover {{
             background: #00d4ff;
@@ -821,10 +836,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             background: #3d2f12;
             border: 1px solid #f0c75e;
             color: #ffe7a6;
-            padding: 4px 10px;
+            padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.8em;
+            min-height: 44px;
         }}
         .record-btn:hover {{
             background: #f0c75e;
@@ -863,6 +879,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.8em;
+            min-height: 44px;
         }}
         .record-now-btn {{
             background: #203554;
@@ -901,10 +918,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             background: #1e3b37;
             border: 1px solid #48d1bf;
             color: #9ff7e9;
-            padding: 4px 10px;
+            padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.8em;
+            min-height: 44px;
         }}
         .snapshot-btn:hover {{
             background: #48d1bf;
@@ -918,10 +936,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             background: #3a2430;
             border: 1px solid #ff7f7f;
             color: #ffb3b3;
-            padding: 4px 10px;
+            padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.8em;
+            min-height: 44px;
         }}
         .restart-btn:hover {{
             background: #ff6b6b;
@@ -935,10 +954,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             background: #3d1212;
             border: 1px solid #ff4444;
             color: #ff9d9d;
-            padding: 4px 10px;
+            padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.8em;
+            min-height: 44px;
         }}
         .youtube-btn:hover {{
             background: #ff4444;
@@ -957,14 +977,21 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             0%, 100% {{ opacity: 1; }}
             50% {{ opacity: 0.7; }}
         }}
+        @media (prefers-reduced-motion: reduce) {{
+            @keyframes blink {{ 0%, 100% {{ opacity: 1; }} }}
+            .detection-status.detecting {{ animation: none; opacity: 0.75; }}
+            @keyframes youtube-pulse {{ 0%, 100% {{ opacity: 1; }} }}
+            .youtube-btn.active {{ animation: none; }}
+        }}
         .mask-preview-btn {{
             background: #1f324f;
             border: 1px solid #ff6b6b;
             color: #ff6b6b;
-            padding: 4px 10px;
+            padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 0.8em;
+            min-height: 44px;
         }}
         .mask-preview-btn:hover {{
             background: #ff6b6b;
@@ -1005,7 +1032,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             align-items: center;
             justify-content: center;
             background: rgba(0,0,0,0.8);
-            color: #888;
+            color: #94a3b8;
         }}
         .camera-stats {{
             padding: 10px 15px;
@@ -1022,7 +1049,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .camera-params {{
             font-size: 0.8em;
-            color: #888;
+            color: #94a3b8;
         }}
         .recording-summary {{
             color: #cbd9f8;
@@ -1046,8 +1073,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #ffd27a;
         }}
         .mask-status {{
-            color: #666;
-            border: 1px solid #666;
+            color: #94a3b8;
+            border: 1px solid #94a3b8;
             font-size: 0.65em;
             padding: 1px 4px;
             border-radius: 4px;
@@ -1088,6 +1115,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             border-radius: 999px;
             cursor: pointer;
             font-size: 0.85em;
+            min-height: 44px;
         }}
         .range-btn.active {{
             background: #00d4ff;
@@ -1509,7 +1537,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         .footer {{
             text-align: center;
             padding: 30px;
-            color: #555;
+            color: #64748b;
             font-size: 0.85em;
         }}
         .version-link {{
@@ -1567,6 +1595,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 width: min(240px, 70vw);
             }}
         }}
+        :focus-visible {{
+            outline: 2px solid #00d4ff;
+            outline-offset: 2px;
+            border-radius: 3px;
+        }}
     </style>
 </head>
 <body>
@@ -1585,11 +1618,12 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         <div class="subtitle" id="global-detection-control-status"></div>
     </div>
 
+    <main>
     <div class="stats-bar">
         {stats_primary}
         <div class="stat">
             <div class="stat-value" id="dashboard-cpu">--</div>
-            <div class="stat-label">System CPU</div>
+            <div class="stat-label">システム CPU</div>
         </div>
         <div class="stat">
             <div class="stat-value" id="uptime">0:00</div>
@@ -3296,7 +3330,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             if (!listEl || !titleEl) return;
             if (!selectedDetectionDate) {{
                 titleEl.textContent = '日付を選択してください';
-                listEl.innerHTML = '<div class="detection-item" style="color:#666">表示する日付を選択してください。</div>';
+                listEl.innerHTML = '<div class="detection-item" style="color:#94a3b8">表示する日付を選択してください。</div>';
                 return;
             }}
             const dateItems = detectionRecords
@@ -3304,7 +3338,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 .sort((a, b) => b.time.localeCompare(a.time));
             titleEl.textContent = `${{dateLabel(selectedDetectionDate)}} の検出`;
             if (dateItems.length === 0) {{
-                listEl.innerHTML = '<div class="detection-item" style="color:#666">この日の検出はありません。</div>';
+                listEl.innerHTML = '<div class="detection-item" style="color:#94a3b8">この日の検出はありません。</div>';
                 return;
             }}
 
@@ -3567,5 +3601,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }}
         }};
     </script>
+    </main>
 </body>
 </html>'''

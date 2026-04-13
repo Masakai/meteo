@@ -2,10 +2,11 @@
 
 def render_settings_html(cameras, version):
     return f'''<!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Camera Settings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>流星検出ダッシュボード - カメラ設定</title>
     <style>
         * {{ box-sizing: border-box; }}
         body {{
@@ -14,6 +15,7 @@ def render_settings_html(cameras, version):
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             color: #eee;
             min-height: 100vh;
+            line-height: 1.6;
         }}
         .wrap {{
             max-width: 980px;
@@ -25,7 +27,7 @@ def render_settings_html(cameras, version):
             color: #00d4ff;
         }}
         .sub {{
-            color: #9ab;
+            color: #94a3b8;
             margin-bottom: 18px;
         }}
         .toolbar {{
@@ -46,6 +48,7 @@ def render_settings_html(cameras, version):
         .btn:hover {{
             background: #00d4ff;
             color: #0f1530;
+            transition: background 0.2s, color 0.2s;
         }}
         .panel {{
             background: #1f2a48;
@@ -135,9 +138,15 @@ def render_settings_html(cameras, version):
                 grid-template-columns: 1fr;
             }}
         }}
+        :focus-visible {{
+            outline: 2px solid #00d4ff;
+            outline-offset: 2px;
+            border-radius: 3px;
+        }}
     </style>
 </head>
 <body>
+    <main>
     <div class="wrap">
         <h1>全カメラ設定</h1>
         <div class="sub">検出パラメータを一括適用します（対象: {len(cameras)} カメラ） / v{version}</div>
@@ -571,5 +580,7 @@ def render_settings_html(cameras, version):
 
         loadCurrent();
     </script>
+    </div>
+    </main>
 </body>
 </html>'''
