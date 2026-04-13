@@ -11,17 +11,21 @@
 
 ## サンプル画面
 
-### トップ画面
+### 検出一覧画面
 
-<img src="assets/dashboard-sample_1.png" alt="Meteo ダッシュボードのトップ画面" width="920">
+<img src="assets/dashboard-sample_1.png" alt="Meteo ダッシュボード 検出一覧画面" width="920">
 
-### カメラ画面
+### カメラライブ画面
 
-<img src="assets/dashboard-sample_2.png" alt="Meteo ダッシュボードのカメラ画面" width="920">
+<img src="assets/dashboard-sample_2.png" alt="Meteo ダッシュボード カメラライブ画面" width="920">
+
+### 統計画面
+
+<img src="assets/dashboard-sample_4.png" alt="Meteo ダッシュボード 統計画面" width="920">
 
 ### 設定画面
 
-<img src="assets/dashboard-sample_3.png" alt="Meteo ダッシュボードの設定画面" width="920">
+<img src="assets/dashboard-sample_3.png" alt="Meteo ダッシュボード 設定画面" width="920">
 
 ## まず読む
 

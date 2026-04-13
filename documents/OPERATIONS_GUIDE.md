@@ -2,7 +2,7 @@
 
 ---
 
-**Version: v3.3.1**
+**Version: v3.8.0**
 
 **Copyright (c) 2026 Masanori Sakai**
 
@@ -157,7 +157,7 @@ python generate_compose.py --streaming-mode webrtc
 
 ### ダッシュボードからの全カメラ一括設定（/settings）
 
-ダッシュボード上部の「全カメラ設定」から、複数カメラへ同時に設定反映できます。
+ダッシュボード左サイドバーの「設定」から、複数カメラへ同時に設定反映できます。
 
 - `現在値を取得`: 各カメラの `/stats.settings` を取得
 - `全カメラに適用`: `POST /camera_settings/apply_all` を実行
