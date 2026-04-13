@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-04-13
+### Added
+- 統計ページに時間帯×カメラの検出数グループ棒グラフ（Plotly.js）を追加。
+- `compute_hourly_stats()` 追加: 5秒グリーディー重複除去後、ローカル時刻の時単位で集計。
+- `/stats_data` レスポンスに `hourly` キー（時間帯別検出数）を追加。
+- `tests/test_stats.py`: 時間帯統計に関するテスト12件を追加。
+- `documents/API_REFERENCE.md`: `/stats_data` の `hourly` レスポンスフィールド仕様を追記。
+
 ## [3.8.0] - 2026-04-13
 ### Added
 - ナビゲーションに `aria-current="page"` を追加（アクセシビリティ改善）。
