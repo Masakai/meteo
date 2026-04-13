@@ -31,99 +31,134 @@ def render_stats_html(version):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <title>流星検出ダッシュボード - 統計</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #eee;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #eef2f7;
+            color: #192333;
             min-height: 100vh;
-            padding: 20px;
+            padding: 20px 20px 20px 240px;
             line-height: 1.6;
         }}
-        .header {{
-            text-align: center;
-            padding: 8px 0 30px;
+        .topnav {{
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+            padding: 24px 14px 20px;
+            width: 220px;
+            min-height: 100vh;
+            background: #0f1c2d;
+            border-right: 2px solid #f5a41f;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 100;
+            margin: 0;
+            overflow-y: auto;
         }}
-        .brand-mark {{
+        .brand-link {{
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 18px;
-            margin-bottom: 14px;
+            text-decoration: none;
+            flex-shrink: 0;
+            margin-bottom: 28px;
+            padding: 4px 0;
         }}
-        .brand-mark img {{
-            width: min(280px, 42vw);
+        .brand-link img {{
+            width: 100%;
+            max-width: 160px;
             height: auto;
             display: block;
-            filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.28));
         }}
-        .brand-title {{
-            color: #f4fbff;
-            font-size: clamp(1.8rem, 4vw, 2.8rem);
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            line-height: 1.1;
+        .brand-text {{
+            font-family: 'Orbitron', sans-serif;
+            color: #dce8f5;
+            font-size: 1.2em;
+            font-weight: 800;
+            letter-spacing: 0.1em;
         }}
-        .header h1 {{
-            color: #00d4ff;
-            font-size: 2em;
-            margin-bottom: 8px;
+        .nav-links {{
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
         }}
-        .page-kicker {{
-            color: #7ec8ff;
-            font-size: 0.82em;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-        }}
-        .header-actions {{
-            margin-top: 12px;
-        }}
-        .settings-link {{
-            display: inline-block;
-            padding: 8px 14px;
-            border-radius: 8px;
-            border: 1px solid #00d4ff;
-            color: #00d4ff;
+        .nav-link {{
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 7px;
+            color: #6a8aaa;
             text-decoration: none;
-            font-size: 0.9em;
-            background: transparent;
+            font-size: 0.88em;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            transition: color 0.15s, background 0.15s;
+            white-space: nowrap;
+            min-height: 40px;
+            cursor: pointer;
         }}
-        .settings-link:hover {{
-            background: #00d4ff;
-            color: #10203c;
-            transition: background 0.2s, color 0.2s;
+        .nav-link:hover {{
+            color: #dce8f5;
+            background: rgba(255,255,255,0.05);
+        }}
+        .nav-active {{
+            color: #f5a41f;
+            font-weight: 600;
+            background: rgba(245, 164, 31, 0.10);
+        }}
+        .page-header {{
+            text-align: center;
+            padding: 16px 0 20px;
+        }}
+        .page-header h1 {{
+            font-family: 'Orbitron', sans-serif;
+            color: #192333;
+            font-size: 1.5em;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
         }}
         .stats-summary {{
             display: flex;
             justify-content: center;
-            align-items: flex-end;
             flex-wrap: wrap;
-            gap: 40px;
-            margin-bottom: 30px;
-            padding: 15px;
-            background: rgba(0,212,255,0.1);
-            border-radius: 10px;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 0;
+            background: transparent;
+            border-radius: 0;
         }}
         .stats-summary .stat {{
+            min-width: 140px;
+            padding: 14px 20px 14px 16px;
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #d0dce8;
+            border-left: 3px solid #d4860a;
+            box-shadow: 0 1px 4px rgba(0,20,50,0.08);
             display: flex;
             flex-direction: column;
-            justify-content: flex-end;
-            text-align: center;
-            min-width: 120px;
+            gap: 4px;
         }}
         .stats-summary .stat-value {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.9em;
+            font-weight: 600;
+            color: #d4860a;
             line-height: 1.1;
-            font-size: 2em;
-            font-weight: bold;
-            color: #00ff88;
             white-space: nowrap;
         }}
         .stats-summary .stat-label {{
-            color: #94a3b8;
-            font-size: 0.85em;
+            color: #7a96b0;
+            font-size: 0.82em;
         }}
         .stats-controls {{
             display: flex;
@@ -135,16 +170,16 @@ def render_stats_html(version):
         .range-btn {{
             padding: 7px 16px;
             border-radius: 6px;
-            border: 1px solid #00d4ff;
-            color: #00d4ff;
-            background: transparent;
+            border: 1px solid #1a8fc4;
+            color: #1a8fc4;
+            background: #ffffff;
             font-size: 0.85em;
             cursor: pointer;
             min-height: 44px;
         }}
         .range-btn:hover, .range-btn.active {{
-            background: #00d4ff;
-            color: #10203c;
+            background: #1a8fc4;
+            color: #ffffff;
         }}
         .stats-table-wrap {{
             width: 100%;
@@ -156,74 +191,70 @@ def render_stats_html(version):
             font-size: 0.9em;
         }}
         thead th {{
-            background: #1e2a4a;
-            color: #00d4ff;
+            background: #f4f8fb;
+            color: #1a8fc4;
             padding: 10px 14px;
             text-align: right;
-            border-bottom: 2px solid #2a4a8a;
+            border-bottom: 2px solid #d0dce8;
             white-space: nowrap;
         }}
         thead th:first-child {{
             text-align: left;
         }}
         tbody tr {{
-            border-bottom: 1px solid #1e2a4a;
+            border-bottom: 1px solid #e8eff6;
         }}
         tbody tr:hover {{
-            background: rgba(0, 212, 255, 0.06);
+            background: rgba(26, 143, 196, 0.06);
         }}
         tbody tr.night-zero {{
             opacity: 0.38;
         }}
         tbody tr.night-ongoing td.night-date::after {{
             content: ' (進行中)';
-            color: #f0c75e;
+            color: #d4860a;
             font-size: 0.85em;
         }}
         tbody td {{
             padding: 9px 14px;
             text-align: right;
-            color: #dde8ff;
+            font-family: 'JetBrains Mono', monospace;
+            color: #192333;
             white-space: nowrap;
         }}
         tbody td:first-child {{
             text-align: left;
-            color: #9bb1d8;
+            color: #4e6880;
         }}
         .count-total {{
             font-weight: bold;
-            color: #00ff88;
+            color: #d4860a;
         }}
         .loading-msg {{
             text-align: center;
             padding: 40px;
-            color: #94a3b8;
+            color: #7a96b0;
         }}
         .chart-wrap {{
             width: 100%;
             margin: 0 0 30px;
-            background: rgba(255,255,255,0.03);
+            background: #ffffff;
+            border: 1px solid #d0dce8;
+            box-shadow: 0 1px 4px rgba(0,20,50,0.08);
             border-radius: 10px;
             padding: 16px;
             box-sizing: border-box;
         }}
         .footer {{
             text-align: center;
-            padding: 30px;
-            color: #64748b;
-            font-size: 0.85em;
-        }}
-        @media (max-width: 720px) {{
-            .brand-mark {{
-                flex-direction: column;
-                gap: 10px;
-            }}
-            .brand-mark img {{
-                width: min(240px, 70vw);
-            }}
+            padding: 24px 30px;
+            color: #7a96b0;
+            font-size: 0.82em;
+            border-top: 1px solid #d8e4ef;
+            margin-top: 40px;
         }}
         :focus-visible {{
-            outline: 2px solid #00d4ff;
+            outline: 2px solid #1a8fc4;
             outline-offset: 2px;
             border-radius: 3px;
         }}
@@ -231,19 +262,17 @@ def render_stats_html(version):
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 </head>
 <body>
-    <div class="header">
-        <div class="brand-mark">
-            {brand_logo_html}
-            <div class="brand-title">Meteor Detection Dashboard</div>
+    <nav class="topnav">
+        <a href="/" class="brand-link">{brand_logo_html}</a>
+        <div class="nav-links">
+            <a class="nav-link" href="/">検出一覧</a>
+            <a class="nav-link" href="/cameras">カメラ</a>
+            <a class="nav-link nav-active" href="/stats" aria-current="page">統計</a>
+            <a class="nav-link" href="/settings">設定</a>
         </div>
-        <div class="page-kicker">Statistics View</div>
+    </nav>
+    <div class="page-header">
         <h1>夜別検出統計</h1>
-        <div class="header-actions">
-            <a class="settings-link" href="/">検出一覧</a>
-            <a class="settings-link" href="/cameras">カメラ表示</a>
-            <a class="settings-link" href="/settings">全カメラ設定</a>
-            <a class="settings-link" href="/stats" aria-current="page" style="background:rgba(0,212,255,0.15)">統計</a>
-        </div>
     </div>
 
     <main>
@@ -380,7 +409,7 @@ def render_stats_html(version):
             renderChart(nights, cameras);
         }}
 
-        const CAMERA_COLORS = ['#00d4ff', '#00ff88', '#f0c75e', '#ff7f7f', '#bf7fff'];
+        const CAMERA_COLORS = ['#1a8fc4', '#d4860a', '#1d9e60', '#cc3333', '#7b4dc4'];
 
         function renderChart(nights, cameras) {{
             const chartEl = document.getElementById('stats-chart');
@@ -401,18 +430,18 @@ def render_stats_html(version):
                 autosize: true,
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
-                font: {{ color: '#ccc', size: 12 }},
+                font: {{ color: '#4e6880', size: 12 }},
                 xaxis: {{
                     type: 'category',
                     tickangle: -45,
                     tickfont: {{ size: 11 }},
-                    gridcolor: '#2a3a5a',
-                    linecolor: '#2a3a5a',
+                    gridcolor: '#d8e4ef',
+                    linecolor: '#d8e4ef',
                 }},
                 yaxis: {{
                     title: '検出数',
-                    gridcolor: '#2a3a5a',
-                    linecolor: '#2a3a5a',
+                    gridcolor: '#d8e4ef',
+                    linecolor: '#d8e4ef',
                     dtick: 1,
                 }},
                 legend: {{ orientation: 'h', x: 0, y: 1.12 }},
@@ -459,6 +488,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 <div class="camera-card">
                     <div class="camera-header">
                         <span class="camera-name">{display_name}</span>
+                        {'<button class="youtube-btn youtube-btn-header" id="youtube-btn' + str(i) + '" onclick="toggleYouTube(' + str(i) + ')">YouTube Live</button>' if cam.get("youtube_key") else '<button class="youtube-btn youtube-btn-header" disabled style="opacity:0.3;cursor:default;">YouTube Live</button>'}
                         <div class="status-indicators">
                             <span class="camera-status indicator-help" id="status{i}" role="img" aria-label="ストリーム接続状態" title="ストリーム接続" data-help="ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）">●</span>
                             <span class="server-status unknown indicator-help" id="server-status{i}" role="img" aria-label="カメラサーバ状態" title="カメラサーバ生存" data-help="カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）">●</span>
@@ -475,7 +505,6 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
                         <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
                         <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
-                        {'<button class="youtube-btn" id="youtube-btn' + str(i) + '" onclick="toggleYouTube(' + str(i) + ')">YouTube配信</button>' if cam.get("youtube_key") else ''}
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
                     </div>
                     <div class="recording-panel" id="recording-panel{i}" hidden>
@@ -512,12 +541,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
 
     page_title = "流星検出ダッシュボード - カメラ" if is_camera_page else "流星検出ダッシュボード - 検出一覧"
     page_heading = "カメラライブ" if is_camera_page else "最近の検出"
-    nav_links = ['<a class="settings-link" href="/">検出一覧</a>' if is_camera_page else '<a class="settings-link" href="/cameras">カメラ表示</a>']
-    nav_links.append('<a class="settings-link" href="/settings">全カメラ設定</a>')
-    nav_links.append('<a class="settings-link" href="/stats">統計</a>')
-    nav_links.append('<button class="settings-link action-button" type="button" onclick="setGlobalDetectionEnabled(false)">検出停止</button>')
-    nav_links.append('<button class="settings-link action-button" type="button" onclick="setGlobalDetectionEnabled(true)">検出再開</button>')
-    header_actions = "\n            ".join(nav_links)
+    _active_detections = '' if is_camera_page else ' nav-active'
+    _active_cameras = ' nav-active' if is_camera_page else ''
+    nav_items_html = f'''<a class="nav-link{_active_detections}" href="/">検出一覧</a>
+                <a class="nav-link{_active_cameras}" href="/cameras">カメラ</a>
+                <a class="nav-link" href="/stats">統計</a>
+                <a class="nav-link" href="/settings">設定</a>'''
+    nav_actions_html = '''<div class="nav-actions">
+        <button class="nav-action-btn" type="button" onclick="setGlobalDetectionEnabled(false)">停止</button>
+        <button class="nav-action-btn" type="button" onclick="setGlobalDetectionEnabled(true)">再開</button>
+    </div>'''
     stats_primary = (
         f'''
         <div class="stat">
@@ -577,119 +610,176 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <title>{page_title}</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #eee;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #eef2f7;
+            color: #192333;
             min-height: 100vh;
-            padding: 20px;
+            padding: 20px 20px 20px 240px;
             line-height: 1.6;
         }}
-        .header {{
-            text-align: center;
-            padding: 8px 0 30px;
+        .topnav {{
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+            padding: 24px 14px 20px;
+            width: 220px;
+            min-height: 100vh;
+            background: #0f1c2d;
+            border-right: 2px solid #f5a41f;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 100;
+            margin: 0;
+            overflow-y: auto;
         }}
-        .brand-mark {{
+        .brand-link {{
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 18px;
-            margin-bottom: 14px;
+            text-decoration: none;
+            flex-shrink: 0;
+            margin-bottom: 28px;
+            padding: 4px 0;
         }}
-        .brand-mark img {{
-            width: min(280px, 42vw);
+        .brand-link img {{
+            width: 100%;
+            max-width: 160px;
             height: auto;
             display: block;
-            filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.28));
         }}
-        .brand-title {{
-            color: #f4fbff;
-            font-size: clamp(1.8rem, 4vw, 2.8rem);
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            line-height: 1.1;
+        .brand-text {{
+            font-family: 'Orbitron', sans-serif;
+            color: #dce8f5;
+            font-size: 1.2em;
+            font-weight: 800;
+            letter-spacing: 0.1em;
         }}
-        .header h1 {{
-            color: #00d4ff;
-            font-size: 2em;
+        .nav-links {{
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }}
+        .nav-link {{
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 7px;
+            color: #6a8aaa;
+            text-decoration: none;
+            font-size: 0.88em;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            transition: color 0.15s, background 0.15s;
+            white-space: nowrap;
+            min-height: 40px;
+            cursor: pointer;
+        }}
+        .nav-link:hover {{
+            color: #dce8f5;
+            background: rgba(255,255,255,0.05);
+        }}
+        .nav-active {{
+            color: #f5a41f;
+            font-weight: 600;
+            background: rgba(245, 164, 31, 0.10);
+        }}
+        .nav-actions {{
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid #2a4a6a;
+        }}
+        .nav-action-btn {{
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.82em;
+            cursor: pointer;
+            min-height: 36px;
+            border: 1px solid #2a4a6a;
+            background: #122440;
+            color: #6a8aaa;
+            transition: all 0.15s;
+            width: 100%;
+            text-align: left;
+        }}
+        .nav-action-btn:hover {{
+            border-color: #5ab4e0;
+            color: #dce8f5;
+        }}
+        .page-header {{
+            text-align: center;
+            padding: 16px 0 20px;
+        }}
+        .page-header h1 {{
+            font-family: 'Orbitron', sans-serif;
+            color: #192333;
+            font-size: 1.5em;
+            font-weight: 600;
+            letter-spacing: 0.06em;
             margin-bottom: 8px;
         }}
-        .header .subtitle {{
-            color: #94a3b8;
-            font-size: 0.9em;
-        }}
         .hero-clock {{
-            margin-top: 10px;
-            color: #b9f3ff;
+            color: #d4860a;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 1.15em;
             font-variant-numeric: tabular-nums;
             letter-spacing: 0.04em;
         }}
-        .page-kicker {{
-            color: #7ec8ff;
-            font-size: 0.82em;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-        }}
-        .header-actions {{
-            margin-top: 12px;
-        }}
-        .settings-link {{
-            display: inline-block;
-            padding: 8px 14px;
-            border-radius: 8px;
-            border: 1px solid #00d4ff;
-            color: #00d4ff;
-            text-decoration: none;
-            font-size: 0.9em;
-            background: transparent;
-        }}
-        .settings-link:hover {{
-            background: #00d4ff;
-            color: #10203c;
-            transition: background 0.2s, color 0.2s;
-        }}
-        .action-button {{
-            cursor: pointer;
-        }}
         .stats-bar {{
             display: flex;
             justify-content: center;
-            align-items: flex-end;
             flex-wrap: wrap;
-            gap: 40px;
-            margin-bottom: 30px;
-            padding: 15px;
-            background: rgba(0,212,255,0.1);
-            border-radius: 10px;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 0;
+            background: transparent;
+            border-radius: 0;
+            align-items: stretch;
         }}
         .stats-bar .stat {{
+            min-width: 140px;
+            padding: 14px 20px 14px 16px;
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #d0dce8;
+            border-left: 3px solid #d4860a;
+            box-shadow: 0 1px 4px rgba(0,20,50,0.08);
             display: flex;
             flex-direction: column;
+            gap: 4px;
             justify-content: flex-end;
-            text-align: center;
-            min-width: 120px;
         }}
         .stats-bar .stat-value {{
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.9em;
+            font-weight: 600;
+            color: #d4860a;
             line-height: 1.1;
-            font-size: 2em;
-            font-weight: bold;
-            color: #00ff88;
             white-space: nowrap;
         }}
         #detection-window {{
-            font-size: 1.2em;
+            font-size: 1.5em;
+            white-space: nowrap;
         }}
         .stat-wide {{
             min-width: 200px;
         }}
         .stats-bar .stat-label {{
-            color: #94a3b8;
-            font-size: 0.85em;
+            color: #7a96b0;
+            font-size: 0.82em;
         }}
         .camera-grid {{
             display: grid;
@@ -699,26 +789,38 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             margin: 0 auto;
         }}
         .camera-card {{
-            background: #1e2a4a;
-            border-radius: 12px;
+            background: #ffffff;
+            border-radius: 10px;
             overflow: hidden;
-            border: 3px solid #4a6f9f;
+            border: 1px solid #d0dce8;
+            box-shadow: 0 1px 4px rgba(0,20,50,0.08);
         }}
         .camera-header {{
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-start;
             align-items: center;
-            padding: 12px 15px;
-            background: #16213e;
-            border-bottom: 3px solid #4a6f9f;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #f4f8fb;
+            border-bottom: 1px solid #d8e4ef;
         }}
         .camera-name {{
+            font-family: 'Orbitron', sans-serif;
             font-weight: bold;
-            color: #00d4ff;
+            color: #1a8fc4;
         }}
         .status-indicators {{
             display: flex;
             gap: 8px;
+            margin-left: auto;
+        }}
+        .youtube-btn-header {{
+            padding: 2px 8px;
+            font-size: 0.72em;
+            line-height: 1;
+            border-radius: 4px;
+            flex-shrink: 0;
+            vertical-align: middle;
         }}
         .indicator-help {{
             position: relative;
@@ -733,9 +835,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             max-width: 320px;
             padding: 8px 10px;
             border-radius: 6px;
-            background: rgba(10, 16, 30, 0.96);
-            border: 1px solid #3b5f9d;
-            color: #dce8ff;
+            background: rgba(15, 28, 45, 0.95);
+            border: 1px solid #2a4a6a;
+            color: #f0f6ff;
             font-size: 12px;
             line-height: 1.45;
             white-space: normal;
@@ -744,27 +846,27 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             pointer-events: none;
         }}
         .camera-status {{
-            color: #00ff88;
+            color: #3dd68c;
             font-size: 0.8em;
         }}
         .camera-status.offline {{
             color: #ff4444;
         }}
         .camera-status.paused {{
-            color: #94a3b8;
+            color: #6a8aaa;
         }}
         .server-status {{
-            color: #00ff88;
+            color: #3dd68c;
             font-size: 0.8em;
         }}
         .server-status.offline {{
             color: #ff4444;
         }}
         .server-status.unknown {{
-            color: #94a3b8;
+            color: #6a8aaa;
         }}
         .detection-status {{
-            color: #94a3b8;
+            color: #6a8aaa;
             font-size: 0.8em;
         }}
         .detection-status.detecting {{
@@ -781,7 +883,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #f4d03f;
         }}
         .detection-status.unknown {{
-            color: #94a3b8;
+            color: #6a8aaa;
         }}
         @keyframes blink {{
             0%, 50% {{ opacity: 1; }}
@@ -794,8 +896,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .camera-actions {{
             padding: 8px 12px;
-            background: #16213e;
-            border-bottom: 3px solid #4a6f9f;
+            background: #f4f8fb;
+            border-bottom: 1px solid #d8e4ef;
             display: flex;
             justify-content: flex-end;
             gap: 8px;
@@ -805,19 +907,19 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            color: #9bb1d8;
+            color: #4e6880;
             font-size: 0.78em;
             cursor: pointer;
             user-select: none;
         }}
         .stream-toggle-label input {{
-            accent-color: #00d4ff;
+            accent-color: #1a8fc4;
             cursor: pointer;
         }}
         .mask-btn {{
-            background: #2a3f6f;
-            border: 1px solid #00d4ff;
-            color: #00d4ff;
+            background: #f0f7fc;
+            border: 1px solid #1a8fc4;
+            color: #1a8fc4;
             padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
@@ -825,17 +927,17 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 44px;
         }}
         .mask-btn:hover {{
-            background: #00d4ff;
-            color: #0f1530;
+            background: #1a8fc4;
+            color: #ffffff;
         }}
         .mask-btn:disabled {{
             opacity: 0.6;
             cursor: wait;
         }}
         .record-btn {{
-            background: #3d2f12;
-            border: 1px solid #f0c75e;
-            color: #ffe7a6;
+            background: #fef8ed;
+            border: 1px solid #d4860a;
+            color: #8a5800;
             padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
@@ -843,13 +945,13 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 44px;
         }}
         .record-btn:hover {{
-            background: #f0c75e;
-            color: #231a08;
+            background: #d4860a;
+            color: #ffffff;
         }}
         .recording-panel {{
             padding: 10px 12px;
-            background: rgba(11, 19, 38, 0.92);
-            border-bottom: 3px solid #4a6f9f;
+            background: #f4f8fb;
+            border-bottom: 1px solid #d8e4ef;
         }}
         .recording-form {{
             display: flex;
@@ -861,16 +963,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             display: flex;
             flex-direction: column;
             gap: 4px;
-            color: #9bb1d8;
+            color: #4e6880;
             font-size: 0.78em;
         }}
         .recording-form input {{
             min-width: 150px;
             padding: 6px 8px;
             border-radius: 6px;
-            border: 1px solid #3b5f9d;
-            background: #16213e;
-            color: #e6f0ff;
+            border: 1px solid #d0dce8;
+            background: #ffffff;
+            color: #192333;
         }}
         .record-now-btn,
         .record-submit-btn,
@@ -882,42 +984,42 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 44px;
         }}
         .record-now-btn {{
-            background: #203554;
-            border: 1px solid #4f84c4;
-            color: #bfe0ff;
+            background: #f0f7fc;
+            border: 1px solid #1a8fc4;
+            color: #1a6090;
         }}
         .record-submit-btn {{
-            background: #284d2c;
-            border: 1px solid #5dd67c;
-            color: #d6ffe0;
+            background: #f0faf3;
+            border: 1px solid #1d9e60;
+            color: #0e5c30;
         }}
         .record-stop-btn {{
-            background: #512327;
-            border: 1px solid #ff7f7f;
-            color: #ffd0d0;
+            background: #fff0f0;
+            border: 1px solid #cc3333;
+            color: #991111;
         }}
         .recording-status {{
             margin-top: 8px;
-            color: #cbd9f8;
+            color: #4e6880;
             font-size: 0.8em;
         }}
         .recording-status.scheduled {{
-            color: #ffd27a;
+            color: #d4860a;
         }}
         .recording-status.recording {{
-            color: #ff7f7f;
+            color: #cc3333;
         }}
         .recording-status.completed {{
-            color: #74e39b;
+            color: #1d9e60;
         }}
         .recording-status.failed,
         .recording-status.stopped {{
             color: #ff9d9d;
         }}
         .snapshot-btn {{
-            background: #1e3b37;
-            border: 1px solid #48d1bf;
-            color: #9ff7e9;
+            background: #f0faf8;
+            border: 1px solid #1d9e80;
+            color: #0e5c4a;
             padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
@@ -925,17 +1027,17 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 44px;
         }}
         .snapshot-btn:hover {{
-            background: #48d1bf;
-            color: #0f1530;
+            background: #1d9e80;
+            color: #ffffff;
         }}
         .snapshot-btn:disabled {{
             opacity: 0.6;
             cursor: wait;
         }}
         .restart-btn {{
-            background: #3a2430;
-            border: 1px solid #ff7f7f;
-            color: #ffb3b3;
+            background: #fff0f0;
+            border: 1px solid #cc3333;
+            color: #991111;
             padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
@@ -943,17 +1045,17 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 44px;
         }}
         .restart-btn:hover {{
-            background: #ff6b6b;
-            color: #1a1a2e;
+            background: #cc3333;
+            color: #ffffff;
         }}
         .restart-btn:disabled {{
             opacity: 0.6;
             cursor: wait;
         }}
         .youtube-btn {{
-            background: #3d1212;
-            border: 1px solid #ff4444;
-            color: #ff9d9d;
+            background: #fff0f0;
+            border: 1px solid #cc2222;
+            color: #991111;
             padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
@@ -984,9 +1086,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             .youtube-btn.active {{ animation: none; }}
         }}
         .mask-preview-btn {{
-            background: #1f324f;
-            border: 1px solid #ff6b6b;
-            color: #ff6b6b;
+            background: #fff0f0;
+            border: 1px solid #cc3333;
+            color: #cc3333;
             padding: 8px 10px;
             border-radius: 6px;
             cursor: pointer;
@@ -994,8 +1096,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 44px;
         }}
         .mask-preview-btn:hover {{
-            background: #ff6b6b;
-            color: #0f1530;
+            background: #cc3333;
+            color: #ffffff;
         }}
         .mask-preview-btn:disabled {{
             opacity: 0.5;
@@ -1032,11 +1134,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             align-items: center;
             justify-content: center;
             background: rgba(0,0,0,0.8);
-            color: #94a3b8;
+            color: #6a8aaa;
         }}
         .camera-stats {{
             padding: 10px 15px;
-            background: #16213e;
+            background: #f4f8fb;
             font-size: 0.9em;
             display: flex;
             justify-content: space-between;
@@ -1045,11 +1147,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             gap: 8px;
         }}
         .camera-stats b {{
-            color: #00ff88;
+            color: #d4860a;
         }}
         .camera-params {{
             font-size: 0.8em;
-            color: #94a3b8;
+            color: #6a8aaa;
         }}
         .recording-summary {{
             color: #cbd9f8;
@@ -1057,41 +1159,46 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .camera-params .param {{
             display: inline-block;
-            background: #2a3f6f;
+            background: #e8f0f8;
             padding: 2px 6px;
             border-radius: 4px;
             margin-left: 4px;
         }}
         .camera-params .param-clip {{
-            color: #00ff88;
+            color: #1d9e60;
         }}
         .camera-params .param-no-clip {{
-            color: #ff8844;
+            color: #d4500a;
         }}
         .camera-params .param-fps-warning {{
-            background: #5a3b14;
-            color: #ffd27a;
+            background: #fef3cd;
+            color: #8a5800;
         }}
         .mask-status {{
-            color: #94a3b8;
-            border: 1px solid #94a3b8;
+            color: #7a96b0;
+            border: 1px solid #7a96b0;
             font-size: 0.65em;
             padding: 1px 4px;
             border-radius: 4px;
         }}
         .mask-status.active {{
-            color: #ff6b6b;
-            border-color: #ff6b6b;
+            color: #cc2222;
+            border-color: #cc2222;
         }}
         .recent-detections {{
             max-width: 1800px;
             margin: 30px auto 0;
             padding: 20px;
-            background: #1e2a4a;
+            background: #ffffff;
+            border: 1px solid #d0dce8;
+            box-shadow: 0 1px 4px rgba(0,20,50,0.08);
             border-radius: 12px;
         }}
         .recent-detections h3 {{
-            color: #00d4ff;
+            color: #192333;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95em;
+            letter-spacing: 0.06em;
             margin-bottom: 15px;
         }}
         .detection-calendar-toolbar {{
@@ -1108,9 +1215,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             gap: 8px;
         }}
         .range-btn {{
-            background: #16213e;
-            border: 1px solid #3b5f9d;
-            color: #dce8ff;
+            background: #ffffff;
+            border: 1px solid #d0dce8;
+            color: #4e6880;
             padding: 8px 12px;
             border-radius: 999px;
             cursor: pointer;
@@ -1118,27 +1225,27 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 44px;
         }}
         .range-btn.active {{
-            background: #00d4ff;
-            color: #10203c;
-            border-color: #00d4ff;
+            background: #1a8fc4;
+            color: #ffffff;
+            border-color: #1a8fc4;
             font-weight: bold;
         }}
         .year-select-wrap {{
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            color: #9bb1d8;
+            color: #4e6880;
             font-size: 0.9em;
         }}
         .year-select-wrap select {{
-            background: #16213e;
-            border: 1px solid #3b5f9d;
-            color: #dce8ff;
+            background: #ffffff;
+            border: 1px solid #d0dce8;
+            color: #192333;
             border-radius: 8px;
             padding: 8px 10px;
         }}
         .calendar-summary {{
-            color: #9bb1d8;
+            color: #7a9ab8;
             margin-bottom: 14px;
             font-size: 0.9em;
         }}
@@ -1149,13 +1256,13 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             margin-bottom: 22px;
         }}
         .calendar-month {{
-            background: rgba(13, 24, 44, 0.9);
-            border: 1px solid #355786;
+            background: #f8fafc;
+            border: 1px solid #d0dce8;
             border-radius: 12px;
             padding: 14px;
         }}
         .calendar-month-title {{
-            color: #00d4ff;
+            color: #1a8fc4;
             font-weight: bold;
             margin-bottom: 10px;
             text-align: center;
@@ -1177,24 +1284,24 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             border-radius: 8px;
         }}
         .calendar-day-empty {{
-            background: rgba(255, 255, 255, 0.02);
+            background: rgba(0, 0, 0, 0.02);
         }}
         .calendar-day {{
             position: relative;
-            border: 1px solid #274364;
-            background: #16213e;
-            color: #dce8ff;
+            border: 1px solid #d8e4ef;
+            background: #f0f4f8;
+            color: #4e6880;
             cursor: pointer;
             font-size: 0.85em;
         }}
         .calendar-day.has-data {{
-            background: #1f5b49;
-            border-color: #58d1aa;
-            color: #e8fff7;
+            background: #e6f7f0;
+            border-color: #2da870;
+            color: #0e4d2e;
             font-weight: bold;
         }}
         .calendar-day.selected {{
-            outline: 2px solid #00d4ff;
+            outline: 2px solid #1a8fc4;
             outline-offset: 1px;
         }}
         .calendar-day:hover {{
@@ -1206,9 +1313,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             left: 50%;
             bottom: calc(100% + 8px);
             transform: translateX(-50%);
-            background: rgba(6, 11, 22, 0.96);
-            color: #f4fbff;
-            border: 1px solid #58d1aa;
+            background: rgba(15, 28, 45, 0.92);
+            color: #f0f8ff;
+            border: 1px solid #2da870;
             border-radius: 6px;
             padding: 4px 8px;
             font-size: 0.75em;
@@ -1222,7 +1329,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             opacity: 1;
         }}
         .selected-date-title {{
-            color: #9fe8ff;
+            color: #1a8fc4;
             margin-bottom: 12px;
             font-size: 1em;
         }}
@@ -1233,22 +1340,22 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             padding-right: 6px;
         }}
         .date-group {{
-            border: 3px solid #4a6f9f;
+            border: 1px solid #d0dce8;
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 20px;
-            background: rgba(42, 63, 111, 0.15);
+            background: #f8fafc;
         }}
         .date-group:last-child {{
             margin-bottom: 0;
         }}
         .date-group-header {{
-            color: #00d4ff;
+            color: #1a8fc4;
             font-weight: bold;
             font-size: 1.1em;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 3px solid #4a6f9f;
+            border-bottom: 1px solid #d0dce8;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -1262,11 +1369,11 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             margin-bottom: 0;
         }}
         .detection-group-title {{
-            color: #00ff88;
+            color: #d4860a;
             font-weight: bold;
             margin-bottom: 8px;
             padding-bottom: 6px;
-            border-bottom: 3px solid #4a6f9f;
+            border-bottom: 1px solid #d0dce8;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -1291,9 +1398,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
 
         .select-all-btn {{
-            background: #2a4f8f;
-            border: 1px solid #4488cc;
-            color: white;
+            background: #f0f7fc;
+            border: 1px solid #1a8fc4;
+            color: #1a6090;
             padding: 4px 10px;
             border-radius: 4px;
             cursor: pointer;
@@ -1302,7 +1409,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             white-space: nowrap;
         }}
         .select-all-btn:hover {{
-            background: #4488cc;
+            background: #1a8fc4;
+            color: #ffffff;
         }}
         .select-delete-btn {{
             background: #cc3333;
@@ -1324,8 +1432,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             cursor: wait;
         }}
         .detection-item.sel-selected {{
-            background: #1a3a6a;
-            outline: 2px solid #00d4ff;
+            background: #e0eff8;
+            outline: 2px solid #1a8fc4;
         }}
         .detection-item-select-wrap {{
             display: flex;
@@ -1338,7 +1446,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             height: 18px;
             cursor: pointer;
             flex-shrink: 0;
-            accent-color: #00d4ff;
+            accent-color: #1a8fc4;
         }}
         .detection-item-body {{
             flex: 1;
@@ -1351,13 +1459,14 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .detection-item {{
             padding: 12px;
-            background: #16213e;
+            background: #f8fafc;
+            border: 1px solid #e4edf5;
             border-radius: 8px;
             font-size: 0.85em;
             transition: background 0.2s;
         }}
         .detection-item:hover {{
-            background: #2a3f6f;
+            background: #eef4fa;
         }}
         .detection-thumb {{
             width: 100%;
@@ -1368,7 +1477,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             cursor: pointer;
         }}
         .detection-item .time {{
-            color: #00d4ff;
+            color: #1a8fc4;
             font-weight: bold;
             margin-bottom: 5px;
         }}
@@ -1397,9 +1506,9 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .detection-link {{
             padding: 7px 8px;
-            background: #2a3f6f;
-            border: 1px solid #00d4ff;
-            color: #00d4ff;
+            background: #f0f7fc;
+            border: 1px solid #1a8fc4;
+            color: #1a8fc4;
             border-radius: 4px;
             text-decoration: none;
             font-size: 0.8em;
@@ -1412,8 +1521,8 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             text-align: center;
         }}
         .detection-link:hover {{
-            background: #00d4ff;
-            color: #0f1530;
+            background: #1a8fc4;
+            color: #ffffff;
         }}
         .delete-btn {{
             background: #ff4444;
@@ -1453,16 +1562,16 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             min-height: 34px;
             padding: 6px 8px;
             border-radius: 4px;
-            border: 1px solid #2a5a86;
-            background: #1f324f;
-            color: #d8ecff;
+            border: 1px solid #d0dce8;
+            background: #f4f8fb;
+            color: #4e6880;
             font-size: 0.8em;
             user-select: none;
         }}
         .label-radio input:checked + span {{
-            border-color: #6ddf94;
-            color: #d8ffe8;
-            background: #1d4632;
+            border-color: #1d9e60;
+            color: #0e5c30;
+            background: #e6f7ef;
         }}
         .modal {{
             display: none;
@@ -1508,7 +1617,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             border: none;
         }}
         .modal-close:hover {{
-            color: #00d4ff;
+            color: #1a8fc4;
         }}
         .modal-info {{
             position: absolute;
@@ -1527,7 +1636,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             text-align: center;
         }}
         .modal-downloads a {{
-            color: #00d4ff;
+            color: #4db8e8;
             text-decoration: none;
             font-size: 0.9em;
         }}
@@ -1536,18 +1645,20 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
         }}
         .footer {{
             text-align: center;
-            padding: 30px;
-            color: #64748b;
-            font-size: 0.85em;
+            padding: 24px 30px;
+            color: #7a96b0;
+            font-size: 0.82em;
+            border-top: 1px solid #d8e4ef;
+            margin-top: 40px;
         }}
         .version-link {{
-            color: #00d4ff;
+            color: #1a8fc4;
             text-decoration: none;
             cursor: pointer;
             transition: color 0.2s;
         }}
         .version-link:hover {{
-            color: #00ff88;
+            color: #d4860a;
         }}
         .changelog-modal {{
             display: none;
@@ -1568,53 +1679,42 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             max-width: 800px;
             max-height: 80vh;
             overflow-y: auto;
-            background: #1e2a4a;
+            background: #ffffff;
             padding: 30px;
             border-radius: 12px;
             position: relative;
-            color: #eee;
+            color: #192333;
         }}
         .changelog-content h1, .changelog-content h2 {{
-            color: #00d4ff;
+            color: #1a8fc4;
         }}
         .changelog-content h3 {{
-            color: #00ff88;
+            color: #f5a41f;
         }}
         .changelog-content pre {{
-            background: #16213e;
+            background: #f4f8fb;
             padding: 10px;
             border-radius: 5px;
             overflow-x: auto;
         }}
-        @media (max-width: 720px) {{
-            .brand-mark {{
-                flex-direction: column;
-                gap: 10px;
-            }}
-            .brand-mark img {{
-                width: min(240px, 70vw);
-            }}
-        }}
         :focus-visible {{
-            outline: 2px solid #00d4ff;
+            outline: 2px solid #1a8fc4;
             outline-offset: 2px;
             border-radius: 3px;
         }}
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="brand-mark">
-            {brand_logo_html}
-            <div class="brand-title">Meteor Detection Dashboard</div>
+    <nav class="topnav">
+        <a href="/" class="brand-link">{brand_logo_html}</a>
+        <div class="nav-links">
+            {nav_items_html}
         </div>
-        <div class="page-kicker">Dashboard View</div>
+        {nav_actions_html}
+    </nav>
+    <div class="page-header">
         <h1>{page_heading}</h1>
-        <div class="subtitle">リアルタイム流星検出システム</div>
         <div class="hero-clock" id="hero-clock">----/--/-- --:--:--</div>
-        <div class="header-actions">
-            {header_actions}
-        </div>
         <div class="subtitle" id="global-detection-control-status"></div>
     </div>
 

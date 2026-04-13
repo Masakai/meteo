@@ -1,33 +1,117 @@
 """Settings page HTML rendering."""
 
+import base64
+from pathlib import Path
+
+
 def render_settings_html(cameras, version):
+    logotype_path = Path(__file__).parent / "documents" / "assets" / "meteo-logotype.svg"
+    logotype_src = ""
+    if logotype_path.exists():
+        logotype_bytes = logotype_path.read_bytes()
+        logotype_src = "data:image/svg+xml;base64," + base64.b64encode(logotype_bytes).decode("ascii")
+    brand_logo_html = f'<img src="{logotype_src}" alt="METEO">' if logotype_src else '<span class="brand-text">METEO</span>'
+
     return f'''<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <title>流星検出ダッシュボード - カメラ設定</title>
     <style>
         * {{ box-sizing: border-box; }}
         body {{
             margin: 0;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #eee;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #eef2f7;
+            color: #192333;
             min-height: 100vh;
             line-height: 1.6;
+            padding: 20px 20px 20px 240px;
+        }}
+        .topnav {{
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0;
+            padding: 24px 14px 20px;
+            width: 220px;
+            min-height: 100vh;
+            background: #0f1c2d;
+            border-right: 2px solid #f5a41f;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 100;
+            margin: 0;
+            overflow-y: auto;
+        }}
+        .brand-link {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            flex-shrink: 0;
+            margin-bottom: 28px;
+            padding: 4px 0;
+        }}
+        .brand-link img {{
+            width: 100%;
+            max-width: 160px;
+            height: auto;
+            display: block;
+        }}
+        .brand-text {{
+            font-family: 'Orbitron', sans-serif;
+            color: #dce8f5;
+            font-size: 1.2em;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+        }}
+        .nav-links {{
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }}
+        .nav-link {{
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-radius: 7px;
+            color: #6a8aaa;
+            text-decoration: none;
+            font-size: 0.88em;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            transition: color 0.15s, background 0.15s;
+            white-space: nowrap;
+            min-height: 40px;
+        }}
+        .nav-link:hover {{
+            color: #dce8f5;
+            background: rgba(255,255,255,0.05);
+        }}
+        .nav-active {{
+            color: #f5a41f;
+            font-weight: 600;
+            background: rgba(245, 164, 31, 0.10);
         }}
         .wrap {{
             max-width: 980px;
             margin: 0 auto;
-            padding: 24px;
+            padding: 0 24px 24px;
         }}
         h1 {{
             margin: 0 0 8px;
-            color: #00d4ff;
+            font-family: 'Orbitron', sans-serif;
+            color: #1a8fc4;
         }}
         .sub {{
-            color: #94a3b8;
+            color: #4e6880;
             margin-bottom: 18px;
         }}
         .toolbar {{
@@ -37,22 +121,23 @@ def render_settings_html(cameras, version):
             flex-wrap: wrap;
         }}
         .btn {{
-            border: 1px solid #00d4ff;
-            background: #20335b;
-            color: #d7f8ff;
+            border: 1px solid #1a8fc4;
+            background: #f0f7fc;
+            color: #1a6090;
             border-radius: 8px;
             padding: 8px 12px;
             cursor: pointer;
             text-decoration: none;
         }}
         .btn:hover {{
-            background: #00d4ff;
-            color: #0f1530;
+            background: #1a8fc4;
+            color: #ffffff;
             transition: background 0.2s, color 0.2s;
         }}
         .panel {{
-            background: #1f2a48;
-            border: 1px solid #2d406d;
+            background: #ffffff;
+            border: 1px solid #d0dce8;
+            box-shadow: 0 1px 4px rgba(0,20,50,0.08);
             border-radius: 12px;
             padding: 16px;
             margin-bottom: 14px;
@@ -60,22 +145,22 @@ def render_settings_html(cameras, version):
         .panel h2 {{
             margin: 0 0 10px;
             font-size: 1rem;
-            color: #7dd9ff;
+            color: #1a8fc4;
         }}
         details.help {{
-            border: 1px solid #3a5488;
+            border: 1px solid #d0dce8;
             border-radius: 10px;
-            background: #172544;
+            background: #f8fafc;
             padding: 10px 12px;
         }}
         details.help summary {{
             cursor: pointer;
-            color: #9fe8ff;
+            color: #1a8fc4;
             font-weight: 600;
         }}
         .help-note {{
             margin: 8px 0 0;
-            color: #a8bfdc;
+            color: #4e6880;
             font-size: 0.85rem;
         }}
         .help-table {{
@@ -86,13 +171,13 @@ def render_settings_html(cameras, version):
         }}
         .help-table th,
         .help-table td {{
-            border: 1px solid #36507f;
+            border: 1px solid #d0dce8;
             padding: 6px 8px;
             vertical-align: top;
         }}
         .help-table th {{
-            background: #13203c;
-            color: #a8dfff;
+            background: #f4f8fb;
+            color: #1a8fc4;
             text-align: left;
         }}
         .grid {{
@@ -103,15 +188,15 @@ def render_settings_html(cameras, version):
         label {{
             display: block;
             font-size: 0.82rem;
-            color: #bfd1ee;
+            color: #4e6880;
             margin-bottom: 4px;
         }}
         input,
         select {{
             width: 100%;
-            background: #13203c;
-            border: 1px solid #34507f;
-            color: #e6f2ff;
+            background: #ffffff;
+            border: 1px solid #d0dce8;
+            color: #192333;
             border-radius: 8px;
             padding: 8px 10px;
             height: 36px;
@@ -126,12 +211,13 @@ def render_settings_html(cameras, version):
             margin-top: 12px;
             padding: 10px;
             border-radius: 8px;
-            background: #13203c;
+            background: #f8fafc;
             white-space: pre-wrap;
-            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
             font-size: 0.85rem;
             line-height: 1.4;
-            border: 1px solid #34507f;
+            border: 1px solid #d0dce8;
+            color: #192333;
         }}
         @media (max-width: 740px) {{
             .grid {{
@@ -139,13 +225,22 @@ def render_settings_html(cameras, version):
             }}
         }}
         :focus-visible {{
-            outline: 2px solid #00d4ff;
+            outline: 2px solid #1a8fc4;
             outline-offset: 2px;
             border-radius: 3px;
         }}
     </style>
 </head>
 <body>
+    <nav class="topnav">
+        <a href="/" class="brand-link">{brand_logo_html}</a>
+        <div class="nav-links">
+            <a class="nav-link" href="/">検出一覧</a>
+            <a class="nav-link" href="/cameras">カメラ</a>
+            <a class="nav-link" href="/stats">統計</a>
+            <a class="nav-link nav-active" href="/settings" aria-current="page">設定</a>
+        </div>
+    </nav>
     <main>
     <div class="wrap">
         <h1>全カメラ設定</h1>
