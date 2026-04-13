@@ -107,6 +107,8 @@ def _rewrite_asset_paths(record: dict, old_camera: str, new_camera: str) -> dict
 
 
 def _collect_media_files(cam_dir: Path) -> list[Path]:
+    if not cam_dir.is_dir():
+        return []
     files = []
     for p in cam_dir.iterdir():
         if p.is_dir() or p.name in _SKIP_FILES or p.suffix.lower() in _SKIP_EXTS:
@@ -672,12 +674,15 @@ class ZipPackager:
 
             # カメラごと JSONL + メディア
             for cam_name, jsonl_lines in cameras.items():
+                cam_dir = self.detections_dir / cam_name
+                if not cam_dir.is_dir():
+                    continue  # カメラディレクトリが存在しない場合はスキップ
+
                 # JSONL（選択分のみ）
                 content = "\n".join(l for l in jsonl_lines if l) + "\n"
                 zf.writestr(f"{_ZIP_ROOT}/{cam_name}/detections.jsonl", content)
 
                 # メディアファイル
-                cam_dir = self.detections_dir / cam_name
                 for rec in records:
                     if rec["camera"] != cam_name:
                         continue
