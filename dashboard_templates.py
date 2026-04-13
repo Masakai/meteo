@@ -245,6 +245,14 @@ def render_stats_html(version):
             padding: 16px;
             box-sizing: border-box;
         }}
+        .chart-section-label {{
+            font-size: 0.85em;
+            color: #4e6880;
+            font-weight: 600;
+            margin: 24px 0 8px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }}
         .footer {{
             text-align: center;
             padding: 24px 30px;
@@ -300,6 +308,10 @@ def render_stats_html(version):
 
     <div class="chart-wrap" id="chart-wrap" style="display:none">
         <div id="stats-chart" style="width:100%;"></div>
+    </div>
+    <div class="chart-section-label">時間帯別検出数</div>
+    <div class="chart-wrap" id="hourly-chart-wrap" style="display:none">
+        <div id="hourly-chart" style="width:100%;"></div>
     </div>
 
     <div class="stats-table-wrap">
@@ -407,6 +419,7 @@ def render_stats_html(version):
 
             // Plotly 積み重ねグラフ
             renderChart(nights, cameras);
+            renderHourlyChart(data.hourly);
         }}
 
         const CAMERA_COLORS = ['#1a8fc4', '#d4860a', '#1d9e60', '#cc3333', '#7b4dc4'];
@@ -452,6 +465,46 @@ def render_stats_html(version):
             Plotly.react(chartEl, traces, layout, {{ responsive: true, useResizeHandler: true, displayModeBar: false }});
             Plotly.Plots.resize(chartEl);
             document.getElementById('chart-wrap').style.display = '';
+        }}
+
+        function renderHourlyChart(hourly) {{
+            if (!hourly || !hourly.cameras || hourly.cameras.length === 0) return;
+            const chartEl = document.getElementById('hourly-chart');
+            const hours = hourly.hours || [...Array(24).keys()];
+            const hourLabels = hours.map(h => h + '時');
+            const traces = hourly.cameras.map((cam, i) => ({{
+                x: hourLabels,
+                y: hourly.by_hour[cam] || new Array(24).fill(0),
+                name: cam,
+                type: 'bar',
+                marker: {{ color: CAMERA_COLORS[i % CAMERA_COLORS.length] }},
+            }}));
+            const layout = {{
+                barmode: 'group',
+                autosize: true,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: {{ color: '#4e6880', size: 12 }},
+                xaxis: {{
+                    type: 'category',
+                    tickfont: {{ size: 11 }},
+                    gridcolor: '#d8e4ef',
+                    linecolor: '#d8e4ef',
+                }},
+                yaxis: {{
+                    title: '検出数',
+                    gridcolor: '#d8e4ef',
+                    linecolor: '#d8e4ef',
+                    dtick: 1,
+                }},
+                legend: {{ orientation: 'h', x: 0, y: 1.12 }},
+                margin: {{ t: 40, b: 60, l: 50, r: 20 }},
+                height: 240,
+            }};
+            Plotly.react(chartEl, traces, layout,
+                {{ responsive: true, useResizeHandler: true, displayModeBar: false }});
+            Plotly.Plots.resize(chartEl);
+            document.getElementById('hourly-chart-wrap').style.display = '';
         }}
 
         loadStats(30, document.querySelector('.range-btn[data-days="30"]'));

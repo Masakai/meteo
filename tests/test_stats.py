@@ -153,3 +153,58 @@ class TestComputeNightlyStats:
         result = dr.compute_nightly_stats("fake.db", camera_display_names, days=3)
         assert result["nights"] == []
         assert result["total_events"] == 0
+
+
+class TestComputeHourlyStats:
+    def _run(self, rows_by_window, days=1, cameras=None):
+        """helper: astro_utils と detection_store をモックして compute_hourly_stats を実行"""
+        camera_display_names = cameras or {"cam_east": "East", "cam_south": "South"}
+
+        call_count = [0]
+
+        def fake_window(target_date, lat, lon, tz):
+            return _sunset_sunrise(target_date.isoformat())
+
+        def fake_query(db_path, start_ts, end_ts):
+            idx = call_count[0]
+            call_count[0] += 1
+            return rows_by_window[idx] if idx < len(rows_by_window) else []
+
+        with patch.object(dr, "_get_detection_window_for_date", side_effect=fake_window), \
+             patch("detection_store.query_detections_for_stats", side_effect=fake_query):
+            result = dr.compute_hourly_stats("fake.db", camera_display_names, days=days)
+
+        return result
+
+    def test_no_detections(self):
+        """検出なし → 全時間帯が0"""
+        result = self._run([[]])
+        assert result["hours"] == list(range(24))
+        assert "East" in result["by_hour"]
+        assert result["by_hour"]["East"] == [0] * 24
+        assert result["by_hour"]["South"] == [0] * 24
+
+    def test_single_detection_at_21_jst(self):
+        """21時JST検出1件 → by_hour['East'][21] == 1、他は0"""
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(_TZ_STR)
+        t = datetime(2026, 4, 12, 21, 0, 0, tzinfo=tz).isoformat()
+        rows = _make_rows("cam_east", [t])
+
+        result = self._run([rows])
+        assert result["by_hour"]["East"][21] == 1
+        assert sum(result["by_hour"]["East"]) == 1
+        assert sum(result["by_hour"]["South"]) == 0
+
+    def test_within_5s_same_camera_deduped(self):
+        """5秒以内の同カメラ2件 → 重複除去で1件のみカウント"""
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(_TZ_STR)
+        base = datetime(2026, 4, 12, 21, 30, 0, tzinfo=tz)
+        t1 = base.isoformat()
+        t2 = (base + timedelta(seconds=3)).isoformat()
+        rows = _make_rows("cam_east", [t1, t2])
+
+        result = self._run([rows])
+        assert sum(result["by_hour"]["East"]) == 1
+        assert result["by_hour"]["East"][21] == 1

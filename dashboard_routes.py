@@ -1424,6 +1424,80 @@ def compute_nightly_stats(db_path, camera_display_names, days=30):
     }
 
 
+def compute_hourly_stats(db_path, camera_display_names, days=30) -> dict:
+    """カメラ別・時間帯別（0〜23時）の流星検出数を集計する。
+
+    Args:
+        db_path: SQLite DBパス
+        camera_display_names: {"camera1_10_0_1_25": "East", ...} 形式のdict
+        days: 遡る日数（デフォルト30）
+
+    Returns:
+        {
+            "hours": [0, 1, ..., 23],
+            "cameras": ["East", "South"],
+            "by_hour": {"East": [0]*24, "South": [0]*24},
+        }
+    """
+    latitude = float(os.environ.get("LATITUDE", "35.3606"))
+    longitude = float(os.environ.get("LONGITUDE", "138.7274"))
+    timezone = os.environ.get("TIMEZONE", "Asia/Tokyo")
+    tz = ZoneInfo(timezone)
+    now = datetime.now(tz)
+    today = now.date()
+
+    camera_names_ordered = list(dict.fromkeys(camera_display_names.values()))
+    by_hour = {name: [0] * 24 for name in camera_names_ordered}
+
+    for offset in range(days):
+        target_date = today - timedelta(days=offset)
+
+        if _get_detection_window_for_date is None:
+            continue
+
+        try:
+            sunset, sunrise = _get_detection_window_for_date(target_date, latitude, longitude, timezone)
+        except Exception:
+            logger.exception("compute_hourly_stats: failed to get window for %s", target_date)
+            continue
+
+        start_ts = sunset.astimezone(tz).strftime("%Y-%m-%dT%H:%M:%S")
+        end_ts = sunrise.astimezone(tz).strftime("%Y-%m-%dT%H:%M:%S")
+
+        try:
+            rows = detection_store.query_detections_for_stats(db_path, start_ts, end_ts)
+        except Exception:
+            logger.exception("compute_hourly_stats: query failed for %s", target_date)
+            rows = []
+
+        last_event_ts = None
+
+        for row in rows:
+            ts_str = row["timestamp"]
+            try:
+                ts = datetime.fromisoformat(ts_str)
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=tz)
+            except Exception:
+                continue
+
+            if last_event_ts is not None and (ts - last_event_ts).total_seconds() <= 5:
+                continue
+
+            last_event_ts = ts
+            hour = ts.astimezone(tz).hour
+            cam_key = row["camera"]
+            display = camera_display_names.get(cam_key, cam_key)
+            if display in by_hour:
+                by_hour[display][hour] += 1
+
+    return {
+        "hours": list(range(24)),
+        "cameras": camera_names_ordered,
+        "by_hour": by_hour,
+    }
+
+
 def handle_stats_data(handler):
     if not handler.path.startswith("/stats_data"):
         return False
@@ -1447,6 +1521,13 @@ def handle_stats_data(handler):
         handler.end_headers()
         handler.wfile.write(json.dumps({"error": "統計データの集計に失敗しました"}).encode("utf-8"))
         return True
+
+    try:
+        hourly = compute_hourly_stats(db, camera_display_names, days=days)
+        result["hourly"] = hourly
+    except Exception:
+        logger.exception("handle_stats_data: compute_hourly_stats failed")
+        result["hourly"] = {}
 
     handler.send_response(200)
     handler.send_header("Content-type", "application/json")
