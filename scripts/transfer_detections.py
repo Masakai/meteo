@@ -278,11 +278,11 @@ class ExportSelector:
     """curses を使ったインタラクティブ選択 TUI。"""
 
     # カラーペア番号
-    _C_HEADER = 1   # ヘッダー（シアン）
-    _C_SEL    = 2   # 選択済み行（緑）
-    _C_CUR    = 3   # カーソル行（白背景）
-    _C_FILT   = 4   # フィルター有効（黄）
-    _C_DLG    = 5   # ダイアログ（青背景）
+    _C_HEADER = 1  # ヘッダー（シアン）
+    _C_SEL = 2  # 選択済み行（緑）
+    _C_CUR = 3  # カーソル行（白背景）
+    _C_FILT = 4  # フィルター有効（黄）
+    _C_DLG = 5  # ダイアログ（青背景）
 
     def __init__(self, all_records: list[dict]):
         self.all_records = all_records
@@ -348,9 +348,9 @@ class ExportSelector:
         # フィルターバー
         cam_s = self.filter_camera or "全て"
         lbl_s = {None: "全て", "": "ラベルなし"}.get(self.filter_label, self.filter_label)
-        df_s  = self.filter_date_from or "----"
-        dt_s  = self.filter_date_to   or "----"
-        fbar  = f" [f]フィルター  カメラ:{cam_s}  期間:{df_s}~{dt_s}  ラベル:{lbl_s} "
+        df_s = self.filter_date_from or "----"
+        dt_s = self.filter_date_to or "----"
+        fbar = f" [f]フィルター  カメラ:{cam_s}  期間:{df_s}~{dt_s}  ラベル:{lbl_s} "
         fattr = curses.color_pair(self._C_FILT) if self._any_filter() else curses.A_DIM
         try:
             stdscr.addstr(1, 0, fbar[:w], fattr)
@@ -376,11 +376,11 @@ class ExportSelector:
             is_sel = rec["id"] in self.selected
 
             mark = " ✓ " if is_sel else "   "
-            ts   = (rec.get("timestamp") or "")[:19].replace("T", " ")
-            cam  = (rec.get("camera") or "")[:24]
+            ts = (rec.get("timestamp") or "")[:19].replace("T", " ")
+            cam = (rec.get("camera") or "")[:24]
             conf = rec.get("confidence")
-            cs   = f"{conf*100:.0f}%" if conf is not None else "  - "
-            lbl  = str(rec.get("label") or "")[:12]
+            cs = f"{conf*100:.0f}%" if conf is not None else "  - "
+            lbl = str(rec.get("label") or "")[:12]
 
             line = f"{mark} {ts:<19} {cam:<24} {cs:>6} {lbl:<12}"
 
@@ -459,9 +459,9 @@ class ExportSelector:
     def _filter_dialog(self, stdscr: curses.window):
         h, w = stdscr.getmaxyx()
 
-        cam_opts  = ["(全て)"] + self.cameras
-        lbl_opts  = ["(全て)", "meteor", "not_meteor", "(ラベルなし)"]
-        lbl_vals  = [None,     "meteor", "not_meteor",  ""]
+        cam_opts = ["(全て)"] + self.cameras
+        lbl_opts = ["(全て)", "meteor", "not_meteor", "(ラベルなし)"]
+        lbl_vals = [None, "meteor", "not_meteor", ""]
 
         # 現在値を選択肢インデックスに変換
         ci = 0
@@ -470,10 +470,11 @@ class ExportSelector:
         li = 0
         for i, v in enumerate(lbl_vals):
             if v == self.filter_label:
-                li = i; break
+                li = i
+                break
 
         date_from = self.filter_date_from
-        date_to   = self.filter_date_to
+        date_to = self.filter_date_to
 
         # フォーカス: 0=カメラ一覧, 1=ラベル一覧, 2=開始日, 3=終了日, 4=適用, 5=キャンセル
         focus = 0
@@ -534,8 +535,8 @@ class ExportSelector:
             df_attr = curses.A_REVERSE if focus == 2 else 0
             dt_attr = curses.A_REVERSE if focus == 3 else 0
             try:
-                win.addstr(row,     1, f"開始日 [{date_from or '----------':10}]", df_attr)
-                win.addstr(row + 1, 1, f"終了日 [{date_to   or '----------':10}]", dt_attr)
+                win.addstr(row, 1, f"開始日 [{date_from or '----------':10}]", df_attr)
+                win.addstr(row + 1, 1, f"終了日 [{date_to or '----------':10}]", dt_attr)
             except curses.error:
                 pass
 
@@ -573,10 +574,10 @@ class ExportSelector:
                     focus = min(5, focus + 1)
             elif key in (ord('\n'), curses.KEY_ENTER, ord(' ')):
                 if focus == 4:  # 適用
-                    self.filter_camera    = None if ci == 0 else cam_opts[ci]
-                    self.filter_label     = lbl_vals[li]
+                    self.filter_camera = None if ci == 0 else cam_opts[ci]
+                    self.filter_label = lbl_vals[li]
                     self.filter_date_from = date_from
-                    self.filter_date_to   = date_to
+                    self.filter_date_to = date_to
                     self._apply_filters()
                     self.cursor = min(self.cursor, max(0, len(self.filtered) - 1))
                     self.scroll = 0
@@ -608,7 +609,8 @@ class ExportSelector:
             if key in (ord('\n'), curses.KEY_ENTER):
                 break
             elif key == 27:
-                s = current; break
+                s = current
+                break
             elif key in (curses.KEY_BACKSPACE, 127, 8):
                 s = s[:-1]
             elif 32 <= key <= 126 and len(s) < maxlen:
@@ -688,7 +690,7 @@ class ZipPackager:
                         if not rel:
                             continue
                         fname = rel.split("/")[-1]
-                        arc   = f"{_ZIP_ROOT}/{cam_name}/{fname}"
+                        arc = f"{_ZIP_ROOT}/{cam_name}/{fname}"
                         if arc in seen:
                             continue
                         seen.add(arc)
@@ -835,7 +837,7 @@ def cmd_import(args: argparse.Namespace) -> None:
         for cam_dir in cam_dirs:
             src_cam = cam_dir.name
             tgt_cam = camera_map.get(src_cam, src_cam)
-            display  = f"{src_cam} → {tgt_cam}" if src_cam != tgt_cam else src_cam
+            display = f"{src_cam} → {tgt_cam}" if src_cam != tgt_cam else src_cam
             print(f"カメラ: {display}")
 
             result = _import_camera(cam_dir, target_dir, src_cam, tgt_cam, apply)
@@ -849,8 +851,8 @@ def cmd_import(args: argparse.Namespace) -> None:
                 print(f"  SQLite 挿入: {result['sqlite_inserted']} 件")
             print()
 
-            totals["records_new"]     += result["records_new"]
-            totals["files_copied"]    += result["files_to_copy"]
+            totals["records_new"] += result["records_new"]
+            totals["files_copied"] += result["files_to_copy"]
             totals["sqlite_inserted"] += result.get("sqlite_inserted", 0)
 
         print("=" * 50)
