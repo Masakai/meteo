@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-04-13
+### Added
+- ナビゲーションに `aria-current="page"` を追加（アクセシビリティ改善）。
+
+### Changed
+- ダッシュボード UI 全面リニューアル（ライトモード移行）。
+- 左固定サイドバーナビゲーション（ダーク）＋アンバーアクセントボーダーを導入。
+- フォント刷新: Orbitron（見出し）/ Inter（本文）/ JetBrains Mono（数値）。
+- カラーパレット刷新: ロゴタイプブルー `#1a8fc4`・アンバー `#d4860a` を軸に再設計。
+- YouTube Live ボタンをカメラヘッダー内に移動。未設定カメラはグレーアウト表示。
+
 ## [3.7.0] - 2026-04-13
 ### Added
 - `/stats` ページ: カメラ別・夜別（日没〜翌日の日の出）の流星統計ビューを追加。Plotly.js による積み重ね棒グラフをコンテナ幅フルで表示。

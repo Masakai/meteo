@@ -488,7 +488,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 <div class="camera-card">
                     <div class="camera-header">
                         <span class="camera-name">{display_name}</span>
-                        {'<button class="youtube-btn youtube-btn-header" id="youtube-btn' + str(i) + '" onclick="toggleYouTube(' + str(i) + ')">YouTube Live</button>' if cam.get("youtube_key") else '<button class="youtube-btn youtube-btn-header" disabled style="opacity:0.3;cursor:default;">YouTube Live</button>'}
+                        {'<button class="youtube-btn youtube-btn-header" id="youtube-btn' + str(i) + '" onclick="toggleYouTube(' + str(i) + ')">YouTube Live</button>' if cam.get("youtube_key") else '<button class="youtube-btn youtube-btn-header" disabled aria-disabled="true" title="YouTube配信未設定" style="opacity:0.3;cursor:default;">YouTube Live</button>'}
                         <div class="status-indicators">
                             <span class="camera-status indicator-help" id="status{i}" role="img" aria-label="ストリーム接続状態" title="ストリーム接続" data-help="ストリーム接続状態（緑: 接続中 / 赤: 切断 / 灰: 常時表示オフ）">●</span>
                             <span class="server-status unknown indicator-help" id="server-status{i}" role="img" aria-label="カメラサーバ状態" title="カメラサーバ生存" data-help="カメラサーバ生存状態（緑: 応答あり / 赤: 応答なし / 灰: 判定保留）">●</span>
@@ -543,8 +543,10 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
     page_heading = "カメラライブ" if is_camera_page else "最近の検出"
     _active_detections = '' if is_camera_page else ' nav-active'
     _active_cameras = ' nav-active' if is_camera_page else ''
-    nav_items_html = f'''<a class="nav-link{_active_detections}" href="/">検出一覧</a>
-                <a class="nav-link{_active_cameras}" href="/cameras">カメラ</a>
+    _aria_detections = ' aria-current="page"' if not is_camera_page else ''
+    _aria_cameras = ' aria-current="page"' if is_camera_page else ''
+    nav_items_html = f'''<a class="nav-link{_active_detections}" href="/"{ _aria_detections}>検出一覧</a>
+                <a class="nav-link{_active_cameras}" href="/cameras"{ _aria_cameras}>カメラ</a>
                 <a class="nav-link" href="/stats">統計</a>
                 <a class="nav-link" href="/settings">設定</a>'''
     nav_actions_html = '''<div class="nav-actions">
