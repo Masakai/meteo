@@ -487,6 +487,31 @@ sequenceDiagram
 - Docker 内でループバックアドレスが指定された場合、ダッシュボードは `go2rtc` コンテナ名で名前解決してアセット取得
 - `go2rtc.yaml` の `webrtc.candidates` にブラウザから到達可能なホスト側 IP を設定する必要がある（`generate_compose.py --streaming-mode webrtc` で自動設定）
 
+## マスクライフサイクル
+
+マスク画像は「ビルド時マスク」と「ランタイムマスク」の2段階で管理されます。
+
+```
+ビルド時（ホスト側）
+  masks/camera1_mask.png          ← generate_compose.py が生成・管理
+  masks/.generated_hashes.json    ← 生成ハッシュ記録（手動更新検出用）
+
+          ↓ Docker イメージ内にコピー（Dockerfile MASK_IMAGE ビルド引数）
+
+ランタイム（コンテナ内）
+  /app/mask_image.png             ← イメージ内の固定マスク（MASK_IMAGE 環境変数で指定）
+  /output/masks/<camera>_mask.png ← ダッシュボード「マスク更新」で永続化されるマスク
+  /app/masks_build/               ← ./masks をマウントしたパス（MASK_BUILD_DIR 環境変数で指定）
+```
+
+### ダッシュボードからのマスク更新フロー
+
+1. ユーザーがダッシュボードの「マスク更新」ボタンを押す
+2. `/confirm_mask_update` が呼ばれ、コンテナ内の実行中検出器に新マスクを反映する
+3. `/output/masks/<camera>_mask.png` へ保存（ランタイム永続化）
+4. `MASK_BUILD_DIR` が設定されている場合、`./masks/<camera>_mask.png`（ホスト側）にも書き込む
+5. ホスト側マスクのハッシュが `masks/.generated_hashes.json` の記録と一致しなくなるため、次回 `generate_compose.py` を実行してもそのマスクは上書きされない
+
 ## 関連ファイル
 
 - `docker-compose.yml`: コンテナオーケストレーション設定

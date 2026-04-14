@@ -48,6 +48,22 @@ except ValueError:
 STREAM_FRAME_INTERVAL = 1.0 / STREAM_MAX_FPS
 
 
+def _write_mask_to_build_dir(mask_build_dir: str, pending_save_path, pending_mask) -> None:
+    """MASK_BUILD_DIR が設定されている場合、masks/ にもマスク画像を書き込む。
+    パストラバーサルを防ぐため dest が build_dir 直下であることを確認する。
+    """
+    if not (mask_build_dir and pending_save_path):
+        return
+    try:
+        build_dir = Path(mask_build_dir).resolve()
+        dest = (build_dir / Path(pending_save_path).name).resolve()
+        if str(dest).startswith(str(build_dir) + os.sep) or dest.parent == build_dir:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(dest), pending_mask)
+    except Exception:
+        pass
+
+
 class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
     """MJPEG ストリーミングハンドラ"""
 
@@ -576,6 +592,14 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                         saved = str(pending_save_path)
                 except Exception:
                     pass
+
+            # masks/ への書き込み（generate_compose.py 再実行時の上書き保護のため）
+            if saved:
+                _write_mask_to_build_dir(
+                    os.environ.get("MASK_BUILD_DIR", ""),
+                    pending_save_path,
+                    pending_mask,
+                )
 
             self.wfile.write(json.dumps({
                 "success": True,

@@ -272,6 +272,37 @@ rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
 ダッシュボードの「マスク更新」ボタンで、**現在フレームからマスクを再生成**できます。
 保存先は `/output/masks/<camera>_mask.png` です。
 
+### generate_compose.py 再実行時のマスク保護
+
+`generate_compose.py` は実行時に `masks/.generated_hashes.json` へ生成マスクの SHA256 ハッシュを記録します。
+次回実行時にハッシュを比較し、**手動で更新されたマスクは上書きしません**。
+
+| 状況 | 動作 |
+|---|---|
+| マスクファイルが存在しない | 新規生成する |
+| ハッシュ記録がない（初回 or 削除済み） | 上書き生成する |
+| ハッシュ一致（前回生成と同じ） | 上書き生成する |
+| ハッシュ不一致（手動更新済み） | スキップ（上書きしない） |
+
+強制上書きする場合は `--force-overwrite-masks` オプションを指定します:
+
+```bash
+python generate_compose.py --force-overwrite-masks
+```
+
+`.generated_hashes.json` は git 管理対象にすることを推奨します（「システムが最後に生成したハッシュ」を追跡できるため）。
+
+#### MASK_BUILD_DIR 環境変数
+
+| 項目 | 内容 |
+|---|---|
+| 変数名 | `MASK_BUILD_DIR` |
+| 設定主体 | **自動設定**（`generate_compose.py` が docker-compose.yml に埋め込む） |
+| 用途 | コンテナ内の `masks/` マウントパスを示す。ダッシュボードの「マスク更新」操作時に、コンテナ内の検出用パスへ書き込んだ後、この変数が示すパスにも同期書き込みする |
+
+> **注意:** `MASK_BUILD_DIR` はユーザーが手動設定する変数ではありません。
+> また、`.generated_hashes.json` が削除または git 管理されていない場合、ハッシュ記録が失われるため `generate_compose.py` 再実行時に手動更新済みのマスクが上書きされることがあります。
+
 ---
 
 ## ノイズ帯マスク設定（v1.12.0+）

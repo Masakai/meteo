@@ -11,7 +11,9 @@ Licensed under the MIT License
 """
 
 import argparse
+import hashlib
 import ipaddress
+import json
 import os
 import re
 import socket
@@ -31,6 +33,42 @@ except Exception:  # pragma: no cover
     build_exclusion_mask = None
 
 VERSION = "1.7.0"
+
+
+def _compute_file_hash(path: Path) -> str:
+    """SHA256ハッシュを返す。ファイルが存在しない場合は空文字列。"""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except (OSError, FileNotFoundError):
+        return ""
+
+
+def load_generated_hashes(hashes_path: Path) -> dict:
+    """hashes_pathのJSONをパース。存在しない・破損時は空dict。"""
+    try:
+        return json.loads(hashes_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_generated_hashes(hashes_path: Path, hashes: dict) -> None:
+    """hashesをJSONとして書き込む。"""
+    hashes_path.parent.mkdir(parents=True, exist_ok=True)
+    hashes_path.write_text(json.dumps(hashes, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def should_generate_mask(output_path: Path, stored_hash: str, force: bool) -> tuple:
+    """(生成すべきか: bool, 理由: str) を返す。"""
+    if force:
+        return (True, "force")
+    if not output_path.exists():
+        return (True, "new")
+    if not stored_hash:
+        return (True, "no_record")
+    current_hash = _compute_file_hash(output_path)
+    if current_hash == stored_hash:
+        return (True, "unchanged")
+    return (False, "manually_modified")
 
 
 def _is_usable_candidate_ip(value: str) -> bool:
@@ -161,6 +199,10 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
     if settings.get("debug_tools"):
         debug_tools_arg = "\n        DEBUG_TOOLS: \"true\""
 
+    # マスクあり時のみ MASK_BUILD_DIR 環境変数とボリュームを追加
+    mask_build_dir_env = "      - MASK_BUILD_DIR=/app/masks_build\n" if mask_image else ""
+    mask_build_volume = "      - ./masks:/app/masks_build\n" if mask_image else ""
+
     return f"""
   # カメラ{index} ({rtsp_info['host']})
   {service_name}:
@@ -174,7 +216,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
       - TZ=Asia/Tokyo
       - RTSP_URL={rtsp_info['url']}
       - CAMERA_NAME={camera_name}
-{display_name_env}      - SENSITIVITY={settings['sensitivity']}
+{display_name_env}{mask_build_dir_env}      - SENSITIVITY={settings['sensitivity']}
       - SCALE={settings['scale']}
       - BUFFER={settings['buffer']}
       - EXCLUDE_BOTTOM={settings['exclude_bottom']}
@@ -197,7 +239,7 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
     volumes:
       - ./detections:/output
       - ./logs:/logs
-    networks:
+{mask_build_volume}    networks:
       - meteor-net
     logging:
       driver: "json-file"
@@ -375,6 +417,8 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
     services = []
     mask_output_dir = Path(settings.get("mask_output_dir", "masks"))
     streamers_path = Path(streamers_file)
+    hashes_path = mask_output_dir / ".generated_hashes.json"
+    stored_hashes = load_generated_hashes(hashes_path)
     for i, line in enumerate(lines, 1):
         parsed = parse_streamers_line(line)
         info = parse_rtsp_url(parsed["url"])
@@ -397,20 +441,36 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
                 if not mask_src.is_absolute():
                     mask_src = (streamers_path.parent / mask_src).resolve()
                 mask_output = mask_output_dir / f"camera{i}_mask.png"
-                try:
-                    mask_image = generate_mask_file(
-                        mask_src,
-                        Path(mask_output),
-                        float(settings["scale"]),
-                        int(settings.get("mask_dilate", "5")),
-                    )
+                mask_filename = f"camera{i}_mask.png"
+                do_generate, reason = should_generate_mask(
+                    mask_output,
+                    stored_hashes.get(mask_filename, ""),
+                    force=settings.get("force_overwrite_masks", False),
+                )
+                if not do_generate:
+                    print(f"スキップ: {mask_output} は手動更新済みのため上書きしません（--force-overwrite-masks で強制上書き可能）")
+                    mask_image = str(mask_output)
                     try:
                         mask_image = str(Path(mask_image).relative_to(Path.cwd()))
                     except ValueError:
                         pass
-                except RuntimeError as exc:
-                    print(f"エラー: マスク生成に失敗しました: {exc}")
-                    sys.exit(1)
+                else:
+                    try:
+                        mask_image = generate_mask_file(
+                            mask_src,
+                            Path(mask_output),
+                            float(settings["scale"]),
+                            int(settings.get("mask_dilate", "5")),
+                        )
+                        try:
+                            mask_image = str(Path(mask_image).relative_to(Path.cwd()))
+                        except ValueError:
+                            pass
+                        stored_hashes[mask_filename] = _compute_file_hash(Path(mask_output))
+                        save_generated_hashes(hashes_path, stored_hashes)
+                    except RuntimeError as exc:
+                        print(f"エラー: マスク生成に失敗しました: {exc}")
+                        sys.exit(1)
             services.append(generate_service(i, info, settings, web_port, mask_image))
         else:
             _u = urlparse(parsed['url'])
@@ -540,6 +600,8 @@ streamersファイルの形式:
                        help="デバッグツール(ping, nc)をカメラコンテナにインストール")
     parser.add_argument("--station-config", default="",
                        help="三角測量用の拠点設定ファイル (station.json) のパス")
+    parser.add_argument("--force-overwrite-masks", action="store_true", default=False,
+                       help="手動更新済みマスクを強制上書きする（通常は保護される）")
 
     args = parser.parse_args()
     if args.streaming_mode == "webrtc" and not args.go2rtc_candidate_host:
@@ -564,6 +626,7 @@ streamersファイルの形式:
         'go2rtc_candidate_host': args.go2rtc_candidate_host,
         'debug_tools': args.debug_tools,
         'station_config': args.station_config,
+        'force_overwrite_masks': args.force_overwrite_masks,
     }
 
     # 生成

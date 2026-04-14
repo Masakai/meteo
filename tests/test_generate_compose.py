@@ -1,6 +1,10 @@
+import hashlib
 import pytest
 import generate_compose as gc
 from generate_compose import (
+    _compute_file_hash,
+    load_generated_hashes,
+    should_generate_mask,
     generate_compose,
     generate_go2rtc_config,
     _is_usable_candidate_ip,
@@ -278,3 +282,73 @@ def test_generate_compose_invalid_url_masks_password(tmp_path, capsys):
     captured = capsys.readouterr()
     assert "secretpass" not in captured.out
     assert "***" in captured.out
+
+
+# --- ハッシュ管理関数のテスト ---
+
+def test_compute_file_hash_existing(tmp_path):
+    """既知バイト列のハッシュが正しいことを確認"""
+    data = b"hello world"
+    f = tmp_path / "test.bin"
+    f.write_bytes(data)
+    expected = hashlib.sha256(data).hexdigest()
+    assert _compute_file_hash(f) == expected
+
+
+def test_compute_file_hash_missing(tmp_path):
+    """存在しないファイル → 空文字列"""
+    assert _compute_file_hash(tmp_path / "nonexistent.bin") == ""
+
+
+def test_load_generated_hashes_missing(tmp_path):
+    """ファイルなし → 空dict"""
+    assert load_generated_hashes(tmp_path / "hashes.json") == {}
+
+
+def test_load_generated_hashes_corrupt(tmp_path):
+    """JSON破損 → 空dict"""
+    f = tmp_path / "hashes.json"
+    f.write_text("not valid json", encoding="utf-8")
+    assert load_generated_hashes(f) == {}
+
+
+def test_should_generate_mask_new_file(tmp_path):
+    """ファイルなし → (True, 'new')"""
+    result = should_generate_mask(tmp_path / "camera1_mask.png", "", force=False)
+    assert result == (True, "new")
+
+
+def test_should_generate_mask_no_record(tmp_path):
+    """ファイルは存在するが stored_hash が空文字 → (True, 'no_record')"""
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(b"some mask data")
+    result = should_generate_mask(mask_file, "", force=False)
+    assert result == (True, "no_record")
+
+
+def test_should_generate_mask_hash_match(tmp_path):
+    """ハッシュ一致 → (True, 'unchanged')"""
+    data = b"mask data"
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(data)
+    stored = hashlib.sha256(data).hexdigest()
+    result = should_generate_mask(mask_file, stored, force=False)
+    assert result == (True, "unchanged")
+
+
+def test_should_generate_mask_hash_mismatch(tmp_path):
+    """ハッシュ不一致 → (False, 'manually_modified')"""
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(b"current content")
+    stored = hashlib.sha256(b"original content").hexdigest()
+    result = should_generate_mask(mask_file, stored, force=False)
+    assert result == (False, "manually_modified")
+
+
+def test_should_generate_mask_force(tmp_path):
+    """force=True かつ不一致でも → (True, 'force')"""
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(b"current content")
+    stored = hashlib.sha256(b"original content").hexdigest()
+    result = should_generate_mask(mask_file, stored, force=True)
+    assert result == (True, "force")

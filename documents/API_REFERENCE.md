@@ -27,6 +27,19 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.10.0 - 手動更新マスクの自動保護
+
+- **追加**: `generate_compose.py` — SHA256ハッシュによるマスク保護。`masks/.generated_hashes.json` にハッシュを記録し、手動更新済みマスクを再実行時に上書きしない
+- **追加**: `generate_compose.py` — `--force-overwrite-masks` フラグで保護対象マスクの強制上書きが可能
+- **追加**: `generate_compose.py` — マスクあり時のみ `MASK_BUILD_DIR` 環境変数と `./masks:/app/masks_build` ボリュームマウントを生成
+- **追加**: `http_handlers.py` — `/confirm_mask_update` でホスト側 `masks/` への同期書き込み（`MASK_BUILD_DIR` 環境変数経由、パストラバーサル防止済み）
+
+### v3.9.0 - 統計ページに時間帯×カメラの検出数グラフ追加
+
+- **追加**: `dashboard_routes.py` / `dashboard_templates.py` — 時間帯×カメラの検出数グループ棒グラフ（Plotly.js）を統計ページに追加
+- **追加**: `detection_store.py` — `compute_hourly_stats()`: 5秒グリーディー重複除去後、ローカル時刻の時単位で集計
+- **変更**: `GET /stats_data` レスポンスに `hourly` キー（時間帯別検出数）を追加
+
 ### v3.8.0 - ダッシュボード UI 全面リニューアル
 
 - **変更**: `dashboard_templates.py` — ライトモード移行・左固定サイドバーナビゲーション（ダーク）＋アンバーアクセントボーダー導入

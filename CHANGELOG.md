@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-04-14
+### Added
+- `generate_compose.py`: SHA256ハッシュによるマスク保護機能を追加。`masks/.generated_hashes.json` にハッシュを記録し、ダッシュボードで手動更新済みのマスクを `generate_compose.py` 再実行時に上書きしないよう保護する。
+- `generate_compose.py`: `--force-overwrite-masks` フラグを追加。保護対象のマスクを強制上書きする場合に使用する。
+- `generate_compose.py`: マスクあり時のみ `MASK_BUILD_DIR` 環境変数と `./masks:/app/masks_build` ボリュームマウントを docker-compose.yml に追記するよう変更。
+- `http_handlers.py`: `/confirm_mask_update` でのホスト側 `masks/` への書き込みを追加（`MASK_BUILD_DIR` 環境変数経由）。パストラバーサル防止のため書き込み先を `MASK_BUILD_DIR` 直下に限定。
+- `documents/ARCHITECTURE.md`: マスクライフサイクル（ビルド時マスク・ランタイムマスクの2段階管理、ダッシュボードからのマスク更新フロー）の説明を追加。
+- `documents/CONFIGURATION_GUIDE.md`: マスク保護機能・`MASK_BUILD_DIR` 環境変数の説明を追加。
+- `tests/test_generate_compose.py`: ハッシュ管理・マスク判定テストを9件追加。
+- `tests/test_http_handlers.py`: 新規作成（3件）。
+
 ## [3.9.0] - 2026-04-13
 ### Added
 - 統計ページに時間帯×カメラの検出数グループ棒グラフ（Plotly.js）を追加。
