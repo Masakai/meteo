@@ -1325,7 +1325,7 @@ def compute_nightly_stats(db_path, camera_display_names, days=30):
 
     Args:
         db_path: SQLite DBパス
-        camera_display_names: {"camera1_10_0_1_25": "East", ...} 形式のdict
+        camera_display_names: {"camera1": "East", ...} 形式のdict
         days: 遡る日数（デフォルト30）
 
     Returns:
@@ -1429,7 +1429,7 @@ def compute_hourly_stats(db_path, camera_display_names, days=30) -> dict:
 
     Args:
         db_path: SQLite DBパス
-        camera_display_names: {"camera1_10_0_1_25": "East", ...} 形式のdict
+        camera_display_names: {"camera1": "East", ...} 形式のdict
         days: 遡る日数（デフォルト30）
 
     Returns:

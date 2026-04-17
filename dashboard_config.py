@@ -4,7 +4,7 @@ Dashboard configuration and environment setup.
 
 import os
 
-VERSION = "3.10.0"
+VERSION = "3.11.0"
 
 # 検出時間の取得用
 try:
@@ -39,9 +39,9 @@ for i in range(1, 10):
 # デフォルト設定
 if not CAMERAS:
     CAMERAS = [
-        {"name": "camera1_10.0.1.25", "url": "http://camera1:8080", "stream_url": "http://camera1:8080", "stream_kind": "webrtc"},
-        {"name": "camera2_10.0.1.3", "url": "http://camera2:8080", "stream_url": "http://camera2:8080", "stream_kind": "webrtc"},
-        {"name": "camera3_10.0.1.11", "url": "http://camera3:8080", "stream_url": "http://camera3:8080", "stream_kind": "webrtc"},
+        {"name": "camera1", "url": "http://camera1:8080", "stream_url": "http://camera1:8080", "stream_kind": "webrtc"},
+        {"name": "camera2", "url": "http://camera2:8080", "stream_url": "http://camera2:8080", "stream_kind": "webrtc"},
+        {"name": "camera3", "url": "http://camera3:8080", "stream_url": "http://camera3:8080", "stream_kind": "webrtc"},
     ]
 
 # go2rtc API URL (Docker内ではホスト名go2rtcを使用)

@@ -27,6 +27,14 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.11.0 - カメラ名をインデックスベースに変更・既存データ移行スクリプト追加
+
+- **変更**: `generate_compose.py` — `CAMERA_NAME` を IP ベース（例: `camera1_192_168_1_10`）からインデックスベース（例: `camera1`）に変更。IP アドレスが変わってもカメラ名が変わらない
+- **変更**: `dashboard_config.py` — デフォルト CAMERAS 名をインデックスベースに更新
+- **変更**: `dashboard_routes.py` — docstring 例をインデックスベース名に更新
+- **追加**: `migrate_camera_dirs.py` — 既存の IP ベースディレクトリを `camera1`/`camera2`/`camera3` に安全移行するスタンドアロンスクリプト（`--dry-run` / `--yes` 対応）
+- **追加**: `tests/test_migrate_camera_dirs.py` — 移行スクリプトのユニットテスト22件
+
 ### v3.10.0 - 手動更新マスクの自動保護
 
 - **追加**: `generate_compose.py` — SHA256ハッシュによるマスク保護。`masks/.generated_hashes.json` にハッシュを記録し、手動更新済みマスクを再実行時に上書きしない
@@ -430,19 +438,19 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
   "recent": [
     {
       "time": "2026-02-02 06:55:33",
-      "camera": "camera1_10_0_1_25",
+      "camera": "camera1",
       "confidence": "87%",
-      "image": "camera1_10_0_1_25/meteor_20260202_065533_composite.jpg",
-      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mp4",
-      "composite_original": "camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg"
+      "image": "camera1/meteor_20260202_065533_composite.jpg",
+      "mp4": "camera1/meteor_20260202_065533.mp4",
+      "composite_original": "camera1/meteor_20260202_065533_composite_original.jpg"
     },
     {
       "time": "2026-02-02 05:32:18",
-      "camera": "camera2_10_0_1_3",
+      "camera": "camera2",
       "confidence": "92%",
-      "image": "camera2_10_0_1_3/meteor_20260202_053218_composite.jpg",
-      "mp4": "camera2_10_0_1_3/meteor_20260202_053218.mp4",
-      "composite_original": "camera2_10_0_1_3/meteor_20260202_053218_composite_original.jpg"
+      "image": "camera2/meteor_20260202_053218_composite.jpg",
+      "mp4": "camera2/meteor_20260202_053218.mp4",
+      "composite_original": "camera2/meteor_20260202_053218_composite_original.jpg"
     }
   ]
 }
@@ -532,7 +540,7 @@ fetch('/detections_mtime')
 {
   "detections": 5,
   "elapsed": 3600.5,
-  "camera": "camera1_10_0_1_25",
+  "camera": "camera1",
   "stream_alive": true,
   "time_since_last_frame": 0.03,
   "is_detecting": true,
@@ -592,7 +600,7 @@ setInterval(() => {
 
 | パラメータ | 型 | 説明 | 例 |
 |-----------|-----|------|-----|
-| `camera` | string | カメラディレクトリ名 | `camera1_10_0_1_25` |
+| `camera` | string | カメラディレクトリ名 | `camera1` |
 | `filename` | string | ファイル名 | `meteor_20260202_065533_composite.jpg` |
 
 **レスポンス**:
@@ -606,13 +614,13 @@ setInterval(() => {
 **使用例**:
 ```bash
 # 画像をダウンロード
-curl -O "http://localhost:8080/image/camera1_10_0_1_25/meteor_20260202_065533_composite.jpg"
+curl -O "http://localhost:8080/image/camera1/meteor_20260202_065533_composite.jpg"
 
 # HTMLから表示
-<img src="/image/camera1_10_0_1_25/meteor_20260202_065533_composite.jpg" alt="Meteor">
+<img src="/image/camera1/meteor_20260202_065533_composite.jpg" alt="Meteor">
 
 # ダウンロードリンク
-<a href="/image/camera1_10_0_1_25/meteor_20260202_065533_composite.jpg" download>
+<a href="/image/camera1/meteor_20260202_065533_composite.jpg" download>
   Download Image
 </a>
 ```
@@ -665,7 +673,7 @@ curl -OJ "http://localhost:8080/camera_snapshot/0?download=1"
   "recording": {
     "supported": true,
     "state": "idle",
-    "camera": "camera1_10_0_1_25",
+    "camera": "camera1",
     "job_id": "",
     "start_at": "",
     "scheduled_at": "",
@@ -939,7 +947,7 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 
 | パラメータ | 型 | 説明 | 例 |
 |-----------|-----|------|-----|
-| `camera` | string | カメラディレクトリ名 | `camera1_10_0_1_25` |
+| `camera` | string | カメラディレクトリ名 | `camera1` |
 | `id` | string | 検出ID（`/detections` レスポンスの `id` フィールド） | `det_a1b2c3d4e5f6789012` |
 
 **レスポンス**:
@@ -964,17 +972,17 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 ```json
 {
   "success": false,
-  "error": "detection id not found: camera1_10_0_1_25 det_a1b2c3d4e5f6789012"
+  "error": "detection id not found: camera1 det_a1b2c3d4e5f6789012"
 }
 ```
 
 **使用例**:
 ```bash
 # curlで削除（idは/detectionsで取得）
-curl -X DELETE "http://localhost:8080/detection/camera1_10_0_1_25/det_a1b2c3d4e5f6789012"
+curl -X DELETE "http://localhost:8080/detection/camera1/det_a1b2c3d4e5f6789012"
 
 # JavaScriptから削除
-fetch(`/detection/camera1_10_0_1_25/${detectionId}`, {
+fetch(`/detection/camera1/${detectionId}`, {
   method: 'DELETE'
 })
 .then(r => r.json())
@@ -1025,7 +1033,7 @@ curl http://localhost:8080/dashboard_stats | jq
 
 | パラメータ | 型 | 説明 | 例 |
 |-----------|-----|------|-----|
-| `camera_name` | string | カメラディレクトリ名 | `camera1_10_0_1_25` |
+| `camera_name` | string | カメラディレクトリ名 | `camera1` |
 
 **レスポンス**:
 - Content-Type: `application/json`
@@ -1062,17 +1070,17 @@ curl http://localhost:8080/dashboard_stats | jq
 ```json
 {
   "success": false,
-  "error": "camera directory not found: camera1_10_0_1_25"
+  "error": "camera directory not found: camera1"
 }
 ```
 
 **使用例**:
 ```bash
 # curlで一括削除
-curl -X POST "http://localhost:8080/bulk_delete_non_meteor/camera1_10_0_1_25" | jq
+curl -X POST "http://localhost:8080/bulk_delete_non_meteor/camera1" | jq
 
 # JavaScriptから一括削除
-fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
+fetch('/bulk_delete_non_meteor/camera1', {
   method: 'POST'
 })
 .then(r => r.json())
@@ -1094,7 +1102,7 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 **リクエストボディ**:
 ```json
 {
-  "camera": "camera1_10_0_1_25",
+  "camera": "camera1",
   "id": "det_a1b2c3d4e5f6789012",
   "label": "detected"
 }
@@ -1104,7 +1112,7 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 
 | パラメータ | 型 | 必須 | 説明 | 例 |
 |-----------|-----|------|------|-----|
-| `camera` | string | Yes | カメラディレクトリ名 | `camera1_10_0_1_25` |
+| `camera` | string | Yes | カメラディレクトリ名 | `camera1` |
 | `id` | string | Yes | 検出ID（`/detections` レスポンスの `id` フィールド） | `det_a1b2c3d4e5f6789012` |
 | `label` | string | Yes | ラベル（`detected` または `post_detected`） | `detected` |
 
@@ -1134,7 +1142,7 @@ fetch('/bulk_delete_non_meteor/camera1_10_0_1_25', {
 curl -X POST "http://localhost:8080/detection_label" \
   -H "Content-Type: application/json" \
   -d '{
-    "camera": "camera1_10_0_1_25",
+    "camera": "camera1",
     "id": "det_a1b2c3d4e5f6789012",
     "label": "detected"
   }' | jq
@@ -1144,7 +1152,7 @@ fetch('/detection_label', {
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify({
-    camera: 'camera1_10_0_1_25',
+    camera: 'camera1',
     id: detectionId,
     label: 'detected'
   })
@@ -1370,7 +1378,7 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 {
   "detections": 5,
   "elapsed": 3600.5,
-  "camera": "camera1_10_0_1_25",
+  "camera": "camera1",
   "settings": {
     "sensitivity": "medium",
     "scale": 0.5,
@@ -1405,7 +1413,7 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
     "start_at": "2026-03-19T21:30:00+09:00",
     "duration_sec": 90,
     "remaining_sec": 42,
-    "output_path": "/output/manual_recordings/camera1_10_0_1_25/manual_camera1_10_0_1_25_20260319_213000_90s.mp4",
+    "output_path": "/output/manual_recordings/camera1/manual_camera1_20260319_213000_90s.mp4",
     "error": ""
   }
 }
@@ -1507,7 +1515,7 @@ setInterval(() => {
   "recording": {
     "supported": true,
     "state": "recording",
-    "camera": "camera1_10_0_1_25",
+    "camera": "camera1",
     "job_id": "rec_1742387400000",
     "start_at": "2026-03-19T21:30:00+09:00",
     "scheduled_at": "2026-03-19T21:29:10+09:00",
@@ -1515,7 +1523,7 @@ setInterval(() => {
     "ended_at": "",
     "duration_sec": 90,
     "remaining_sec": 37,
-    "output_path": "/output/manual_recordings/camera1_10_0_1_25/manual_camera1_10_0_1_25_20260319_213000_90s.mp4",
+    "output_path": "/output/manual_recordings/camera1/manual_camera1_20260319_213000_90s.mp4",
     "error": ""
   }
 }
@@ -1580,7 +1588,7 @@ curl "http://localhost:8081/snapshot" --output camera1_snapshot.jpg
 {
   "success": true,
   "message": "mask updated",
-  "saved": "/output/masks/camera1_10_0_1_25_mask.png"
+  "saved": "/output/masks/camera1_mask.png"
 }
 ```
 
@@ -1820,7 +1828,7 @@ print(f"Camera: {stats['camera']}, Detections: {stats['detections']}")
 
 # 検出結果を削除
 delete_response = requests.delete(
-    'http://localhost:8080/detection/camera1_10_0_1_25/2026-02-02 06:55:33'
+    'http://localhost:8080/detection/camera1/2026-02-02 06:55:33'
 )
 print(delete_response.json())
 ```
@@ -1959,7 +1967,7 @@ Write-Host "Camera: $($stats.camera), Detections: $($stats.detections)"
 
 # 検出結果を削除
 $deleteResult = Invoke-RestMethod `
-  -Uri "http://localhost:8080/detection/camera1_10_0_1_25/2026-02-02%2006:55:33" `
+  -Uri "http://localhost:8080/detection/camera1/2026-02-02%2006:55:33" `
   -Method Delete
 Write-Host $deleteResult.message
 ```
@@ -2125,14 +2133,14 @@ if __name__ == "__main__":
 
     # 検出にラベルを設定
     result = client.set_detection_label(
-        camera="camera1_10_0_1_25",
+        camera="camera1",
         timestamp="2026-02-02 06:55:33",
         label="meteor"
     )
     print(result)
 
     # 非流星検出を一括削除
-    delete_result = client.bulk_delete_non_meteor("camera1_10_0_1_25")
+    delete_result = client.bulk_delete_non_meteor("camera1")
     print(f"Deleted {delete_result['deleted_count']} non-meteor detections")
 ```
 

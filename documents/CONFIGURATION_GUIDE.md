@@ -46,7 +46,7 @@ docker-compose.ymlで設定される環境変数:
 |-------|------------|------|--------|
 | `TZ` | `Asia/Tokyo` | タイムゾーン | `America/New_York` |
 | `RTSP_URL` | - | RTSPストリームURL | `rtsp://user:pass@10.0.1.25/live` |
-| `CAMERA_NAME` | `camera` | カメラ識別名 | `camera1_10_0_1_25` |
+| `CAMERA_NAME` | `camera` | カメラ識別名 | `camera1` |
 | `SENSITIVITY` | `medium` | 検出感度 | `low` / `medium` / `high` / `fireball` |
 | `SCALE` | `0.5` | 処理スケール | `0.25` ~ `1.0` |
 | `BUFFER` | `15` | リングバッファ秒数（RTSP Webは検出前後1秒+最大検出時間に上限調整） | `10` ~ `30` |

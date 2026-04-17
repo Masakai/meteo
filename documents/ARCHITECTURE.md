@@ -285,7 +285,7 @@ sequenceDiagram
 ```
 /output/
   ├── detections.db                          # SQLite DB（検出データ正本 v3.6.0+）
-  ├── camera1_10_0_1_25/
+  ├── camera1/
   │   ├── detections.jsonl                   # 検出ログ (1行1イベント、検出エンジン書き込み)
   │   ├── meteor_20260202_065533.mp4
   │   ├── meteor_20260202_065533_composite.jpg
@@ -293,9 +293,9 @@ sequenceDiagram
   │   └── manual_recordings/                 # 手動録画保存先 (v3.2.0+)
   │       ├── manual_camera1_20260319_213000_90s.mp4
   │       └── manual_camera1_20260319_213000_90s.jpg  # サムネイル (v3.2.1+)
-  ├── camera2_10_0_1_3/
+  ├── camera2/
   │   └── ...
-  └── camera3_10_0_1_11/
+  └── camera3/
       └── ...
 ```
 
@@ -341,7 +341,7 @@ sequenceDiagram
 {
   "detections": 5,
   "elapsed": 3600.5,
-  "camera": "camera1_10_0_1_25",
+  "camera": "camera1",
   "settings": {
     "sensitivity": "medium",
     "scale": 0.5,
@@ -425,12 +425,12 @@ sequenceDiagram
     {
       "id": "det_a1b2c3d4e5f6g7h8i9j0",
       "time": "2026-02-02 06:55:33",
-      "camera": "camera1_10_0_1_25",
+      "camera": "camera1",
       "camera_display": "カメラ1",
       "confidence": "87%",
-      "image": "camera1_10_0_1_25/meteor_20260202_065533_composite.jpg",
-      "mp4": "camera1_10_0_1_25/meteor_20260202_065533.mp4",
-      "composite_original": "camera1_10_0_1_25/meteor_20260202_065533_composite_original.jpg",
+      "image": "camera1/meteor_20260202_065533_composite.jpg",
+      "mp4": "camera1/meteor_20260202_065533.mp4",
+      "composite_original": "camera1/meteor_20260202_065533_composite_original.jpg",
       "label": "detected",
       "source_type": "manual_recording"
     }

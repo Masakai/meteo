@@ -186,7 +186,7 @@ def generate_mask_file(mask_src: Path, output_path: Path, scale: float, dilate: 
 def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int, mask_image: str) -> str:
     """1つのカメラ用のサービス定義を生成"""
 
-    camera_name = f"camera{index}_{rtsp_info['host'].replace('.', '_')}"
+    camera_name = f"camera{index}"
     display_name = rtsp_info.get('display_name', '')
     service_name = f"camera{index}"
     mask_env = "/app/mask_image.png" if mask_image else ""
@@ -423,7 +423,7 @@ def generate_compose(streamers_file: str, settings: dict, base_port: int = 8080)
         parsed = parse_streamers_line(line)
         info = parse_rtsp_url(parsed["url"])
         if info:
-            info["name"] = f"camera{i}_{info['host'].replace('.', '_')}"
+            info["name"] = f"camera{i}"
             # 表示名を保持
             if parsed["display_name"]:
                 info["display_name"] = parsed["display_name"]
@@ -641,7 +641,7 @@ streamersファイルの形式:
         info = parse_rtsp_url(parsed["url"])
         if not info:
             continue
-        info["name"] = f"camera{i}_{info['host'].replace('.', '_')}"
+        info["name"] = f"camera{i}"
         if parsed.get("youtube_key"):
             info["youtube_key"] = parsed["youtube_key"]
         cameras.append(info)

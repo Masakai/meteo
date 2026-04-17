@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.0] - 2026-04-18
+### Changed
+- `generate_compose.py`: `CAMERA_NAME` をIPベース（例: `camera1_192_168_1_10`）からインデックスベース（例: `camera1`）に変更。IPアドレスが変わってもカメラ名が変わらなくなる。
+- `dashboard_config.py`: デフォルト CAMERAS 名をインデックスベースに更新。
+- `dashboard_routes.py`: docstring 例をインデックスベース名に更新。
+- `documents/API_REFERENCE.md` / `documents/ARCHITECTURE.md` / `documents/CONFIGURATION_GUIDE.md`: サンプル値をインデックスベース名に更新。
+
+### Added
+- `migrate_camera_dirs.py` 新規追加: 既存の IP ベースディレクトリを `camera1`/`camera2`/`camera3` に安全移行するスタンドアロンスクリプト（`--dry-run` / `--yes` 対応、DB 更新優先でファイルと DB の不整合を防止）。
+- `tests/test_migrate_camera_dirs.py` 新規追加: 移行スクリプトのユニットテスト22件。
+
 ## [3.10.0] - 2026-04-14
 ### Added
 - `generate_compose.py`: SHA256ハッシュによるマスク保護機能を追加。`masks/.generated_hashes.json` にハッシュを記録し、ダッシュボードで手動更新済みのマスクを `generate_compose.py` 再実行時に上書きしないよう保護する。
