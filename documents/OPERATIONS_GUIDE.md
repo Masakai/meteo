@@ -2,7 +2,7 @@
 
 ---
 
-**Version: v3.8.0**
+**Version: v3.11.1**
 
 **Copyright (c) 2026 Masanori Sakai**
 
@@ -25,6 +25,8 @@ Licensed under the MIT License
 
 - [起動と停止](#起動と停止)
 - [アップデート手順](#アップデート手順)
+- [バージョン別マイグレーション](#バージョン別マイグレーション)
+- [運用スクリプト一覧](#運用スクリプト一覧)
 - [meteor-docker.sh コマンドリファレンス](#meteor-dockersh-コマンドリファレンス)
 - [ログの監視](#ログの監視)
 - [状態確認](#状態確認)
@@ -76,7 +78,7 @@ cp streamers.sample streamers
 vim streamers  # RTSP URLを設定
 
 # 昼間画像を指定する場合（任意）
-# rtsp://user:pass@10.0.1.25/live | camera1.jpg
+# rtsp://user:pass@192.0.2.25/live | camera1.jpg
 # OpenCV がない環境ではマスク生成のみスキップ
 
 # 2. docker-compose.ymlを生成
@@ -170,7 +172,7 @@ python generate_compose.py --streaming-mode webrtc
 
 起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、
 コンテナ再起動後も維持されます。
-この `<camera>` は内部識別子です。`CAMERA_NAME_DISPLAY` を設定していても、保存ファイル名やディレクトリ名には表示名ではなく内部名が使われます。
+この `<camera>` は内部名です。`CAMERA_NAME_DISPLAY` を設定していても、保存ファイル名やディレクトリ名には表示名ではなく内部名が使われます。
 
 ### 停止
 
@@ -244,8 +246,8 @@ python3 generate_compose.py
 ./meteor-docker.sh restart
 ```
 
-> **注意**: go2rtc.yaml を変更した場合は go2rtc コンテナも再起動してください。
-> `docker compose restart go2rtc`
+!!! note "go2rtc 再起動が必要"
+    go2rtc.yaml を変更した場合は go2rtc コンテナも再起動してください: `docker compose restart go2rtc`
 
 ### アップデート後の確認
 
@@ -259,6 +261,123 @@ curl -s http://localhost:8080/health | jq .version
 # エラーが出ていないか確認
 ./meteor-docker.sh logs dashboard | grep -i error
 ```
+
+---
+
+## バージョン別マイグレーション
+
+旧バージョンから更新する際は、以下の手順を**必ず起動前に**実施してください。各スクリプトは冪等性を保つように設計されています（再実行しても壊れない）。
+
+### v3.6.0 → SQLite 化アップデート
+
+v3.6.0 以降、検出データの正本は `$DETECTIONS_DIR/detections.db`（SQLite）に移行しました。検出エンジン自体は引き続き `detections.jsonl` に追記しますが、ダッシュボードは SQLite を参照します。
+
+**移行タイミング:** v3.6.0 以上のイメージに初めて更新するとき、1度だけ実行
+
+```bash
+# 仮想環境を有効化（ホスト上で実行。Docker コンテナ内でも可）
+source .venv/bin/activate
+
+# 既存 JSONL → SQLite に一括取り込み
+python scripts/migrate_jsonl_to_sqlite.py
+```
+
+**挙動と安全性:**
+
+- `INSERT OR IGNORE` による冪等実行（何度実行しても重複しない）
+- 既存の `detections.jsonl` は**削除されない**（ロールバックソースとして保持）
+- `detection_labels.json` があれば同時に SQLite のラベル列へ取り込まれる
+
+**ロールバック:** SQLite を使わない状態に戻したい場合は `$DETECTIONS_DIR/detections.db` を削除するだけ。JSONL は残っているため検出データは失われない。
+
+詳細は [DETECTION_STORE.md](DETECTION_STORE.md) を参照してください。
+
+### v3.11.0 → カメラ名インデックス化アップデート
+
+!!! warning "破壊的マイグレーション"
+    `migrate_camera_dirs.py` はディレクトリ移動と SQLite の `UPDATE` を伴います。**最初の実行は必ず `--dry-run` を付け**、コンテナを停止し、`detections/` をバックアップしてから実行してください。
+
+v3.11.0 以降、`generate_compose.py` は `CAMERA{i}_NAME = camera{i}` を固定で書き出します。旧 IP 含みの内部名（例: `camera1_10_0_1_25`）が検出ディレクトリや SQLite に残っている場合は、プロジェクトルート直下の `migrate_camera_dirs.py` で移行します。
+
+**移行タイミング:** v3.11.0 以上のイメージに初めて更新するとき、1度だけ実行
+
+```bash
+# 0. コンテナを停止し、バックアップを取る
+./meteor-docker.sh stop
+cp -a detections detections.bak_$(date +%Y%m%d_%H%M%S)
+
+# 1. 必ず dry-run で内容を確認
+python migrate_camera_dirs.py --dry-run
+
+# 2. 問題なければ本実行（対話確認あり）
+python migrate_camera_dirs.py
+
+# 3. 非対話実行する場合
+python migrate_camera_dirs.py --yes
+
+# 対象ディレクトリを明示する場合
+python migrate_camera_dirs.py --detections-dir /mnt/vol/detections
+```
+
+**事前準備（必須）:**
+
+- `detections/` を `tar` 等でバックアップする
+- コンテナを停止した状態で実行する（書き込み競合を避けるため）
+
+**挙動:**
+
+- `detections/camera{i}_*/` 配下のメディアファイル（`.mp4` / `.jpg` / `.png`）を `detections/camera{i}/` へ `rename` で移動（同名衝突時は `_1`, `_2` ... のサフィックス付与）
+- `detections.jsonl` はマージ追記（バイナリ単位）
+- `detections.db` の `camera` 列および `clip_path` / `image_path` / `composite_original_path` / `alternate_clip_paths` を `replace()` で旧名→新名へ一括更新
+- 実行前に `detections.db` を `detections.db.bak_<timestamp>` として自動バックアップ
+- 完了後、元の `camera{i}_*/` は `camera{i}_*.migrated_<timestamp>/` にリネームして残置（動作確認後に手動削除可）
+
+**ロールバック手順:**
+
+問題が発生した場合は、以下で元の状態に戻せます（タイムスタンプは実行時のものに置換）。
+
+```bash
+# SQLite DB を戻す
+cp detections/detections.db.bak_<timestamp> detections/detections.db
+
+# 元ディレクトリに戻す（必要に応じて）
+for d in detections/camera*_*.migrated_<timestamp>; do
+    mv "$d" "${d%.migrated_<timestamp>}"
+done
+
+# 新しい camera{i} ディレクトリは未処理のまま残るため、事前に撮っておいた
+# detections.bak_<日時> から全量復元するのが安全
+```
+
+詳細は [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) の「カメラ命名規則（v3.11.0+）」節および [DETECTION_STORE.md](DETECTION_STORE.md#トラブルシューティング) を参照してください。
+
+---
+
+## 運用スクリプト一覧
+
+`scripts/` 配下および一部プロジェクトルートに、検出データの移行・救済・調査を行うスタンドアロンスクリプトが用意されています。詳細な引数・挙動は [SCRIPTS_REFERENCE.md](SCRIPTS_REFERENCE.md) を参照してください。
+
+| スクリプト | 配置 | 用途 | 冪等性 | 破壊性 |
+|---|---|---|---|---|
+| `migrate_jsonl_to_sqlite.py` | `scripts/` | v3.6.0+ の初回 SQLite 取り込み | ○ [^idem1] | JSONL 非破壊 |
+| `migrate_camera_dirs.py` | プロジェクトルート | v3.11.0+ のカメラ名インデックス化 | ○ [^idem2] | DB/ディレクトリを書き換え [^destr1] |
+| `migrate_detection_ids.py` | `scripts/` | 検出IDの再発番・付与漏れ補修 | ○ | JSONL を書き換え |
+| `rescue_orphan_detection_files.py` | `scripts/` | JSONL に存在しない孤立ファイルを検知・救済 | ○ | `--apply` 指定時のみ JSONL 追記 |
+| `import_from_other_system.py` | `scripts/` | 別マシンの `detections/` を取り込む | ○ [^idem3] | `--apply` 指定時のみコピー・DB更新 |
+| `merge_detection_directories.py` | `scripts/` | 2 つの検出ディレクトリを統合 | ○ [^idem4] | `--apply` 指定時のみファイル移動 [^destr2] |
+| `transfer_detections.py` | `scripts/` | ZIP エクスポート/インポート（TUI） | ○ [^idem5] | export は読み込みのみ、import は `--apply` 指定時のみ書き込み |
+| `dump_detections_db.py` | `scripts/` | SQLite の内容をダンプ（table/JSON/CSV） | ○ | なし（読み取り専用） |
+
+[^idem1]: `INSERT OR IGNORE` により重複行は無視
+[^idem2]: `--dry-run` を明示しない限り**本実行**する点に注意。自動バックアップ (`detections.db.bak_<timestamp>`) あり
+[^idem3]: 既存ファイルは上書きしない
+[^idem4]: `--apply` までは副作用なし。ただし JSONL は追記ベースで再実行時にも`.jsonl` ファイルへ追加する設計のため、**同じマージを 2 回走らせると一時的に重複行が増える**（SQLite 同期時には `id` で重複排除される）
+[^idem5]: import 側は `--apply` 指定時のみ副作用が発生
+[^destr1]: 自動バックアップあり
+[^destr2]: `--cleanup-source` 指定時は空になった元ファイル・ディレクトリも削除
+
+!!! note "`migrate_camera_dirs.py` の配置について"
+    `migrate_camera_dirs.py` のみプロジェクトルートに配置されています。これはカメラ名インデックス化が初回アップデート時の 1 回限り・起動前に実行する特殊なオペレーションであるためです。
 
 ---
 
@@ -353,9 +472,9 @@ meteor-camera3    44.1%    318.2MiB / 8GiB      3.88%
 meteor-dashboard  2.5%     78.3MiB / 8GiB       0.95%
 
 === 検出結果 ===
-  camera1_10_0_1_25: 15件 (最新: 2026-02-02 06:55)
-  camera2_10_0_1_3: 8件 (最新: 2026-02-02 05:32)
-  camera3_10_0_1_11: 12件 (最新: 2026-02-02 07:01)
+  camera1: 15件 (最新: 2026-02-02 06:55)
+  camera2: 8件 (最新: 2026-02-02 05:32)
+  camera3: 12件 (最新: 2026-02-02 07:01)
 ```
 
 ---
@@ -584,9 +703,9 @@ rm -f ./logs/*.log.[1-9]
 ```
 Dashboard starting on port 8080
 Cameras: 3
-  - camera1 (10.0.1.25): http://localhost:8081
-  - camera2 (10.0.1.3): http://localhost:8082
-  - camera3 (10.0.1.11): http://localhost:8083
+  - camera1 (192.0.2.25): http://localhost:8081
+  - camera2 (192.0.2.3): http://localhost:8082
+  - camera3 (192.0.2.11): http://localhost:8083
 
 Open http://localhost:8080/ in your browser
 ```
@@ -722,7 +841,7 @@ sudo systemctl start meteor-cleanup.timer
 find ./detections -name "*.mp4" -mtime +7 -delete
 
 # 特定カメラのみ削除
-find ./detections/camera1_10_0_1_25 -type f -mtime +7 -delete
+find ./detections/camera1 -type f -mtime +7 -delete
 
 # 手動録画ファイルのみ削除（v3.2.0+）
 find ./detections -path "*/manual_recordings/*" -mtime +7 -delete
@@ -822,13 +941,13 @@ docker compose up
 
 ```bash
 # 1. カメラにpingが通るか確認
-ping 10.0.1.25
+ping 192.0.2.25
 
 # 2. RTSPポートが開いているか確認
-nc -zv 10.0.1.25 554
+nc -zv 192.0.2.25 554
 
 # 3. ffmpegで直接接続テスト
-ffmpeg -i "rtsp://user:pass@10.0.1.25/live" -frames:v 1 test.jpg
+ffmpeg -i "rtsp://user:pass@192.0.2.25/live" -frames:v 1 test.jpg
 
 # 4. streamersファイルを確認
 cat streamers

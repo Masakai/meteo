@@ -1,6 +1,6 @@
 # Docker コンテナ構成ドキュメント
 
-**バージョン: v3.2.1**
+**バージョン: v3.11.1**
 
 ---
 
@@ -39,9 +39,9 @@ graph TB
     end
 
     subgraph "外部ネットワーク"
-        RTSP1["RTSP Camera<br/>10.0.1.25:554"]
-        RTSP2["RTSP Camera<br/>10.0.1.3:554"]
-        RTSP3["RTSP Camera<br/>10.0.1.11:554"]
+        RTSP1["RTSP Camera<br/>cam1.lan:554"]
+        RTSP2["RTSP Camera<br/>cam2.lan:554"]
+        RTSP3["RTSP Camera<br/>cam3.lan:554"]
     end
 
     Browser -->|"HTTP UI"| Dashboard
@@ -105,7 +105,7 @@ graph LR
 | **ポートマッピング** | `8080:8080` (ホスト:コンテナ) |
 | **再起動ポリシー** | `unless-stopped` |
 | **依存関係** | camera1, camera2, camera3, go2rtc（WebRTC構成時） |
-| **ボリューム** | `./detections:/output` (読み込み専用的使用) |
+| **ボリューム** | `./detections:/output` (rw。検出結果の読み込みと削除 API 経由の書き込みに使用) |
 | **ネットワーク** | `meteor-net` (bridge) |
 
 #### 環境変数
@@ -118,17 +118,17 @@ graph LR
 | `LONGITUDE` | `139.6503` | 観測地の経度（東京） |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
 | `ENABLE_TIME_WINDOW` | `true` | 天文薄暮時間帯制限 |
-| `CAMERA1_NAME` | `camera1_10_0_1_25` | カメラ1の内部名（ディレクトリ名・識別子） |
-| `CAMERA1_NAME_DISPLAY` | `東側` | カメラ1のWeb表示名 |
+| `CAMERA1_NAME` | `camera1` | カメラ1の内部名（v3.11.0+ で `camera{i}` 固定。ディレクトリ名・識別子） |
+| `CAMERA1_NAME_DISPLAY` | `東側` | カメラ1のWeb表示名（UI専用、ディレクトリ名には使われない） |
 | `CAMERA1_URL` | `http://localhost:8081` | カメラ1のURL |
 | `CAMERA1_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
 | `CAMERA1_STREAM_URL` | `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false` | ライブ表示用URL |
-| `CAMERA2_NAME` | `camera2_10_0_1_3` | カメラ2の内部名（ディレクトリ名・識別子） |
+| `CAMERA2_NAME` | `camera2` | カメラ2の内部名 |
 | `CAMERA2_NAME_DISPLAY` | `南側` | カメラ2のWeb表示名 |
 | `CAMERA2_URL` | `http://localhost:8082` | カメラ2のURL |
 | `CAMERA2_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
 | `CAMERA2_STREAM_URL` | `http://localhost:1984/stream.html?src=camera2&mode=webrtc&mode=mse&mode=hls&mode=mjpeg&background=false` | ライブ表示用URL |
-| `CAMERA3_NAME` | `camera3_10_0_1_11` | カメラ3の内部名（ディレクトリ名・識別子） |
+| `CAMERA3_NAME` | `camera3` | カメラ3の内部名 |
 | `CAMERA3_NAME_DISPLAY` | `西側` | カメラ3のWeb表示名 |
 | `CAMERA3_URL` | `http://localhost:8083` | カメラ3のURL |
 | `CAMERA3_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
@@ -137,17 +137,28 @@ graph LR
 #### Dockerfile.dashboard
 
 ```dockerfile
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 WORKDIR /app
+
+# ffmpeg + VAAPI (amd64 のみ)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && \
+    if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+        apt-get install -y --no-install-recommends intel-media-va-driver-non-free || true; \
+    fi
+
 COPY requirements-docker.txt .
 RUN pip install --no-cache-dir -r requirements-docker.txt
+
 COPY dashboard*.py .
+COPY detection_store.py .
 COPY astro_utils.py .
+COPY CHANGELOG.md .
 COPY documents/assets/meteo-logotype.svg ./documents/assets/meteo-logotype.svg
+
 ENV TZ=Asia/Tokyo
 ENV PORT=8080
 EXPOSE 8080
-CMD ["python", "dashboard.py"]
+CMD ["python3", "dashboard.py"]
 ```
 
 主な依存ライブラリ: `flask`, `astral`
@@ -163,7 +174,7 @@ graph TB
     subgraph "meteor-camera1 コンテナ"
         Detector["meteor_detector_rtsp_web.py"]
         Astro["astro_utils.py"]
-        Output["/output/camera1_10_0_1_25/"]
+        Output["/output/camera1/"]
 
         subgraph "内部スレッド"
             RTSP["RTSPReader"]
@@ -198,8 +209,8 @@ graph TB
 | 変数名 | 値 | 説明 |
 |-------|-----|------|
 | `TZ` | `Asia/Tokyo` | タイムゾーン |
-| `RTSP_URL` | `rtsp://6199:4003@10.0.1.25/live` | RTSPストリームURL |
-| `CAMERA_NAME` | `camera1_10_0_1_25` | カメラ識別名（ディレクトリ名） |
+| `RTSP_URL` | `rtsp://user:pass@192.0.2.25/live` | RTSPストリームURL（RFC5737 TEST-NET の例示値。実運用ではカメラの IP に置換） |
+| `CAMERA_NAME` | `camera1` | カメラ識別名（v3.11.0+ は `camera{i}` 固定、ディレクトリ名と同一） |
 | `SENSITIVITY` | `medium` | 感度 (low/medium/high/faint/fireball) |
 | `SCALE` | `0.5` | 処理スケール (0.0-1.0) |
 | `BUFFER` | `15` | リングバッファ秒数 |
@@ -233,10 +244,15 @@ RUN apt-get update --allow-releaseinfo-change && \
 
 # アプリケーションコード
 COPY meteor_detector_rtsp_web.py .
+COPY detection_state.py .
+COPY detection_filters.py .
+COPY recording_manager.py .
+COPY http_handlers.py .
 COPY meteor_detector_realtime.py .
 COPY meteor_detector_common.py .
 COPY meteor_mask_utils.py .
 COPY astro_utils.py .
+COPY astro_twilight_utils.py .
 
 # マスク画像（デフォルトは空ファイル）
 ARG MASK_FROM_DAY=mask_none.jpg
@@ -324,7 +340,7 @@ api:
 
 webrtc:
   candidates:
-    - 10.0.1.59:8555
+    - 192.0.2.59:8555  # RFC5737 TEST-NET の例示値。実運用ではホストの到達可能な IP に置換
 
 streams:
   camera1:
@@ -339,7 +355,8 @@ streams:
 - `webrtc.candidates` はブラウザが接続するホスト側候補アドレスです。
 - `streams.*` は各カメラの RTSP ソース定義です。
 
-> **注**: YouTube Live 配信は go2rtc ではなく、dashboard コンテナ内の ffmpeg サブプロセスが担当します（後述）。go2rtc.yaml に `publish` セクションや `camera{N}_youtube` ストリームは不要です。
+!!! note "YouTube Live 配信の担当"
+    YouTube Live 配信は go2rtc ではなく、dashboard コンテナ内の ffmpeg サブプロセスが担当します（後述）。go2rtc.yaml に `publish` セクションや `camera{N}_youtube` ストリームは不要です。
 
 ---
 
@@ -426,24 +443,36 @@ graph TB
 
 ### ディレクトリ構造
 
+v3.11.0 以降、カメラディレクトリ名は `camera{i}` で固定されます。
+
 ```
 ./detections/
-  ├── camera1_10_0_1_25/
+  ├── detections.db                                  # SQLite 検出DB (v3.6.0+)
+  ├── camera1/
   │   ├── detections.jsonl
   │   ├── meteor_20260202_065533.mp4
   │   ├── meteor_20260202_065533_composite.jpg
   │   ├── meteor_20260202_065533_composite_original.jpg
   │   └── manual_recordings/                         # 手動録画保存先 (v3.2.0+)
-  │       └── camera1_10_0_1_25/                     # カメラ名サブディレクトリ
-  │           ├── manual_camera1_20260319_213000_90s.mp4
-  │           └── manual_camera1_20260319_213000_90s.jpg  # サムネイル (v3.2.1+)
-  ├── camera2_10_0_1_3/
+  │       ├── manual_camera1_20260319_213000_90s.mp4
+  │       └── manual_camera1_20260319_213000_90s.jpg  # サムネイル (v3.2.1+)
+  ├── camera2/
   │   └── ...
-  └── camera3_10_0_1_11/
+  └── camera3/
       └── ...
+
+./masks/
+  ├── camera1_mask.png                   # generate_compose.py が生成・管理
+  ├── camera2_mask.png
+  ├── camera3_mask.png
+  └── .generated_hashes.json             # 手動更新マスク保護のハッシュ記録 (v3.10.0+)
 ```
 
-#### ボリューム使用パターン
+#### masks/.generated_hashes.json の役割（v3.10.0+）
+
+`generate_compose.py` はマスク生成時に SHA256 ハッシュを `.generated_hashes.json` に記録します。次回 `generate_compose.py` を再実行したときにハッシュを突き合わせ、**ユーザーがダッシュボードから手動更新したマスクは上書きしません**。強制上書きしたい場合は `python generate_compose.py --force-overwrite-masks` を指定します。詳細は [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) の「generate_compose.py 再実行時のマスク保護」節を参照してください。
+
+### ボリューム使用パターン
 
 | コンテナ | パス | モード | 操作 |
 |---------|------|--------|------|
@@ -707,12 +736,13 @@ lsof -i :8081
 
 ### 1. RTSP認証情報
 
-⚠️ **注意**: docker-compose.ymlにRTSP URLの認証情報が平文で含まれています
+!!! warning "認証情報の取り扱い"
+    docker-compose.ymlにRTSP URLの認証情報が平文で含まれています
 
 **推奨対策**:
 ```bash
 # .envファイルを使用
-echo 'RTSP_URL_CAMERA1=rtsp://user:pass@10.0.1.25/live' > .env
+echo 'RTSP_URL_CAMERA1=rtsp://user:pass@192.0.2.25/live' > .env
 chmod 600 .env
 ```
 
@@ -770,23 +800,23 @@ flowchart LR
 
 ```bash
 # streamers ファイルに新しいカメラのRTSP URLを追加
-echo "rtsp://user:pass@10.0.1.20/live" >> streamers
+echo "rtsp://user:pass@192.0.2.20/live" >> streamers
 ```
 
 streamers ファイル形式:
 ```
-rtsp://username:password@192.168.1.100/live
-rtsp://username:password@192.168.1.101/live
-rtsp://username:password@192.168.1.102/live
+rtsp://username:password@192.0.2.100/live
+rtsp://username:password@192.0.2.101/live
+rtsp://username:password@192.0.2.102/live
 # コメント行は無視されます
-rtsp://192.168.1.103:554/stream  # 認証なしも可能
+rtsp://192.0.2.103:554/stream  # 認証なしも可能
 ```
 
 昼間画像を指定してマスクを自動生成する場合:
 ```
-rtsp://username:password@192.168.1.100/live | camera1.jpg
-rtsp://username:password@192.168.1.101/live | camera2.jpg
-rtsp://192.168.1.103:554/stream
+rtsp://username:password@192.0.2.100/live | camera1.jpg
+rtsp://username:password@192.0.2.101/live | camera2.jpg
+rtsp://192.0.2.103:554/stream
 ```
 
 - `|` 右側は昼間画像パス（相対パス可）
@@ -842,6 +872,19 @@ docker compose ps
 | `--enable-time-window` | `false` | 天文薄暮時間帯制限 |
 | `--mask-output-dir` | `masks` | 生成マスクの保存先 |
 | `--mask-dilate` | `20` | マスク拡張ピクセル数 |
+| `--streaming-mode` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`)。`webrtc` 時は `go2rtc` サービスと `go2rtc.yaml` が併せて生成される |
+| `--go2rtc-candidate-host` | 自動検出 | WebRTC candidate のホスト IP を上書き指定（通常はローカル IP を自動検出） |
+| `--go2rtc-config` | `go2rtc.yaml` | go2rtc 設定ファイルの出力先 |
+| `--force-overwrite-masks` | `false` | マスクの SHA256 ハッシュ保護を無効化して強制上書き（v3.10.0+） |
+
+### MASK_BUILD_DIR ビルド引数（v3.10.0+）
+
+マスクが生成された場合、`generate_compose.py` は各カメラサービスに以下を自動付与します。
+
+- `environment: - MASK_BUILD_DIR=/app/masks_build`
+- `volumes: - ./masks:/app/masks_build`
+
+ダッシュボードの「マスク更新」操作（`/confirm_mask_update`）では、コンテナ内の検出用マスクに加えて `MASK_BUILD_DIR` が示すホスト側 `./masks/` にも同期書き込みし、`masks/.generated_hashes.json` との突き合わせで再生成時の自動保護が効くようにしています。`MASK_BUILD_DIR` はユーザーが手動設定する変数ではありません（`generate_compose.py` が必要なときだけ出力）。
 
 ### 自動生成される構成
 
@@ -871,16 +914,18 @@ sequenceDiagram
 
 **入力 (streamers)**:
 ```
-rtsp://6199:4003@10.0.1.25/live
-rtsp://6199:4003@10.0.1.3/live
+rtsp://user:pass@192.0.2.25/live
+rtsp://user:pass@192.0.2.3/live
 ```
+
+（`192.0.2.x` は RFC5737 TEST-NET-1 の例示アドレスです。実運用ではカメラの到達可能な IP に置換してください。）
 
 ※ 昼間画像を指定する場合は `| camera1.jpg` のように行末に追加します。
 
 **出力 (docker-compose.yml)**:
 - ダッシュボード: `localhost:8080`
-- カメラ1 (10.0.1.25): `localhost:8081`
-- カメラ2 (10.0.1.3): `localhost:8082`
+- カメラ1（`CAMERA1_NAME=camera1`、接続先 192.0.2.25）: `localhost:8081`
+- カメラ2（`CAMERA2_NAME=camera2`、接続先 192.0.2.3）: `localhost:8082`
 
 ### カメラ削除手順
 

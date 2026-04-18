@@ -1,4 +1,6 @@
-# meteor_detector_rtsp_web.py - 内部コンポーネント仕様書
+# 検出コンポーネント仕様書
+
+**バージョン: v3.11.1**
 
 ---
 
@@ -11,7 +13,21 @@ Licensed under the MIT License
 
 ## 概要
 
-`meteor_detector_rtsp_web.py` は、RTSPストリームから流星を検出し、Webプレビューを提供するリアルタイム検出エンジンです。
+RTSP ストリームから流星を検出し Web プレビューを提供するリアルタイム検出エンジンは、v3.6.2 のリファクタリングで以下のモジュールに分割されました。本ドキュメントはそれぞれのモジュールについて章立てで解説します。
+
+| モジュール | 役割 |
+|---|---|
+| `meteor_detector_rtsp_web.py` | エントリポイント。`main()` と `detection_thread_worker` を持つ |
+| `meteor_detector_realtime.py` | `RTSPReader` / `RingBuffer` / `RealtimeMeteorDetector` / `MeteorEvent`（変更禁止） |
+| `meteor_detector_common.py` | RTSP/MP4 共通の数値演算・ビデオ書き出し等ユーティリティ（変更禁止） |
+| `detection_state.py` | `DetectionState` dataclass。検出ループのグローバル状態 |
+| `detection_filters.py` | `build_twilight_params` / `filter_dark_objects` / `apply_sensitivity_preset` |
+| `recording_manager.py` | 手動録画ジョブの管理と `ffmpeg` サブプロセス制御 |
+| `http_handlers.py` | `MJPEGHandler` / `ThreadedHTTPServer` |
+| `astro_twilight_utils.py` | 薄明期間（civil / nautical / astronomical）判定 |
+| `astro_utils.py` | 検出ウィンドウ（前夜の日没〜当日の日出）判定（変更禁止） |
+
+> 変更禁止と記した 3 ファイル（`meteor_detector_common.py` / `meteor_detector_realtime.py` / `astro_utils.py`）は検出アルゴリズムの中核であり、修正時はレビュアー承認が必須です（[CLAUDE.md 参照](../CLAUDE.md)）。
 
 ## アーキテクチャ
 
@@ -469,7 +485,9 @@ class MeteorEvent:
 | `duration` | `float` | 継続時間（秒） |
 | `length` | `float` | 軌跡長（ピクセル） |
 
-#### JSON出力形式
+#### JSON出力形式（to_dict）
+
+`MeteorEvent.to_dict()` は**下記のフィールドのみ**を返します。`id` / `base_name` / `clip_path` / `image_path` / `composite_original_path` は `save_meteor_event()` 側で後付けされ、JSONL 行として書き出されます（実装: `meteor_detector_realtime.py:262-273` / `879-892`）。
 
 ```json
 {
@@ -487,7 +505,7 @@ class MeteorEvent:
 
 ---
 
-### 5. detection_thread_worker
+### 6. detection_thread_worker
 
 **責務**: メイン検出ループを実行する（別スレッド）
 
@@ -579,7 +597,7 @@ flowchart TD
 
 ---
 
-### 6. MJPEGHandler (Webサーバー)
+### 7. MJPEGHandler (Webサーバー)
 
 **責務**: HTTP経由でプレビューストリームと統計情報を提供
 
@@ -639,7 +657,7 @@ sequenceDiagram
 {
   "detections": 5,
   "elapsed": 3600.5,
-  "camera": "camera1_10.0.1.25",
+  "camera": "camera1",
   "settings": {
     "sensitivity": "medium",
     "scale": 0.5,
@@ -691,6 +709,134 @@ sequenceDiagram
 - 自動再起動で反映:
   - `sensitivity`, `scale`, `buffer`, `extract_clips`
 - 起動時依存項目は `output/runtime_settings/<camera>.json` に保存され、再起動後も維持
+
+---
+
+### 8. detection_state.py — DetectionState dataclass（v3.6.2+）
+
+検出ループと HTTP ハンドラが共有するグローバル状態を `DetectionState` という dataclass に集約したモジュールです。v3.6.2 の責務分割時に、旧実装のモジュールグローバル変数 60 個超をこの 1 クラスに束ねました。
+
+#### 主要フィールド（抜粋）
+
+| フィールド | 型 | 役割 |
+|---|---|---|
+| `current_frame` | `np.ndarray \| None` | プレビュー用の最新フレーム |
+| `current_frame_lock` | `threading.Lock` | `current_frame` の読み書き排他 |
+| `detection_count` | `int` | 当プロセスでの検出総数 |
+| `camera_name` / `camera_display_name` | `str` | 内部名（v3.11 で `camera{i}`）と UI 表示名 |
+| `current_detector` | `object` | `RealtimeMeteorDetector` インスタンス |
+| `current_pending_exclusion_mask` | `np.ndarray \| None` | 保留中の除外マスク（確定待ち） |
+| `current_recording_job` | `dict \| None` | 手動録画ジョブの状態 |
+| `current_twilight_active` | `bool` | 現在が薄明期間内か |
+| `current_settings` | `dict` | `/stats` 返却用の設定スナップショット |
+
+#### シングルトンアクセス
+
+```python
+from detection_state import state
+
+state.detection_count += 1
+with state.current_frame_lock:
+    frame = state.current_frame
+```
+
+#### 補助関数
+
+- `_storage_camera_name(cam_name)`: 保存先に使う安全な識別子へ正規化（英数/ハイフン/アンダースコア以外を `_` に置換）
+- `_runtime_override_paths(output_dir, cam_name)`: `runtime_settings/<camera>.json` の候補パスを返す（プライマリ + レガシー互換）
+- `_load_runtime_overrides()` / `_save_runtime_overrides()`: ランタイム設定の JSON 読み書き（tmpfile 経由で原子的保存）
+
+---
+
+### 9. detection_filters.py — 感度プリセット・鳥フィルタ・薄明
+
+検出ループから呼び出される純粋関数群で、設定値の変換と候補フィルタリングを担当します。
+
+#### build_twilight_params(sensitivity, min_speed, base_params)
+
+薄明期間中に差し替えるための `DetectionParams` を返す。`sensitivity`（`low` / `medium` / `high` / `faint`）と `min_speed` (px/s) を受け取り、base_params をコピーしてプリセット・最小速度のみ上書きします。
+
+#### filter_dark_objects(objects, min_brightness)
+
+`detect_bright_objects()` の結果リストから、`brightness` が `min_brightness` 未満のオブジェクトを除外します。鳥シルエット（逆光の黒い塊）を典型的なターゲットとして想定しています。
+
+- 通常時: `BIRD_FILTER_ENABLED=true`（デフォルト OFF）で有効化。閾値は `BIRD_MIN_BRIGHTNESS` (デフォルト 80)
+- 薄明時: `TWILIGHT_BIRD_FILTER_ENABLED=true`（デフォルト ON）で有効化。閾値は `TWILIGHT_BIRD_MIN_BRIGHTNESS` (デフォルト 80)
+
+#### apply_sensitivity_preset(params, sensitivity)
+
+`low` / `medium` / `high` / `faint` / `fireball` のプリセット値を `params` に上書きして返します。`meteor_detector_rtsp_web.py` の `main()` および設定反映 API から呼ばれます。
+
+#### _to_bool(value, default)
+
+環境変数の truthy 文字列（`1` / `true` / `yes` / `on` など）を bool に変換する内部ユーティリティ。空文字列や `None` は `default` に倒れます。
+
+---
+
+### 10. recording_manager.py — 手動録画ジョブ管理
+
+v3.2.0 で導入された手動録画の内部実装を担当します。ffmpeg サブプロセスのライフサイクルを管理し、`detection_state.state.current_recording_job` を通じて状態を公開します。
+
+#### 主要関数（すべて pragma: no cover — ffmpeg 実行を伴うためユニットテスト対象外）
+
+- `_recordings_dir()`: 録画ファイルの保存ディレクトリを返す
+- `_recording_supported()`: `ffmpeg` コマンドが利用可能か
+- `_recording_snapshot_locked()`: `current_recording_job` を UI 用に整形して返す
+- `_parse_recording_start_at(value)`: `POST /recording/schedule` の `start_at` を解析
+- `_set_recording_job_state(job, job_state, *, error="")`: ジョブの状態遷移を記録
+- `_stop_recording_process(job, *, reason)`: 実行中の ffmpeg を terminate → kill の順で停止
+- `_recording_worker(job)`: スケジュール開始までの待機と ffmpeg 実行を行うワーカー
+
+#### ffmpeg コマンド構成
+
+実装上は `-re -rtsp_transport tcp -i {RTSP_URL} -t {duration_sec} -c copy -an {output_path}` を基本とし、RTSP 音声が pcm_alaw の場合は `-an` で音声を切り落として保存します（v3.2.1 での修正）。録画完了後は同名 JPEG サムネイルを自動生成します（v3.2.1+）。
+
+---
+
+### 11. http_handlers.py — MJPEGHandler と ThreadedHTTPServer
+
+Python 標準 `http.server` ベースの HTTP ハンドラです。検出ループから独立した Web サーバースレッドで動作します。
+
+#### クラス
+
+- `MJPEGHandler(BaseHTTPRequestHandler)`: 全エンドポイント（`/` / `/stream` / `/snapshot` / `/mask` / `/stats` / `/recording/*` / `/update_mask` / `/confirm_mask_update` / `/discard_mask_update` / `/apply_settings` / `/restart`）を集約
+- `ThreadedHTTPServer(ThreadingMixIn, HTTPServer)`: マルチクライアント対応の HTTP サーバー
+
+#### マスク更新の 2 段階フロー
+
+ダッシュボードから「マスク更新」を押した場合のフローは以下の通り。
+
+1. `POST /update_mask` で現在フレームから生成した保留マスクを `state.current_pending_exclusion_mask` に保持
+2. ユーザーがプレビューで確認
+3. `POST /confirm_mask_update` で保留マスクを確定
+   - `state.current_detector.update_exclusion_mask(new_mask)` で検出器に反映
+   - `/output/masks/<camera>_mask.png` に永続化
+   - `MASK_BUILD_DIR` 環境変数が設定されていれば、`_write_mask_to_build_dir()` でホスト側 `masks/` にも同期書き込み（v3.10.0+）
+
+`_write_mask_to_build_dir()` ではパストラバーサル対策として、保存先パスを `Path.resolve()` で正規化し、`MASK_BUILD_DIR` 配下に収まっていることを確認しています（[SECURITY.md 参照](SECURITY.md)）。
+
+#### STREAM_JPEG_QUALITY / STREAM_MAX_FPS
+
+MJPEG ストリームの帯域・CPU 消費を抑えるための環境変数:
+
+| 変数 | デフォルト | 範囲 | 用途 |
+|---|---|---|---|
+| `STREAM_JPEG_QUALITY` | `60` | `30` ～ `95` | JPEG エンコード品質 |
+| `STREAM_MAX_FPS` | `12` | `1.0` ～ `30.0` | ストリーム配信上限 FPS |
+
+---
+
+### 12. astro_twilight_utils.py — 薄明期間判定（v3.5.0+）
+
+`astro_utils.py`（検出ウィンドウ = 日没〜日出）とは別の独立モジュールで、夕方薄明（sunset → dusk）と朝方薄明（dawn → sunrise）の 2 区間を計算します。
+
+#### get_twilight_window(target_date, latitude, longitude, timezone, twilight_type="nautical")
+
+指定日の薄明期間を `((evening_start, evening_end), (morning_start, morning_end))` の 2 組の datetime タプルで返します。`twilight_type` は `civil` (6°) / `nautical` (12°) / `astronomical` (18°) のいずれか。無効値は `ValueError`。
+
+#### is_twilight_active(latitude, longitude, timezone, twilight_type="nautical")
+
+現在時刻が薄明期間内かを判定する真偽値を返します。深夜跨ぎを考慮して前日分の朝方薄明もチェックします。詳細は [ASTRO_UTILS.md](ASTRO_UTILS.md) の「astro_twilight_utils.py」節を参照。
 
 ---
 
@@ -791,14 +937,49 @@ cv2.circle(composite, end_point, 6, (0, 0, 255), 2)    # 終了点（赤）
 
 ## 環境変数による設定
 
+全一覧は [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) を参照してください。ここでは検出エンジンが読み取る代表的な環境変数のみ記載します。
+
+### 基本
+
 | 環境変数 | デフォルト値 | 説明 |
 |---------|------------|------|
-| `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限の有効化 |
-| `LATITUDE` | `35.3606` | 観測地の緯度（富士山頂） |
-| `LONGITUDE` | `138.7274` | 観測地の経度（富士山頂） |
-| `TIMEZONE` | `Asia/Tokyo` | タイムゾーン |
+| `CAMERA_NAME` | `camera` | カメラ内部名（v3.11.0+ は `camera{i}` 固定） |
+| `CAMERA_NAME_DISPLAY` | `""` | UI 表示名（ディレクトリ名には使われない） |
+| `SENSITIVITY` | `medium` | 感度プリセット（`detection_filters.apply_sensitivity_preset`） |
+| `SCALE` | `0.5` | 処理スケール |
+| `BUFFER` | `15` | リングバッファ秒数 |
 | `EXTRACT_CLIPS` | `true` | クリップ動画保存の有効化 |
 | `RTSP_LOG_DETAIL` | `true` | RTSP 接続の詳細ログ出力 (v3.1.1+) |
+
+### 検出ウィンドウ・薄明（v3.5.0+）
+
+| 環境変数 | デフォルト値 | 関連モジュール |
+|---------|------------|---|
+| `ENABLE_TIME_WINDOW` | `false` | `astro_utils.is_detection_active` |
+| `LATITUDE` | `35.3606` | `astro_utils` / `astro_twilight_utils` |
+| `LONGITUDE` | `138.7274` | 同上 |
+| `TIMEZONE` | `Asia/Tokyo` | 同上 |
+| `TWILIGHT_DETECTION_MODE` | `reduce` | `detection_thread_worker`。`reduce` / `skip` |
+| `TWILIGHT_TYPE` | `nautical` | `astro_twilight_utils.get_twilight_window` |
+| `TWILIGHT_SENSITIVITY` | `low` | `detection_filters.build_twilight_params` |
+| `TWILIGHT_MIN_SPEED` | `200` | 同上 (px/s) |
+
+### 鳥シルエット除外（v3.5.0/v3.6.1）
+
+| 環境変数 | デフォルト値 | 関連関数 |
+|---------|------------|---|
+| `BIRD_FILTER_ENABLED` | `false` | `detection_filters.filter_dark_objects`（通常時 opt-in） |
+| `BIRD_MIN_BRIGHTNESS` | `80` | 同上の閾値 |
+| `TWILIGHT_BIRD_FILTER_ENABLED` | `true` | 薄明時 opt-out |
+| `TWILIGHT_BIRD_MIN_BRIGHTNESS` | `80` | 同上の閾値 |
+
+### MJPEG ストリーム（http_handlers.py）
+
+| 環境変数 | デフォルト値 | 用途 |
+|---------|------------|---|
+| `STREAM_JPEG_QUALITY` | `60` | `/stream` の JPEG 品質（30-95） |
+| `STREAM_MAX_FPS` | `12` | `/stream` の最大 FPS（1.0-30.0） |
+| `MASK_BUILD_DIR` | 自動設定 | ホスト側 `./masks/` のコンテナ内マウントパス（`/confirm_mask_update` で同期書き込みに使用。v3.10.0+） |
 
 ---
 

@@ -371,6 +371,55 @@ docker compose up -d
 - **低空の流星が検出されない**: `--exclude-bottom` を小さくする
 - **瞬間的な流星が検出されない**: `--skip` を 1 に戻す（MP4）
 
+## 鳥シルエット誤検出を減らす（v3.5.0+）
+
+夜明け前・日没直後の薄明時間帯は空が少し明るいため、鳥が「黒い塊（シルエット）」として差分検出にかかることがあります。`detection_filters.filter_dark_objects()` が平均輝度の低い候補を除外する機能を提供しています。
+
+なお v3.6.1 では通常夜間用の `BIRD_FILTER_ENABLED` の既定値や閾値の扱いを見直した細かな修正が入っています。詳細は [CHANGELOG.md](https://github.com/Masakai/meteo/blob/master/CHANGELOG.md) の v3.6.1 項を参照してください。
+
+### 関連環境変数
+
+| 変数 | デフォルト | 意味 |
+|---|---|---|
+| `TWILIGHT_BIRD_FILTER_ENABLED` | `true` | 薄明時の鳥フィルタ有効化（opt-out、既定有効） |
+| `TWILIGHT_BIRD_MIN_BRIGHTNESS` | `80` | 薄明時に除外する平均輝度のしきい値（0-255） |
+| `BIRD_FILTER_ENABLED` | `false` | 通常夜間時間帯にも適用（opt-in、既定無効） |
+| `BIRD_MIN_BRIGHTNESS` | `80` | 通常時に除外する平均輝度のしきい値 |
+
+### チューニング指針
+
+- **薄明時に鳥が検出されやすい**: `TWILIGHT_BIRD_MIN_BRIGHTNESS` を `100` 程度まで上げる（**注意**: 120 以上は暗い流星も巻き込みやすい）
+- **通常夜間にも鳥・蝙蝠が写る環境**: `BIRD_FILTER_ENABLED=true` に設定し、段階的に `BIRD_MIN_BRIGHTNESS` を調整
+- **`faint` プリセット使用時**: 暗い流星を拾うため閾値は低めに（60 前後）推奨
+
+### 動作原理
+
+候補オブジェクトの平均輝度が閾値を下回ったものを除外します。流星は差分で「明るく」現れるため閾値より高い輝度になり、影として差分に現れる鳥は閾値未満で除外される、という違いを利用しています。
+
+## 薄明時の感度低減（v3.5.0+）
+
+薄明期間中は背景ノイズが増えるため、プリセットとは別の動作モードで感度を落とす仕組みが入っています。[CONFIGURATION_GUIDE.md の「薄明動作モード」節](CONFIGURATION_GUIDE.md#薄明動作モードv350) に合わせて調整します。
+
+### モード切替の推奨
+
+| 状況 | 推奨設定 |
+|---|---|
+| 薄明中も明るい流星だけ拾いたい（デフォルト） | `TWILIGHT_DETECTION_MODE=reduce`、`TWILIGHT_SENSITIVITY=low`、`TWILIGHT_MIN_SPEED=200` |
+| 薄明中の誤検出を完全に避ける | `TWILIGHT_DETECTION_MODE=skip` |
+| 薄明の定義を厳しく（より狭い区間に限定） | `TWILIGHT_TYPE=civil`（6°のみ薄明扱い） |
+| 薄明の定義を緩く（広く薄明扱い） | `TWILIGHT_TYPE=astronomical`（18° まで薄明扱い） |
+
+### `reduce` モードで見逃しが増えた場合
+
+- `TWILIGHT_SENSITIVITY` を `medium` に引き上げる
+- `TWILIGHT_MIN_SPEED` を `150` まで下げる（ただし鳥・航空機の混入が増える）
+
+### `reduce` モードで誤検出が多い場合
+
+- `TWILIGHT_BIRD_FILTER_ENABLED=true`（デフォルト有効）を維持
+- `TWILIGHT_MIN_SPEED` を `250` 前後に引き上げる
+- ノイズ帯マスクも併用する
+
 ## 注意点
 
 - 見逃しを減らすと **誤検出は増えやすくなります**。

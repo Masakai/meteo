@@ -27,6 +27,16 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.11.1 - ドキュメント全面改版
+
+- **変更**: `documents/` 配下 全リファレンスを v3.6〜v3.11 の累積変更（SQLite 化・検出エンジン責務分割・マスク自動保護・カメラ名インデックス化）に追従して改版
+- **追加**: `documents/DETECTION_STORE.md` — 検出結果ストレージ（SQLite スキーマ・JSONL 同期アルゴリズム）の新規ドキュメント
+- **追加**: `documents/SCRIPTS_REFERENCE.md` — `scripts/` 配下と `migrate_camera_dirs.py` の運用スクリプトリファレンスを新規作成
+- **変更**: `mkdocs.yml` — nav に `DETECTION_STORE.md` / `SCRIPTS_REFERENCE.md` を追加
+- **変更**: `README.md` — ファイル構成に v3.6.2 以降の新モジュールを反映、アップグレード節に v3.6.2 / v3.10.0 / v3.11.0 を追加
+- **変更**: `INSTALL.md` — 実在 IP を RFC5737 TEST-NET に置換（セキュリティ改善）
+- **変更**: なし（コード無変更、ドキュメント・設定のみの改版）
+
 ### v3.11.0 - カメラ名をインデックスベースに変更・既存データ移行スクリプト追加
 
 - **変更**: `generate_compose.py` — `CAMERA_NAME` を IP ベース（例: `camera1_192_168_1_10`）からインデックスベース（例: `camera1`）に変更。IP アドレスが変わってもカメラ名が変わらない
@@ -437,20 +447,32 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
   "total": 15,
   "recent": [
     {
+      "id": "det_a1b2c3d4e5f6g7h8i9j0",
       "time": "2026-02-02 06:55:33",
       "camera": "camera1",
+      "camera_display": "東側",
       "confidence": "87%",
       "image": "camera1/meteor_20260202_065533_composite.jpg",
       "mp4": "camera1/meteor_20260202_065533.mp4",
-      "composite_original": "camera1/meteor_20260202_065533_composite_original.jpg"
+      "composite_original": "camera1/meteor_20260202_065533_composite_original.jpg",
+      "alternate_clip_paths": [
+        "camera1/meteor_20260202_065533.mov"
+      ],
+      "label": "",
+      "source_type": ""
     },
     {
+      "id": "det_b2c3d4e5f6g7h8i9j0a1",
       "time": "2026-02-02 05:32:18",
       "camera": "camera2",
+      "camera_display": "南側",
       "confidence": "92%",
       "image": "camera2/meteor_20260202_053218_composite.jpg",
       "mp4": "camera2/meteor_20260202_053218.mp4",
-      "composite_original": "camera2/meteor_20260202_053218_composite_original.jpg"
+      "composite_original": "camera2/meteor_20260202_053218_composite_original.jpg",
+      "alternate_clip_paths": [],
+      "label": "meteor",
+      "source_type": ""
     }
   ]
 }
@@ -460,16 +482,22 @@ fetch('/detection_window?lat=35.6762&lon=139.6503')
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| `total` | integer | 総検出数 |
+| `total` | integer | 総検出数（論理削除済みを除く） |
 | `recent` | array | 検出リスト（時刻降順） |
-| `recent[].time` | string | 検出時刻 |
-| `recent[].camera` | string | カメラ名 |
+| `recent[].id` | string | SHA-1 ダイジェストベースの検出ID（`det_` + 先頭20桁）。削除・ラベル API の URL パラメータに使用 |
+| `recent[].time` | string | 検出時刻（ローカルタイム） |
+| `recent[].camera` | string | カメラ内部名（v3.11.0+ は `camera{i}`） |
+| `recent[].camera_display` | string | カメラの**表示名**（`CAMERA{i}_NAME_DISPLAY`）。未設定時は `camera` と同じ内部名（例: `camera1`）が入る |
 | `recent[].confidence` | string | 信頼度（パーセント表示） |
-| `recent[].image` | string | 画像パス |
+| `recent[].image` | string | コンポジット画像パス（カメラディレクトリ相対） |
 | `recent[].mp4` | string | 動画パス（通常は `.mp4`） |
 | `recent[].composite_original` | string | 元画像の比較明合成パス |
-| `recent[].label` | string | 検出ラベル（v1.10.0以降、未設定時は空文字） |
-| `recent[].source_type` | string | `"manual_recording"` の場合は手動録画（v3.2.1以降、手動録画エントリのみ付与） |
+| `recent[].alternate_clip_paths` | array | 同一イベントに紐づく追加クリップパス（例: `.mov` 併存時）。未登録時は空配列 |
+| `recent[].label` | string | 検出ラベル（v1.10.0+、未設定時は空文字） |
+| `recent[].source_type` | string | 手動録画エントリの場合 `"manual_recording"`、通常検出は空文字（v3.2.1+） |
+
+!!! note "備考"
+    レスポンスは `detection_store.query_detections()`（`deleted = 0` のみ）の結果を整形して返します。`alternate_clip_paths` は SQLite 上では JSON 文字列として保存され、読み出し時に配列へデコードされます。詳細は [DETECTION_STORE.md](DETECTION_STORE.md) を参照してください。
 
 **使用例**:
 ```bash
@@ -941,7 +969,16 @@ curl -X POST "http://localhost:8080/camera_settings/apply_all" \
 
 ### DELETE /detection/{camera}/{id}
 
-**説明**: 検出結果を削除（動画、画像、JSONLエントリ）
+**説明**: 検出結果を論理削除する。SQLite 上では `detections.deleted = 1` フラグを立て、他の検出から参照されていないメディアファイル（MP4 / JPG / alternate clips）のみ物理削除する。JSONL ファイルは変更しない（ロールバック用に保持）
+
+**削除ロジック（v3.6.0+）**:
+
+1. `detection_store.get_detection_by_id(id)` で対象レコードを取得
+2. 各アセットパス（`clip_path` / `image_path` / `composite_original_path` / `alternate_clip_paths`）について `count_asset_references(exclude_id=id)` で参照数を数え、残存参照が 0 のパスのみファイルシステムから削除
+3. `soft_delete(id)` で `deleted = 1` を立てる
+4. 削除したファイル名のリストを返却
+
+JSONL ファイルは変更されないため、論理削除の取り消しは `detections.db` を削除して `scripts/migrate_jsonl_to_sqlite.py` を再実行すれば復元できます。詳しい手順は [DETECTION_STORE.md のトラブルシューティング節](DETECTION_STORE.md#トラブルシューティング) を参照してください。
 
 **URLパラメータ**:
 

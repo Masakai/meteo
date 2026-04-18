@@ -330,7 +330,7 @@ graph TB
   "triangulation_server_url": "https://triangulation.example.com",
   "api_key": "your-secret-api-key-here",
   "cameras": {
-    "camera1_10_0_1_25": {
+    "camera1": {
       "azimuth": 90.0,
       "elevation": 45.0,
       "roll": 0.0,
@@ -369,7 +369,7 @@ graph TB
   "api_key": "your-secret-key",
   "detections": [
     {
-      "camera_name": "camera1_10_0_1_25",
+      "camera_name": "camera1",
       "timestamp": "2026-02-10T00:11:08.844611+09:00",
       "start_az": 95.3,
       "start_el": 62.1,

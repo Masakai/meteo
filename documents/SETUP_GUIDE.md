@@ -1,4 +1,4 @@
-# セットアップマニュアル（初心者向け）v3.8.0
+# セットアップマニュアル（初心者向け）v3.11.1
 
 Windows と macOS で、実行環境の作成から動作確認までの手順をまとめています。
 
@@ -108,7 +108,7 @@ python meteor_detector.py input.mp4 --realtime \
 ## 6. RTSPストリーム（Webプレビュー）
 
 ```bash
-python meteor_detector_rtsp_web.py rtsp://192.168.1.100:554/stream --web-port 8080
+python meteor_detector_rtsp_web.py rtsp://192.0.2.100:554/stream --web-port 8080
 ```
 
 ブラウザで開く:
@@ -129,12 +129,23 @@ http://localhost:8080/
 `|` 区切りでマスク画像、表示名、YouTube配信キーも指定可能です。
 
 ```
-rtsp://user:pass@10.0.1.25/live | camera1.jpg | 東カメラ
-rtsp://user:pass@10.0.1.3/live  || 西カメラ
-rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
+rtsp://user:pass@192.0.2.25/live | camera1.jpg | 東カメラ
+rtsp://user:pass@192.0.2.3/live  || 西カメラ
+rtsp://user:pass@192.0.2.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
 ```
 
+!!! warning "認証情報を平文コミットしない"
+    `streamers` は RTSP の `user:pass` を平文で含むため、`.gitignore` 対象（`streamers` / `streamers.sample` と別ファイル）のまま運用してください。公開リポジトリへコミットした場合は、カメラ側でパスワードを変更し、Git 履歴から削除してください。環境変数化したい場合は [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) の「.env ファイルを使用」節を参照してください。
+
 YouTube Liveに配信したいカメラは、4番目のフィールドに `youtube:` に続けてストリームキーを記載します。ストリームキーはYouTube Studioのライブ配信設定画面で取得できます。
+
+#### カメラ識別子について（v3.11.0+）
+
+v3.11.0 以降、`generate_compose.py` は各カメラの内部名を **`camera1` / `camera2` / `camera3` ... に固定** で書き出します（IP や streamers 記載順序に関わらず記載順で振られるインデックスのみを使用）。
+
+- 保存先ディレクトリは `detections/camera1/` のように `camera{i}` に統一されます
+- `streamers` の「表示名」フィールドはダッシュボード UI のラベルにのみ使用され、ディレクトリ名やファイル名には使われません
+- 旧バージョン（〜v3.10.x）で作成された IP 含みディレクトリ（例: `camera1_10_0_1_25/`）がある場合は [OPERATIONS_GUIDE.md の「v3.11.0 → カメラ名インデックス化アップデート」節](OPERATIONS_GUIDE.md#v3110--カメラ名インデックス化アップデート) を参照し、`migrate_camera_dirs.py` で移行してください。
 
 ### 7-2. docker-compose.yml を生成
 

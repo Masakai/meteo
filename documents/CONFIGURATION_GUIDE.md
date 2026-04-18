@@ -1,6 +1,6 @@
 # 設定ガイド (Configuration Guide)
 
-**バージョン: v3.8.0**
+**バージョン: v3.11.1**
 
 ---
 
@@ -23,16 +23,67 @@ Licensed under the MIT License
 
 ## 目次
 
+- [カメラ命名規則（v3.11.0+）](#カメラ命名規則v3110)
 - [環境変数](#環境変数)
+- [SQLite 検出データベース（v3.6.0+）](#sqlite-検出データベースv360)
 - [マスク設定（固定カメラ向け）](#マスク設定固定カメラ向け)
 - [ノイズ帯マスク設定（v1.12.0+）](#ノイズ帯マスク設定v1120)
 - [検出パラメータ](#検出パラメータ)
 - [感度プリセット](#感度プリセット)
 - [処理スケール設定](#処理スケール設定)
 - [天文薄暮時間帯設定](#天文薄暮時間帯設定)
+- [薄明動作モード（v3.5.0+）](#薄明動作モードv350)
 - [ハードウェア別推奨設定](#ハードウェア別推奨設定)
 - [チューニング方法](#チューニング方法)
 - [バージョン別新機能](#バージョン別新機能)
+
+---
+
+## カメラ命名規則（v3.11.0+）
+
+v3.11.0 以降、`generate_compose.py` はカメラの**内部名**（`CAMERA{i}_NAME`）を **インデックスベースで固定** します。生成される内部名は `camera1` / `camera2` / `camera3` ... のみで、IP アドレスを含みません。
+
+本ドキュメントでは用語を以下の 2 種類に統一します（UI 側の表記揺れを避けるため）。
+
+- **内部名（`CAMERA_NAME` / `CAMERA{i}_NAME`）**: ディレクトリ名・SQLite の `camera` 列・`runtime_settings/<name>.json` のファイル名に使用。`camera1` / `camera2` ... で固定。
+- **表示名（`CAMERA_NAME_DISPLAY` / `CAMERA{i}_NAME_DISPLAY`）**: ダッシュボード UI のラベルにのみ使用。未設定時は内部名と同じ値が UI に出る。
+
+### 背景
+
+v3.10.x までは内部名に IP が含まれていました（例: `camera1_10_0_1_25`）。この方式には以下の課題がありました:
+
+- カメラの IP を変更すると内部名も変わり、過去の検出結果ディレクトリと紐づかなくなる
+- SQLite の `camera` 列にも旧名が残り続け、統計やフィルタが分断される
+
+### 仕様
+
+- `CAMERA{i}_NAME = camera{i}` で常に固定される。`streamers` ファイルの 3 列目は表示名としてのみ扱われ、内部名には使われず、ダッシュボード UI の表示名 (`CAMERA{i}_NAME_DISPLAY`) にのみ反映される
+- 保存先ディレクトリは `$DETECTIONS_DIR/camera{i}/`、`runtime_settings/camera{i}.json` なども同じ内部名で統一される
+- `CAMERA_NAME_DISPLAY` はあくまで表示名であり、ファイル名やディレクトリ名には使われない
+
+### 旧環境からの移行
+
+旧 IP ベースのディレクトリ（`camera1_10_0_1_25/` など）が既にある場合は、スタンドアロンスクリプト `migrate_camera_dirs.py` で安全に移行できます。
+
+```bash
+# 実行前に必ず dry-run で内容確認
+python migrate_camera_dirs.py --dry-run
+
+# 問題なければ本実行（対話確認あり）
+python migrate_camera_dirs.py
+
+# 対話確認を省略する場合
+python migrate_camera_dirs.py --yes
+```
+
+主な動作:
+
+- `detections/camera{i}_*/` 配下のメディア（`.mp4` / `.jpg` / `.png`）を `detections/camera{i}/` へ移動
+- `detections.jsonl` は追記マージ
+- `detections.db` の `camera` 列と各パスカラムを新名に一括 UPDATE（実行前に `.bak_<timestamp>` バックアップを自動作成）
+- 元の `camera{i}_*/` は `camera{i}_*.migrated_<timestamp>/` へリネームして残置
+
+詳細手順は [OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md) の「v3.11.0 → カメラ名インデックス化アップデート」節を参照してください。
 
 ---
 
@@ -45,9 +96,10 @@ docker-compose.ymlで設定される環境変数:
 | 変数名 | デフォルト値 | 説明 | 設定例 |
 |-------|------------|------|--------|
 | `TZ` | `Asia/Tokyo` | タイムゾーン | `America/New_York` |
-| `RTSP_URL` | - | RTSPストリームURL | `rtsp://user:pass@10.0.1.25/live` |
-| `CAMERA_NAME` | `camera` | カメラ識別名 | `camera1` |
-| `SENSITIVITY` | `medium` | 検出感度 | `low` / `medium` / `high` / `fireball` |
+| `RTSP_URL` | - | RTSPストリームURL | `rtsp://user:pass@192.0.2.25/live` |
+| `CAMERA_NAME` | `camera` | カメラの**内部名**（v3.11.0+ では `generate_compose.py` によって `camera{i}` に固定設定される） | `camera1` |
+| `CAMERA_NAME_DISPLAY` | `""` | カメラの**表示名**（ダッシュボード UI のみで使用、ディレクトリ名には使われない） | `東側` |
+| `SENSITIVITY` | `medium` | 検出感度 | `low` / `medium` / `high` / `faint` / `fireball` |
 | `SCALE` | `0.5` | 処理スケール | `0.25` ~ `1.0` |
 | `BUFFER` | `15` | リングバッファ秒数（RTSP Webは検出前後1秒+最大検出時間に上限調整） | `10` ~ `30` |
 | `EXCLUDE_BOTTOM` | `0.0625` | 画面下部除外率 | `0.0` ~ `0.25` |
@@ -75,7 +127,8 @@ docker-compose.ymlで設定される環境変数:
 | `BIRD_FILTER_ENABLED` | `false` | 通常時の黒点フィルタ（opt-in） | `true` / `false` |
 | `BIRD_MIN_BRIGHTNESS` | `80` | 通常時の除外輝度閾値 | `40` ~ `120` |
 
-> **注意**: `BIRD_MIN_BRIGHTNESS` および `TWILIGHT_BIRD_MIN_BRIGHTNESS` を 120 以上に設定すると暗い流星を誤除外するリスクがある。`faint` プリセット使用時は特に注意。
+!!! warning "高閾値のリスク"
+    `BIRD_MIN_BRIGHTNESS` および `TWILIGHT_BIRD_MIN_BRIGHTNESS` を 120 以上に設定すると暗い流星を誤除外するリスクがある。`faint` プリセット使用時は特に注意。
 
 ### ダッシュボードの環境変数
 
@@ -86,8 +139,8 @@ docker-compose.ymlで設定される環境変数:
 | `LONGITUDE` | `138.7274` | 観測地の経度 |
 | `TIMEZONE` | `Asia/Tokyo` | タイムゾーン名 |
 | `ENABLE_TIME_WINDOW` | `false` | 天文薄暮時間帯制限（カメラコンテナ側のデフォルトは `true`） |
-| `CAMERA1_NAME` | - | カメラ1の内部名（ディレクトリ名・識別子） |
-| `CAMERA1_NAME_DISPLAY` | - | カメラ1のWeb表示名（UI専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
+| `CAMERA1_NAME` | - | カメラ1の**内部名**（ディレクトリ名・SQLite の `camera` 列に使われる） |
+| `CAMERA1_NAME_DISPLAY` | - | カメラ1の**表示名**（ダッシュボード UI 専用。保存先ディレクトリや `runtime_settings` のファイル名には使われない） |
 | `CAMERA1_URL` | - | カメラ1のURL |
 | `CAMERA1_STREAM_KIND` | `webrtc` | ライブ表示方式 (`mjpeg` / `webrtc`) |
 | `CAMERA1_STREAM_URL` | `CAMERA1_URL` | ライブ表示用URL (`webrtc` 時は `http://localhost:1984/stream.html?src=camera1&mode=webrtc&mode=mse...` など。埋め込み時はダッシュボード表示中のホスト名を優先して接続) |
@@ -169,7 +222,7 @@ docker-compose.ymlで参照:
 ```yaml
 environment:
   - SENSITIVITY=${SENSITIVITY:-medium}
-  - RTSP_URL=rtsp://${RTSP_USER}:${RTSP_PASS}@10.0.1.25/live
+  - RTSP_URL=rtsp://${RTSP_USER}:${RTSP_PASS}@192.0.2.25/live
 ```
 
 ### ダッシュボード一括設定（再ビルド不要） v1.13.0+
@@ -196,7 +249,7 @@ environment:
 
 起動時依存の設定は `output/runtime_settings/<camera>.json` に保存されます。
 これにより、コンテナ再起動後も同じ設定が維持されます。
-`<camera>` には `CAMERA_NAME` の内部名が使われ、`CAMERA_NAME_DISPLAY` の表示名には切り替わりません。
+`<camera>` には `CAMERA_NAME` の**内部名**が使われ、`CAMERA_NAME_DISPLAY` の**表示名**には切り替わりません。
 
 #### 設定変更の推奨手順
 
@@ -234,6 +287,10 @@ python scripts/migrate_jsonl_to_sqlite.py
 
 既存の JSONL ファイルは移行後も削除されない。SQLite を使わない状態に戻す場合は `detections.db` を削除するだけでよい。
 
+### 詳細
+
+SQLite スキーマ、JSONL → SQLite 同期アルゴリズム、主要 API（`query_detections()` / `soft_delete` / `count_asset_references` など）の詳細は [DETECTION_STORE.md](DETECTION_STORE.md) を参照してください。
+
 ---
 
 ## マスク設定（固定カメラ向け）
@@ -250,13 +307,13 @@ RTSP URL | マスク画像 | 表示名 | youtube:STREAM_KEY
 |---|---|---|
 | RTSP URL | ○ | カメラのRTSP接続URL |
 | マスク画像 | - | 除外マスク生成用の昼間画像パス |
-| 表示名 | - | ダッシュボードでのカメラ表示名 |
+| 表示名 | - | ダッシュボード UI の**表示名**（`CAMERA{i}_NAME_DISPLAY` にマップされる。内部名には使われない） |
 | youtube:KEY | - | YouTube Liveストリームキー（`youtube:`プレフィックス必須） |
 
 ```
-rtsp://user:pass@10.0.1.25/live | camera1.jpg | 東カメラ
-rtsp://user:pass@10.0.1.3/live  | camera2.jpg | 西カメラ
-rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
+rtsp://user:pass@192.0.2.25/live | camera1.jpg | 東カメラ
+rtsp://user:pass@192.0.2.3/live  | camera2.jpg | 西カメラ
+rtsp://user:pass@192.0.2.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
 ```
 
 ### streamers に昼間画像を指定
@@ -300,8 +357,8 @@ python generate_compose.py --force-overwrite-masks
 | 設定主体 | **自動設定**（`generate_compose.py` が docker-compose.yml に埋め込む） |
 | 用途 | コンテナ内の `masks/` マウントパスを示す。ダッシュボードの「マスク更新」操作時に、コンテナ内の検出用パスへ書き込んだ後、この変数が示すパスにも同期書き込みする |
 
-> **注意:** `MASK_BUILD_DIR` はユーザーが手動設定する変数ではありません。
-> また、`.generated_hashes.json` が削除または git 管理されていない場合、ハッシュ記録が失われるため `generate_compose.py` 再実行時に手動更新済みのマスクが上書きされることがあります。
+!!! note "MASK_BUILD_DIR の扱い"
+    `MASK_BUILD_DIR` はユーザーが手動設定する変数ではありません。また、`.generated_hashes.json` が削除または git 管理されていない場合、ハッシュ記録が失われるため `generate_compose.py` 再実行時に手動更新済みのマスクが上書きされることがあります。
 
 ---
 
@@ -896,6 +953,61 @@ curl "http://localhost:8080/detection_window?lat=35.6762&lon=139.6503" | jq
 
 ---
 
+## 薄明動作モード（v3.5.0+）
+
+`ENABLE_TIME_WINDOW=true` の場合、検出対象の夜間時間帯に加えて、**薄明（twilight）期間**の検出挙動を個別に制御できます。薄明期間は `astro_twilight_utils.py` によって太陽の沈み角（civil / nautical / astronomical）別に計算されます（詳細は [ASTRO_UTILS.md](ASTRO_UTILS.md) の `astro_twilight_utils.py` 節を参照）。
+
+### 関連環境変数
+
+| 変数名 | デフォルト値 | 説明 |
+|-------|------------|------|
+| `TWILIGHT_DETECTION_MODE` | `reduce` | 薄明期間中の検出動作。`reduce`（感度を下げて継続）/ `skip`（候補除外） |
+| `TWILIGHT_TYPE` | `nautical` | 薄明の定義。`civil`(6°) / `nautical`(12°) / `astronomical`(18°) |
+| `TWILIGHT_SENSITIVITY` | `low` | `reduce` モード時に適用する感度プリセット |
+| `TWILIGHT_MIN_SPEED` | `200` | `reduce` モード時の最小速度 (px/s)。鳥や航空機など遅い物体の誤検出抑制 |
+
+### モード別の挙動
+
+- **`reduce`（推奨）**: 薄明期間中のみ `TWILIGHT_SENSITIVITY` プリセットを適用し、`min_speed` を `TWILIGHT_MIN_SPEED` まで引き上げる。明るい物体は通常通り検出されるが、鳥・飛行機など遅く暗めの物体が混入しにくくなる
+- **`skip`**: 薄明期間中は全候補を破棄する。誤検出を最も抑える代わりに、薄明直後の明るい流星も取りこぼす
+
+### 鳥シルエット除外フィルタ
+
+薄明時は空が明るく、鳥が「黒い塊」として差分検出にかかることがあります。これを抑えるため、`detection_filters.py` の `filter_dark_objects()` によって **平均輝度が閾値未満のオブジェクトを除外** できます。
+
+| 変数名 | デフォルト値 | 適用タイミング |
+|-------|------------|--------------|
+| `TWILIGHT_BIRD_FILTER_ENABLED` | `true` | 薄明期間中のみ有効（opt-out） |
+| `TWILIGHT_BIRD_MIN_BRIGHTNESS` | `80` | 薄明時の輝度閾値（これ未満は鳥とみなして除外） |
+| `BIRD_FILTER_ENABLED` | `false` | 通常夜間時間帯にも適用（opt-in） |
+| `BIRD_MIN_BRIGHTNESS` | `80` | 通常時の輝度閾値 |
+
+!!! warning "高閾値のリスク"
+    閾値 120 以上は暗い流星を誤除外するリスクがあります。`faint` プリセット使用時は特に注意してください。
+
+### 設定例
+
+```yaml
+# 薄明時は反応を抑えたい（reduce モード、civil 薄明まで抑制）
+environment:
+  - ENABLE_TIME_WINDOW=true
+  - TWILIGHT_TYPE=civil
+  - TWILIGHT_DETECTION_MODE=reduce
+  - TWILIGHT_SENSITIVITY=low
+  - TWILIGHT_MIN_SPEED=250
+  - TWILIGHT_BIRD_FILTER_ENABLED=true
+```
+
+```yaml
+# 薄明中は完全停止する（skip モード）
+environment:
+  - ENABLE_TIME_WINDOW=true
+  - TWILIGHT_TYPE=nautical
+  - TWILIGHT_DETECTION_MODE=skip
+```
+
+---
+
 ## ハードウェア別推奨設定
 
 ### 低スペックPC（2コア、4GB RAM）
@@ -1220,7 +1332,7 @@ python generate_compose.py --buffer 10
 **設定例**:
 ```
 # streamers ファイル
-rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
+rtsp://user:pass@192.0.2.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
 ```
 
 **新規環境変数**:
@@ -1261,7 +1373,7 @@ rtsp://user:pass@10.0.1.11/live || 南カメラ | youtube:xxxx-xxxx-xxxx-xxxx
 python generate_compose.py \
   --streamers streamers \
   --streaming-mode webrtc \
-  --go2rtc-candidate-host 192.168.1.10
+  --go2rtc-candidate-host 192.0.2.10
 ```
 
 ---

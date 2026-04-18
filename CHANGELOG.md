@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.1] - 2026-04-18
+### Changed
+- ドキュメント全面改版: v3.6〜v3.11 の累積変更（SQLite 化・検出エンジン責務分割・マスク自動保護・カメラ名インデックス化）を `documents/` 配下の各リファレンスへ反映。
+- `documents/ARCHITECTURE.md`: 削除シーケンス図を実装の順序（アセット参照カウント → 物理削除 → soft_delete）に合わせて修正。JSONL 側と SQLite 側のフィールド差（`clip_path` 等はファイル名のみ / `alternate_clip_paths` は SQLite 層で付与）を明記。
+- `documents/DETECTOR_COMPONENTS.md`: v3.6.2 で追加されたモジュール節（`detection_state.py` / `detection_filters.py` / `recording_manager.py` / `http_handlers.py` / `astro_twilight_utils.py`）の見出し階層を H3 に統一し連番（1〜12）を整理。`MeteorEvent.to_dict()` が `id` を含まない点を明記。
+- `documents/DOCKER_ARCHITECTURE.md`: `Dockerfile` / `Dockerfile.dashboard` の実体（`FROM python:3.11-slim-bookworm`・`CMD ["python3", "dashboard.py"]`・新規モジュールの COPY 追加）と記述を一致させた。RTSP 例示値を RFC5737 TEST-NET に変更。
+- `documents/DETECTION_STORE.md`: `_normalize_detection_record()` が `id` を既存値優先で扱う挙動に修正。`migrate_jsonl_to_sqlite.py` の CLI 例を `DETECTIONS_DIR=./detections python scripts/migrate_jsonl_to_sqlite.py` に統一。
+- `documents/SCRIPTS_REFERENCE.md`: `migrate_camera_dirs.py` のデフォルト本実行挙動を警告強化。`merge_detection_directories.py` のデフォルト引数値（`--source=南側` / `--target=camera2_10_0_1_3`）に注意書きを追加。TUI キー操作を箇条書き化。
+- `documents/SECURITY.md`: カメラ名マイグレーション節に admonition と具体的なロールバックコマンドを追加。
+- `documents/OPERATIONS_GUIDE.md`: v3.11.0 マイグレーション節に admonition・事前バックアップ・ロールバック手順を追記。運用スクリプト一覧を脚注ベースに整理し、`merge_detection_directories.py` の再実行時 JSONL 追記に関する注記を追加。
+- `documents/CONFIGURATION_GUIDE.md`: 用語を「内部名（`CAMERA_NAME`）」/「表示名（`CAMERA_NAME_DISPLAY`）」の 2 語に統一。
+- `documents/API_REFERENCE.md`: `/detections` の `> **備考:**` を mkdocs-material の admonition (`!!! note`) に変更。削除 API の節に DETECTION_STORE.md のロールバック手順へのリンクを追加。
+- `documents/DETECTION_TUNING.md`: 鳥シルエット節のバージョン表記を `（v3.5.0+）` に統一し、opt-in/opt-out に既定有効/無効の補足を追加。
+- `documents/ASTRO_UTILS.md`: `astro_twilight_utils.py` 節に明示アンカー `{#astro_twilight_utils}` を付与し、呼び出し箇所の表記揺れを解消。
+- `documents/SETUP_GUIDE.md`: `streamers` ファイルの認証情報平文コミットに関する警告を追加。
+- `mkdocs.yml`: `DETECTION_STORE.md` / `SCRIPTS_REFERENCE.md` を nav に追加。
+- `README.md`: ファイル構成に v3.6.2 以降の新モジュール（`detection_state.py` / `detection_filters.py` / `recording_manager.py` / `http_handlers.py` / `astro_twilight_utils.py` / `detection_store.py` / `migrate_camera_dirs.py`）を反映。`documents/` 配下の新ドキュメント（`DETECTION_STORE.md` / `SCRIPTS_REFERENCE.md`）へのリンクを追加。アップグレード節に v3.6.2 / v3.10.0 / v3.11.0 を追加。
+
 ## [3.11.0] - 2026-04-18
 ### Changed
 - `generate_compose.py`: `CAMERA_NAME` をIPベース（例: `camera1_192_168_1_10`）からインデックスベース（例: `camera1`）に変更。IPアドレスが変わってもカメラ名が変わらなくなる。

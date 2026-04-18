@@ -1,5 +1,7 @@
 # 天文計算モジュール仕様 (Astronomical Utilities)
 
+**バージョン: v3.11.1**
+
 ---
 
 **Copyright (c) 2026 Masanori Sakai**
@@ -11,12 +13,25 @@ Licensed under the MIT License
 
 ## 概要
 
-`astro_utils.py` は、天文薄暮期間の計算と検出時間帯の判定を行うモジュールです。
+天文計算は 2 つのモジュールに分かれています。
+
+- `astro_utils.py`: **検出ウィンドウ**の判定。前日の日没から翌日の日出までを「夜間」として、この区間内かどうかを `ENABLE_TIME_WINDOW=true` のとき検出ループから問い合わせる（変更禁止ファイル）
+- `astro_twilight_utils.py`: **薄明区間**の判定（v3.5.0+）。夕方薄明（sunset → dusk）と朝方薄明（dawn → sunrise）の 2 区間について civil/nautical/astronomical の太陽沈み角別に計算する。薄明動作モード（`reduce` / `skip`）や鳥フィルタの適用タイミングに使う
+
+### 2 つの天文モジュールの使い分け
+
+| 判定対象 | モジュール | 関数 | 典型的な呼び出し元 |
+|---|---|---|---|
+| 検出ウィンドウ（日没〜日出） | `astro_utils.py` | `get_detection_window()` / `is_detection_active()` | `meteor_detector_rtsp_web.py` の `detection_thread_worker`、ダッシュボードの `GET /detection_window` |
+| 薄明区間（夕方・朝方） | `astro_twilight_utils.py` | `get_twilight_window()` / `is_twilight_active()` | 薄明時の感度切替（`build_twilight_params`）、鳥フィルタ適用判定 |
+
+両者は独立しており、互いに呼び出し合うことはありません。薄明区間は検出ウィンドウの一部（= 夜の両端）に含まれる関係です。
 
 ## 目次
 
 - [モジュール概要](#モジュール概要)
 - [関数リファレンス](#関数リファレンス)
+- [astro_twilight_utils.py（v3.5.0+）](#astro_twilight_utils)
 - [天文薄暮とは](#天文薄暮とは)
 - [使用例](#使用例)
 - [計算原理](#計算原理)
@@ -200,6 +215,81 @@ else:
     objects = []
     is_detecting_now = False
 ```
+
+---
+
+## astro_twilight_utils.py（v3.5.0+） {#astro_twilight_utils}
+
+`astro_utils.py` が「検出ウィンドウ」（日没〜日出）を返すのに対し、`astro_twilight_utils.py` は **薄明区間** を返します。薄明は民間（civil, 6°）・航海（nautical, 12°）・天文（astronomical, 18°）の 3 種類があり、太陽沈み角で定義されます。
+
+### 関数: get_twilight_window()
+
+**シグネチャ**:
+
+```python
+def get_twilight_window(
+    target_date: datetime.date,
+    latitude: float,
+    longitude: float,
+    timezone: str,
+    twilight_type: str = "nautical",
+) -> Tuple[
+    Tuple[datetime, datetime],  # evening_start, evening_end (sunset → dusk)
+    Tuple[datetime, datetime],  # morning_start, morning_end (dawn → sunrise)
+]:
+```
+
+**説明**: 指定日の夕方薄明（`sunset → dusk`）と翌日の朝方薄明（`dawn → sunrise`）の 2 区間を計算して返します。`twilight_type` が不正値なら `ValueError`。
+
+**使用例**:
+
+```python
+import datetime
+from astro_twilight_utils import get_twilight_window
+
+(eve_start, eve_end), (morn_start, morn_end) = get_twilight_window(
+    datetime.date(2026, 2, 2),
+    latitude=35.6762,
+    longitude=139.6503,
+    timezone="Asia/Tokyo",
+    twilight_type="nautical",
+)
+# eve_start: sunset（太陽が地平線を下回った瞬間）
+# eve_end:   dusk（太陽が沈み角 12° を超えた瞬間 = 夜空の「本番開始」）
+```
+
+### 関数: is_twilight_active()
+
+**シグネチャ**:
+
+```python
+def is_twilight_active(
+    latitude: float,
+    longitude: float,
+    timezone: str,
+    twilight_type: str = "nautical",
+) -> bool:
+```
+
+**説明**: 現在時刻（タイムゾーン依存）が薄明期間内かを返す。内部実装は以下の 3 条件を順にチェックします。
+
+1. 当日夕方薄明 `eve_start <= now <= eve_end`
+2. 翌朝の朝方薄明 `morn_start <= now <= morn_end`（深夜 0 時を跨ぐケース）
+3. **前日** を基準とした朝方薄明（0 時直前〜日出直前に呼ばれた場合）
+
+**呼び出し箇所（例）**:
+
+- `meteor_detector_rtsp_web.detection_thread_worker`: 薄明動作モード（`TWILIGHT_DETECTION_MODE`）の分岐
+- `detection_filters.filter_dark_objects`: 鳥フィルタ適用タイミング
+
+### 関連環境変数
+
+薄明関連の環境変数は [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md#薄明動作モードv350) を参照してください。主なもの:
+
+- `TWILIGHT_TYPE`（`civil` / `nautical` / `astronomical`）
+- `TWILIGHT_DETECTION_MODE`（`reduce` / `skip`）
+- `TWILIGHT_SENSITIVITY`（`reduce` モード時の感度）
+- `TWILIGHT_MIN_SPEED`（`reduce` モード時の最小速度 px/s）
 
 ---
 

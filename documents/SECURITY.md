@@ -1,6 +1,6 @@
 # セキュリティガイド (Security Guide)
 
-**バージョン: v3.2.1**
+**バージョン: v3.11.1**
 
 ---
 
@@ -73,15 +73,15 @@ graph TB
 **デフォルト設定**:
 ```
 streamers ファイル（平文）:
-rtsp://username:password@10.0.1.25/live
+rtsp://username:password@192.0.2.25/live
 ```
 
 補足: `| 昼間画像パス` を行末に付けることも可能ですが、画像ファイルにもアクセス制限を推奨します。
 
-⚠️ **リスク**:
-- 認証情報が平文で保存
-- Gitにコミットすると公開される
-- ファイルシステムアクセスで閲覧可能
+!!! warning "リスク"
+    - 認証情報が平文で保存
+    - Gitにコミットすると公開される
+    - ファイルシステムアクセスで閲覧可能
 
 ---
 
@@ -103,9 +103,9 @@ RTSP_USER_CAMERA3=username3
 RTSP_PASS_CAMERA3=password3
 
 # カメラIPアドレス
-CAMERA1_IP=10.0.1.25
-CAMERA2_IP=10.0.1.3
-CAMERA3_IP=10.0.1.11
+CAMERA1_IP=192.0.2.25
+CAMERA2_IP=192.0.2.3
+CAMERA3_IP=192.0.2.11
 EOF
 
 # パーミッション制限（重要！）
@@ -190,7 +190,7 @@ services:
       - camera1_auth
     environment:
       - RTSP_URL_FILE=/run/secrets/camera1_auth
-      - CAMERA_IP=10.0.1.25
+      - CAMERA_IP=192.0.2.25
 
 secrets:
   camera1_auth:
@@ -257,7 +257,8 @@ ports:
   - "1984:1984"  # go2rtc (WebRTC使用時)
 ```
 
-⚠️ **リスク**: すべてのポートが外部に公開。特に go2rtc の 1984 番ポートを外部公開する場合は、信頼できるネットワークに限定してください。
+!!! warning "リスク"
+    すべてのポートが外部に公開。特に go2rtc の 1984 番ポートを外部公開する場合は、信頼できるネットワークに限定してください。
 
 ---
 
@@ -315,7 +316,7 @@ sudo ufw default allow outgoing
 sudo ufw allow 22/tcp
 
 # ダッシュボードポート（信頼できるIPのみ）
-sudo ufw allow from 192.168.1.0/24 to any port 8080
+sudo ufw allow from 192.0.2.0/24 to any port 8080
 
 # 有効化
 sudo ufw enable
@@ -326,7 +327,7 @@ sudo ufw status
 
 ```bash
 # ダッシュボードポート（信頼できるIPのみ）
-sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" port port="8080" protocol="tcp" accept'
+sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="192.0.2.0/24" port port="8080" protocol="tcp" accept'
 
 sudo firewall-cmd --reload
 sudo firewall-cmd --list-all
@@ -422,8 +423,41 @@ sudo systemctl enable certbot.timer
 - **`Path.resolve()` による境界確認**: 解決後の絶対パスが `DETECTIONS_DIR` 配下に収まっていることを確認し、`..` 等を含む上位ディレクトリへのアクセスを拒否しています。
 - **URLエンコード統一**: `dashboard.py` の各ルートでは `urllib.parse.quote` により `subpath` をエンコードしてから内部ハンドラへ渡し、デコード前の `..` 混入を防いでいます。
 - **録画系 API のアクセス制御**: v3.2.0 で追加された録画予約 (`POST /camera_recording_schedule/<index>`) および録画停止 (`POST /camera_recording_stop/<index>`) 、v3.2.1 で追加された手動録画削除 (`DELETE /manual_recording/`) はダッシュボード経由でのみ使用可能です。これらのエンドポイントを外部に直接公開しないよう、リバースプロキシやファイアウォールで制御してください。
+- **MASK_BUILD_DIR 経由のホスト書き込み（v3.10.0+）**: カメラコンテナの `/confirm_mask_update` は、ダッシュボードの「マスク更新」確定時に `MASK_BUILD_DIR`（ホストの `./masks/` のコンテナマウントパス）にもマスク PNG を書き込みます。`http_handlers._write_mask_to_build_dir()` は以下の多層防御を実装しています。
+  - 書き込み先の親パスを `Path.resolve()` で正規化
+  - 正規化後の絶対パスが `MASK_BUILD_DIR` ディレクトリ直下に収まることを確認（収まらない場合は書き込みをスキップ）
+  - ファイル名は `pending_save_path` の basename のみを使用（ディレクトリ要素は破棄）
+
+  これらにより、保留中マスク名に `../` を含む細工があっても `MASK_BUILD_DIR` の外側には書き込まれません。
 
 これらの対策を維持するため、ファイルパスを扱う新規エンドポイントを追加する際は同様の検証ロジックを組み込んでください。
+
+### カメラ名マイグレーションスクリプト（v3.11.0+）
+
+!!! warning "`migrate_camera_dirs.py` は破壊的操作です"
+    このスクリプトはデフォルトで**本実行**します（他の `scripts/` 配下のツールと挙動が逆）。最初の実行は必ず `--dry-run` を付けて内容を確認してください。
+
+`migrate_camera_dirs.py` は `detections/camera{i}_*/` ディレクトリを `detections/camera{i}/` に統合します。破壊的操作であるため、以下の安全機構を備えています。
+
+- **最初の実行は必ず `--dry-run` から**: `python migrate_camera_dirs.py --dry-run` で移動対象を確認してから本実行してください。本実行時も `--yes` を付けない限り対話確認プロンプトが出ます
+- **`shutil.move` ではなく `Path.rename` を使用**: 同一ファイルシステム内での高速アトミック移動
+- **同名衝突時のサフィックス付与**: 移動先に同名ファイルが存在する場合、`_unique_path()` が `_1`, `_2`, ... のサフィックスを付与して既存ファイルを保護
+- **SQLite DB の自動バックアップ**: `detections.db` を `detections.db.bak_<timestamp>` として自動コピーしてから `UPDATE` を実行
+- **元ディレクトリの残置**: 移動完了後、元の `camera{i}_*/` は `camera{i}_*.migrated_<timestamp>/` にリネームされ削除されない。動作確認後に手動で削除する
+
+**ロールバック手順**: 問題が発生した場合は以下で `detections.db` を戻せます（タイムスタンプは実行時の値に置換）。
+
+```bash
+# DB のみ戻す場合
+cp detections/detections.db.bak_<timestamp> detections/detections.db
+
+# 元ディレクトリも戻したい場合は .migrated_<timestamp> サフィックスを外す
+mv detections/camera1_10_0_1_25.migrated_<timestamp> detections/camera1_10_0_1_25
+```
+
+詳細なロールバック手順は [DETECTION_STORE.md](DETECTION_STORE.md#トラブルシューティング) を参照してください。
+
+**運用必須**: スクリプト実行前にコンテナを停止 (`./meteor-docker.sh stop`) し、`detections/` を外部にバックアップしてから実行してください。
 
 ### ディレクトリパーミッション
 
@@ -612,7 +646,7 @@ services:
 
 ```bash
 # 特定IPからのみ許可
-sudo iptables -A INPUT -p tcp --dport 8080 -s 192.168.1.0/24 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 8080 -s 192.0.2.0/24 -j ACCEPT
 sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 
 # 永続化

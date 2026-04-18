@@ -43,8 +43,10 @@ nav:
   - API リファレンス: API_REFERENCE.md
   - 検出感度チューニング: DETECTION_TUNING.md
   - セキュリティ: SECURITY.md
+  - 運用スクリプト: SCRIPTS_REFERENCE.md
   - アーキテクチャ:
       - 全体構成: ARCHITECTURE.md
       - Docker 構成: DOCKER_ARCHITECTURE.md
       - 検出コンポーネント: DETECTOR_COMPONENTS.md
+      - 検出結果ストレージ: DETECTION_STORE.md
       - 天文計算モジュール: ASTRO_UTILS.md

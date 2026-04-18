@@ -9,7 +9,7 @@
 
 # Meteo ドキュメントサイト
 
-**バージョン: v3.11.0**
+**バージョン: v3.11.1**
 
 ## サンプル画面
 
@@ -61,6 +61,10 @@
     <strong><a href="SECURITY/">セキュリティガイド</a></strong>
     運用時に必要な保護と管理ルール。
   </div>
+  <div class="link-card">
+    <strong><a href="SCRIPTS_REFERENCE/">運用スクリプトリファレンス</a></strong>
+    scripts/ 配下と migrate_camera_dirs.py の用途・引数一覧。
+  </div>
 </div>
 
 ## 内部設計
@@ -79,7 +83,11 @@
     検出処理の内部構成と役割。
   </div>
   <div class="link-card">
+    <strong><a href="DETECTION_STORE/">検出結果ストレージ</a></strong>
+    SQLite スキーマと JSONL 同期アルゴリズム（v3.6.0+）。
+  </div>
+  <div class="link-card">
     <strong><a href="ASTRO_UTILS/">天文計算モジュール</a></strong>
-    日照・天体時刻計算の仕様。
+    日照・天体時刻計算の仕様。検出ウィンドウと薄明区間の使い分け。
   </div>
 </div>

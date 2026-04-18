@@ -1,5 +1,7 @@
 # アーキテクチャドキュメント
 
+**バージョン: v3.11.1**
+
 ---
 
 **Copyright (c) 2026 Masanori Sakai**
@@ -13,61 +15,84 @@ Licensed under the MIT License
 
 流星検出システムは、以下の主要コンポーネントで構成されています：
 
-1. **meteor_detector_rtsp_web.py** - 流星検出エンジン（個別カメラ用）
-2. **dashboard.py** - 統合ダッシュボード（複数カメラ管理）
-3. **go2rtc** - ブラウザ向け WebRTC / MSE 中継（WebRTC 構成時）
+1. **カメラコンテナ**（`meteor_detector_rtsp_web.py`）: 個別カメラごとの流星検出エンジン。v3.6.2 のリファクタリングで以下のモジュールに責務分割されている
+   - `detection_state.py`: グローバル状態（`DetectionState` dataclass）
+   - `detection_filters.py`: 感度プリセット・鳥フィルタ・薄明パラメータ
+   - `recording_manager.py`: ffmpeg ベース手動録画のジョブ管理
+   - `http_handlers.py`: `MJPEGHandler` / ThreadedHTTPServer
+   - `astro_twilight_utils.py`: 薄明期間（civil / nautical / astronomical）判定
+   - `astro_utils.py`: 検出ウィンドウ（日没〜日出）判定
+2. **ダッシュボードコンテナ**（`dashboard.py`）: Flask アプリ + ハンドラ群（`dashboard_routes.py` / `dashboard_camera_handlers.py`）。検出結果は `detection_store.py`（SQLite）を介して参照する
+3. **go2rtc コンテナ**: ブラウザ向け WebRTC / MSE / HLS 中継（WebRTC 構成時）
 
-RTSP/MP4検出で共通化したロジックは `meteor_detector_common.py` に集約しています。
+RTSP/MP4 検出で共通化したロジックは `meteor_detector_common.py` / `meteor_detector_realtime.py` に集約しています。
 
 ## コンポーネント間の関係
 
 ```mermaid
 graph TB
     User["ユーザー<br/>ブラウザ"]
-    Dashboard["dashboard.py<br/>ポート: 8080"]
-    Go2RTC["go2rtc<br/>ポート: 1984 / 8555"]
-    Detector1["meteor_detector_rtsp_web.py<br/>カメラ1 ポート: 8081"]
-    Detector2["meteor_detector_rtsp_web.py<br/>カメラ2 ポート: 8082"]
-    Detector3["meteor_detector_rtsp_web.py<br/>カメラ3 ポート: 8083"]
-    RTSP1["RTSPストリーム1"]
-    RTSP2["RTSPストリーム2"]
-    RTSP3["RTSPストリーム3"]
-    Storage["検出結果ストレージ<br/>/output/"]
 
-    User -->|"HTTP GET / /cameras"| Dashboard
+    subgraph "ダッシュボードコンテナ"
+        FlaskApp["dashboard.py<br/>Flask アプリファクトリ"]
+        Routes["dashboard_routes.py<br/>検出一覧・削除・統計・設定"]
+        CamHandlers["dashboard_camera_handlers.py<br/>スナップショット・マスク・録画・YouTube"]
+        Store["detection_store.py<br/>SQLite CRUD + JSONL同期"]
+    end
+
+    Go2RTC["go2rtc<br/>:1984 / :8555"]
+
+    subgraph "カメラコンテナ (meteor_detector_rtsp_web.py)"
+        DetEntry["main() + detection_thread_worker"]
+        DetState["detection_state.py<br/>DetectionState"]
+        DetFilter["detection_filters.py<br/>プリセット・鳥フィルタ・薄明"]
+        Rec["recording_manager.py<br/>ffmpeg 録画"]
+        HTTP["http_handlers.py<br/>MJPEGHandler"]
+        Twilight["astro_twilight_utils.py<br/>薄明期間判定"]
+        AstroWin["astro_utils.py<br/>検出ウィンドウ判定"]
+    end
+
+    RTSP["RTSPストリーム"]
+    SQLiteDB["/output/detections.db<br/>SQLite (v3.6.0+)"]
+    JSONL["camera{i}/detections.jsonl<br/>検出エンジンの追記ログ"]
+    Media["camera{i}/meteor_*.mp4 / .jpg"]
+
+    User -->|"HTTP"| FlaskApp
     User -->|"WebRTC / MSE"| Go2RTC
-    Dashboard -->|"HTTP GET /stats"| Detector1
-    Dashboard -->|"HTTP GET /stats"| Detector2
-    Dashboard -->|"HTTP GET /stats"| Detector3
-    Dashboard -->|"HTTP GET /camera_snapshot など"| Detector1
-    Dashboard -->|"HTTP GET /camera_snapshot など"| Detector2
-    Dashboard -->|"HTTP GET /camera_snapshot など"| Detector3
-    Dashboard -->|"POST /recording/schedule など"| Detector1
-    Dashboard -->|"POST /recording/schedule など"| Detector2
-    Dashboard -->|"POST /recording/schedule など"| Detector3
-    Dashboard -->|"HTTP GET /go2rtc_asset/*"| Go2RTC
-    Dashboard -->|"GET /api/streams（状態確認）"| Go2RTC
-    Dashboard -->|"ファイル読み込み・削除"| Storage
-    Dashboard -->|"RTMP配信（ffmpegサブプロセス）"| YouTube["YouTube Live"]
-    Go2RTC -->|"RTSP受信"| RTSP1
-    Go2RTC -->|"RTSP受信"| RTSP2
-    Go2RTC -->|"RTSP受信"| RTSP3
+    FlaskApp --> Routes
+    FlaskApp --> CamHandlers
+    Routes --> Store
+    Store -->|"read / UPDATE deleted=1"| SQLiteDB
+    Routes -->|"sync_camera_from_jsonl"| JSONL
+    CamHandlers -->|"HTTP"| HTTP
+    CamHandlers -->|"RTMP (ffmpeg)"| YouTube["YouTube Live"]
+    CamHandlers -->|"GET asset / WS"| Go2RTC
 
-    Detector1 -->|"映像取得"| RTSP1
-    Detector2 -->|"映像取得"| RTSP2
-    Detector3 -->|"映像取得"| RTSP3
+    DetEntry --> DetState
+    DetEntry --> DetFilter
+    DetEntry --> Rec
+    DetEntry --> HTTP
+    DetEntry --> Twilight
+    DetEntry --> AstroWin
+    DetEntry -->|"追記"| JSONL
+    DetEntry -->|"書き出し"| Media
 
-    Detector1 -->|"検出結果保存"| Storage
-    Detector2 -->|"検出結果保存"| Storage
-    Detector3 -->|"検出結果保存"| Storage
+    Go2RTC -->|"RTSP"| RTSP
+    DetEntry -->|"RTSP"| RTSP
 
-    style Dashboard fill:#dbe7f6
+    style FlaskApp fill:#dbe7f6
+    style Store fill:#dce6ff
     style Go2RTC fill:#d7eef2
-    style Detector1 fill:#e2eafc
-    style Detector2 fill:#e2eafc
-    style Detector3 fill:#e2eafc
-    style Storage fill:#dce6ff
+    style DetEntry fill:#e2eafc
+    style DetState fill:#e2eafc
+    style DetFilter fill:#e2eafc
+    style Rec fill:#e2eafc
+    style HTTP fill:#e2eafc
+    style SQLiteDB fill:#dce6ff
 ```
+
+!!! note "ダッシュボードの内部構造"
+    `dashboard.py` は Flask アプリファクトリであり、ルートの実装は `dashboard_routes.py`（検出一覧・削除・統計・設定等）と `dashboard_camera_handlers.py`（カメラスナップショット・マスク更新・手動録画・YouTube 配信）に分離されている。SQLite アクセスは `detection_store.py` モジュールを通じて行う（詳細は [DETECTION_STORE.md](DETECTION_STORE.md) 参照）。
 
 ## シーケンス図
 
@@ -151,8 +176,8 @@ sequenceDiagram
 
     loop 3秒ごと
         Browser->>Dashboard: GET /detections
-        Dashboard->>Storage: detections.jsonl読み込み
-        Storage-->>Dashboard: 検出ログ
+        Dashboard->>Storage: detection_store.query_detections() 経由で SQLite 参照
+        Storage-->>Dashboard: 検出レコード（deleted=0 のみ）
         Dashboard-->>Browser: {total: X, recent: [...]}
     end
 ```
@@ -239,29 +264,45 @@ sequenceDiagram
     Dashboard-->>Browser: {success: true, deleted_files: [...]}
 ```
 
-### 5. 検出結果削除シーケンス
+### 5. 検出結果削除シーケンス（v3.6.0+ SQLite ベース）
+
+v3.6.0 以降、検出結果の削除は SQLite の論理削除（`deleted = 1`）で行います。`detections.jsonl` は書き換えません。
 
 ```mermaid
 sequenceDiagram
     participant Browser
-    participant Dashboard
-    participant Storage as /output/camera_name
+    participant Routes as dashboard_routes.py
+    participant Store as detection_store.py
+    participant DB as detections.db
+    participant FS as /output/camera{i}/
 
-    Browser->>Dashboard: DELETE /detection/camera1/det_a1b2c3d4e5f6g7h8i9j0
+    Browser->>Routes: DELETE /detection/camera1/det_a1b2c3d4e5f6g7h8i9j0
+    Routes->>Store: get_detection_by_id(db_path, id)
+    Store->>DB: SELECT * FROM detections WHERE id = ?
+    DB-->>Store: {clip_path, image_path, composite_original_path, alternate_clip_paths}
+    Store-->>Routes: レコード
 
-    Dashboard->>Dashboard: detection_id から対象レコードを検索
+    loop 各アセットパス
+        Routes->>Store: count_asset_references(db_path, path, exclude_id=id)
+        Store->>DB: SELECT COUNT(*) ... WHERE deleted=0 AND path = ?
+        alt 参照数 = 0
+            Routes->>FS: Path.unlink()
+        else 参照数 >= 1
+            Note over Routes,FS: 他レコードが同じファイルを参照中のためファイル保持
+        end
+    end
 
-    Dashboard->>Storage: ファイル削除（他レコードから参照されていない場合）<br/>- meteor_20260202_065533.mp4<br/>- meteor_20260202_065533_composite.jpg<br/>- meteor_20260202_065533_composite_original.jpg
+    Routes->>Store: soft_delete(db_path, id)
+    Store->>DB: UPDATE detections SET deleted = 1 WHERE id = ?
 
-    Dashboard->>Storage: detections.jsonl読み込み
-    Dashboard->>Dashboard: 該当 detection_id の行を除外
-    Dashboard->>Storage: detections.jsonl上書き
-
-    Dashboard-->>Browser: {success: true, deleted_files: [...]}
-
-    Browser->>Dashboard: GET /detections (リスト更新)
-    Dashboard-->>Browser: 最新の検出リスト
+    Routes-->>Browser: {success: true, id, deleted_files: [...]}
 ```
+
+特徴:
+
+- **JSONL は不変**: 検出エンジンの追記ログはそのまま残り、再同期時に再挿入されないよう `INSERT OR IGNORE` で衝突回避
+- **参照カウントによる安全なファイル削除**: 同一メディアを複数の検出が指している場合（例: 結合イベント）、最後の参照が消えるまで物理削除しない
+- **ロールバック**: 誤削除時は `detections.db` を削除して `python scripts/migrate_jsonl_to_sqlite.py` を再実行すれば、JSONL から再構築できる
 
 ## データフロー
 
@@ -301,8 +342,16 @@ sequenceDiagram
 
 ### detections.jsonl フォーマット
 
+検出エンジンが 1 行 1 イベントで追記する JSON Lines 形式。v1.24.0 以降は ID ベースの管理に移行し、各エントリにファイルパスと `id` を含みます。
+
+JSONL はあくまで検出エンジン側の追記専用ログであり、`clip_path` / `image_path` / `composite_original_path` は**ファイル名のみ**（カメラ名プレフィックスなし）で保存されます。カメラディレクトリ相対パス化・`alternate_clip_paths`・`label` の付与はダッシュボード側の SQLite 取り込み時（`_normalize_detection_record()`）に行われます。
+
+**JSONL 側で検出エンジンが書き出すフィールド**（実装: `meteor_detector_realtime.py:save_meteor_event`）:
+
 ```json
 {
+  "id": "det_a1b2c3d4e5f6g7h8i9j0",
+  "base_name": "meteor_20260202_065533",
   "timestamp": "2026-02-02T06:55:33.411811",
   "start_time": 125.340,
   "end_time": 125.780,
@@ -311,134 +360,33 @@ sequenceDiagram
   "end_point": [450, 220],
   "length_pixels": 135.6,
   "peak_brightness": 245.3,
-  "confidence": 0.87
+  "confidence": 0.87,
+  "clip_path": "meteor_20260202_065533.mp4",
+  "image_path": "meteor_20260202_065533_composite.jpg",
+  "composite_original_path": "meteor_20260202_065533_composite_original.jpg"
 }
 ```
 
-## API仕様
+**SQLite 取り込み時に付与されるフィールド**（実装: `dashboard_routes._normalize_detection_record`）:
 
-### meteor_detector_rtsp_web.py のエンドポイント
+| フィールド | 説明 |
+|---|---|
+| `clip_path` / `image_path` / `composite_original_path` | カメラディレクトリ相対パス（例: `camera1/meteor_...mp4`）に正規化 |
+| `camera` / `camera_display` | カメラ内部名・表示名を追加 |
+| `alternate_clip_paths` | 同名別拡張子の既存ファイル（`.mov` 等）を検索して補完（既定は空配列） |
+| `label` | 外部 `detection_labels.json` をマージ（既定は空文字列） |
+| `time` | UI 表示用の `YYYY-MM-DD HH:MM:SS` 形式 |
 
-| エンドポイント | メソッド | 説明 | レスポンス |
-|--------------|---------|------|-----------|
-| `/` | GET | プレビューHTML | `text/html` |
-| `/stream` | GET | MJPEGストリーム | `multipart/x-mixed-replace` |
-| `/snapshot` | GET | 現在フレームJPEG取得 | `image/jpeg` |
-| `/mask` | GET | マスク画像取得（`?pending=1` で保留中マスク） | `image/png` |
-| `/stats` | GET | 統計情報（v3.2.0以降は `recording` フィールドを含む） | `application/json` |
-| `/recording/status` | GET | 手動録画状態取得（v3.2.0+） | `application/json` |
-| `/recording/schedule` | POST | 手動録画の予約/即時開始（v3.2.0+） | `application/json` |
-| `/recording/stop` | POST | 手動録画の停止（v3.2.0+） | `application/json` |
-| `/update_mask` | POST | 現在フレームからマスク更新 | `application/json` |
-| `/confirm_mask_update` | POST | 保留中のマスク更新を確定 | `application/json` |
-| `/discard_mask_update` | POST | 保留中のマスク更新を破棄 | `application/json` |
-| `/apply_settings` | POST | 設定をランタイム反映（必要時自動再起動） | `application/json` |
-| `/restart` | POST | プロセス再起動要求 | `application/json` |
+ダッシュボードは `detection_store.sync_camera_from_jsonl()` で**新規行のみ**を SQLite (`detections.db`) に取り込み、以降の読み取り・削除・ラベル更新は SQLite 上で行います。JSONL は検出エンジン側の追記専用ログとしてそのまま保持されます。
 
-#### /stats レスポンス例
+## API 仕様
 
-```json
-{
-  "detections": 5,
-  "elapsed": 3600.5,
-  "camera": "camera1",
-  "settings": {
-    "sensitivity": "medium",
-    "scale": 0.5,
-    "buffer": 15.0,
-    "extract_clips": true,
-    "source_fps": 20.0,
-    "exclude_bottom": 0.0625,
-    "mask_image": "/app/mask_image.png",
-    "mask_from_day": "",
-    "mask_dilate": 5,
-    "nuisance_overlap_threshold": 0.6,
-    "nuisance_path_overlap_threshold": 0.7,
-    "nuisance_mask_image": "",
-    "nuisance_from_night": "",
-    "nuisance_dilate": 3
-  },
-  "runtime_fps": 19.83,
-  "stream_alive": true,
-  "time_since_last_frame": 0.03,
-  "is_detecting": true,
-  "detection_status": "DETECTING",
-  "detection_window_enabled": true,
-  "detection_window_active": true,
-  "detection_window_start": "18:00:00",
-  "detection_window_end": "05:00:00",
-  "mask_active": true,
-  "mask_update_pending": false,
-  "recording": {
-    "supported": true,
-    "state": "idle",
-    "start_at": "",
-    "duration_sec": 0,
-    "remaining_sec": 0,
-    "output_path": "",
-    "error": ""
-  }
-}
-```
+HTTP エンドポイントの完全仕様は [API_REFERENCE.md](API_REFERENCE.md) を参照してください。ここではアーキテクチャ上のポイントのみ記載します。
 
-`recording` フィールドは v3.2.0 で追加されました。`state` は `idle` / `scheduled` / `recording` / `completed` / `stopped` のいずれかです。
+- **カメラコンテナ側**: `/stream` (MJPEG)、`/stats`、`/recording/*`、`/update_mask` / `/confirm_mask_update` / `/discard_mask_update`、`/apply_settings`。実装は `http_handlers.py` の `MJPEGHandler` クラス。
+- **ダッシュボード側**: `/health`、`/detections`、`/detection/{camera}/{id}` (DELETE)、`/detection_label`、`/stats`、`/stats_data`、`/camera_stats/{index}`、`/camera_recording_*`、`/camera_embed/{index}`、`/go2rtc_asset/{name}`、`/youtube_start|stop|status/{index}`、`/bulk_delete_non_meteor/{camera_name}` など。実装は `dashboard_routes.py` / `dashboard_camera_handlers.py`。
 
-### dashboard.py のエンドポイント
-
-| エンドポイント | メソッド | 説明 | レスポンス |
-|--------------|---------|------|-----------|
-| `/health` | GET | ダッシュボードヘルスチェック | `application/json` |
-| `/` | GET | ダッシュボードHTML（検出一覧） | `text/html` |
-| `/cameras` | GET | カメラライブ画面HTML | `text/html` |
-| `/settings` | GET | 全カメラ設定ページ | `text/html` |
-| `/detection_window` | GET | 検出時間帯取得 | `application/json` |
-| `/detections` | GET | 検出リスト取得 | `application/json` |
-| `/detections_mtime` | GET | 検出ログ更新時刻取得 | `application/json` |
-| `/dashboard_stats` | GET | ダッシュボードCPU統計取得 | `application/json` |
-| `/camera_stats/{index}` | GET | カメラ統計情報取得 | `application/json` |
-| `/camera_embed/{index}` | GET | WebRTC 埋め込みページ（v3.1.0+） | `text/html` |
-| `/go2rtc_asset/{name}` | GET | go2rtc フロント資産プロキシ（v3.1.0+） | `application/javascript` |
-| `/camera_recording_status/{index}` | GET | カメラ手動録画状態取得（v3.2.0+） | `application/json` |
-| `/camera_recording_schedule/{index}` | POST | カメラ手動録画の予約/即時開始（v3.2.0+） | `application/json` |
-| `/camera_recording_stop/{index}` | POST | カメラ手動録画の停止（v3.2.0+） | `application/json` |
-| `/camera_settings/current` | GET | 設定の現在値取得 | `application/json` |
-| `/camera_settings/apply_all` | POST | 設定を全カメラへ一括反映 | `application/json` |
-| `/camera_mask/{index}` | GET/POST | カメラマスクの取得/更新 | `application/json` |
-| `/camera_mask_confirm/{index}` | POST | マスク更新を確定 | `application/json` |
-| `/camera_mask_discard/{index}` | POST | マスク更新を破棄 | `application/json` |
-| `/camera_mask_image/{index}` | GET | マスク画像取得 | `image/jpeg` |
-| `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） | `image/jpeg` |
-| `/camera_restart/{index}` | POST | カメラ再起動要求 | `application/json` |
-| `/image/{camera}/{filename}` | GET | 画像ファイル取得 | `image/jpeg` |
-| `/detection/{camera}/{timestamp}` | DELETE | 検出結果削除 | `application/json` |
-| `/manual_recording/{path}` | DELETE | 手動録画ファイル削除（v3.2.1+） | `application/json` |
-| `/detection_label` | POST | 検出ラベル設定 | `application/json` |
-| `/bulk_delete_non_meteor/{camera_name}` | POST | 非流星検出一括削除 | `application/json` |
-| `/changelog` | GET | CHANGELOG表示 | `text/plain` |
-
-#### /detections レスポンス例
-
-```json
-{
-  "total": 15,
-  "recent": [
-    {
-      "id": "det_a1b2c3d4e5f6g7h8i9j0",
-      "time": "2026-02-02 06:55:33",
-      "camera": "camera1",
-      "camera_display": "カメラ1",
-      "confidence": "87%",
-      "image": "camera1/meteor_20260202_065533_composite.jpg",
-      "mp4": "camera1/meteor_20260202_065533.mp4",
-      "composite_original": "camera1/meteor_20260202_065533_composite_original.jpg",
-      "label": "detected",
-      "source_type": "manual_recording"
-    }
-  ]
-}
-```
-
-`id` は検出エントリの一意識別子（SHA-1 ダイジェスト）です。`source_type` は手動録画エントリの場合のみ `"manual_recording"` が設定されます。
+なお、ダッシュボードの検出 API（`/detections` / `/detection/{camera}/{id}` / `/detection_label`）は SQLite (`detection_store.py`) を介して動作し、論理削除と参照カウントベースのファイル削除を行います（「検出結果削除シーケンス」節参照）。
 
 ## 設計のポイント
 

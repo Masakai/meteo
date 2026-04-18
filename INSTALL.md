@@ -65,7 +65,7 @@ curl -fsSL https://raw.githubusercontent.com/[YOUR-USERNAME]/meteor-detector/mas
 3. **各カメラの情報**
    - カメラ名（英数字、例: camera1）
    - 表示名（日本語可、例: カメラ1）
-   - RTSP URL（例: rtsp://admin:password@192.168.1.100/live）
+   - RTSP URL（例: rtsp://admin:password@192.0.2.100/live）
 
 ### オプション B: 手動インストール
 
@@ -237,7 +237,7 @@ open masks/camera1_mask.png
 
 ```bash
 # RTSPストリームのテスト
-ffprobe rtsp://admin:password@192.168.1.100/live
+ffprobe rtsp://admin:password@192.0.2.100/live
 ```
 
 ### ポートが既に使用されている
