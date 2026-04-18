@@ -7,11 +7,13 @@ from pathlib import Path
 import pytest
 
 from migrate_camera_dirs import (
+    _backup_db,
     _merge_jsonl,
     _move_media_files,
     _unique_path,
     _update_db,
     find_migration_targets,
+    migrate,
 )
 
 
@@ -229,3 +231,138 @@ class TestMoveMediaFiles:
         moved = _move_media_files(src, dest)
         assert moved == []
         assert not (dest / "detections.jsonl").exists()
+
+
+class TestBackupDb:
+    def test_creates_backup_file(self, tmp_path):
+        db_path = tmp_path / "detections.db"
+        db_path.write_bytes(b"SQLITE")
+        bak = _backup_db(db_path, "20260101_000000")
+        assert bak.exists()
+        assert bak.name == "detections.db.bak_20260101_000000"
+
+    def test_backup_content_matches_original(self, tmp_path):
+        db_path = tmp_path / "detections.db"
+        db_path.write_bytes(b"SQLITE_DATA")
+        bak = _backup_db(db_path, "20260101_000000")
+        assert bak.read_bytes() == b"SQLITE_DATA"
+
+    def test_original_not_removed(self, tmp_path):
+        db_path = tmp_path / "detections.db"
+        db_path.write_bytes(b"SQLITE")
+        _backup_db(db_path, "20260101_000000")
+        assert db_path.exists()
+
+
+class TestMigrate:
+    def _make_detection_dir(self, base: Path, camera_old: str) -> Path:
+        """移行前のカメラディレクトリを作成する"""
+        src = base / camera_old
+        src.mkdir()
+        (src / "meteor.mp4").write_bytes(b"video")
+        (src / "meteor.jpg").write_bytes(b"image")
+        (src / "detections.jsonl").write_bytes(b'{"id": "1"}\n')
+        return src
+
+    def _make_db(self, db_path: Path, camera: str) -> None:
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            """CREATE TABLE detections (
+                id TEXT PRIMARY KEY,
+                camera TEXT,
+                clip_path TEXT,
+                image_path TEXT,
+                composite_original_path TEXT,
+                alternate_clip_paths TEXT
+            )"""
+        )
+        conn.execute(
+            """CREATE TABLE jsonl_sync_state (
+                camera TEXT PRIMARY KEY,
+                last_synced_at TEXT
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO detections VALUES (?, ?, ?, ?, ?, ?)",
+            ("det_001", camera, f"{camera}/meteor.mp4", f"{camera}/meteor.jpg", "", ""),
+        )
+        conn.execute(
+            "INSERT INTO jsonl_sync_state VALUES (?, ?)",
+            (camera, "2026-01-01T00:00:00"),
+        )
+        conn.commit()
+        conn.close()
+
+    def test_migrate_no_targets_prints_message(self, tmp_path, capsys):
+        """移行対象がない場合はメッセージを出力して終了すること"""
+        (tmp_path / "camera1").mkdir()  # index-based なので対象外
+        migrate(tmp_path, dry_run=False, yes=True)
+        captured = capsys.readouterr()
+        assert "移行対象のディレクトリが見つかりません" in captured.out
+
+    def test_migrate_dry_run_does_not_move_files(self, tmp_path, capsys):
+        """dry_run=True の場合はファイルを実際に移動しないこと"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=True, yes=False)
+        # ファイルが移動していないこと
+        assert (tmp_path / "camera1_10_0_1_15" / "meteor.mp4").exists()
+        captured = capsys.readouterr()
+        assert "--dry-run" in captured.out
+
+    def test_migrate_yes_moves_files(self, tmp_path, capsys):
+        """yes=True で実際にファイルが移動されること"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=False, yes=True)
+        assert (tmp_path / "camera1" / "meteor.mp4").exists()
+        assert (tmp_path / "camera1" / "meteor.jpg").exists()
+
+    def test_migrate_yes_merges_jsonl(self, tmp_path, capsys):
+        """yes=True でJSONLが移行先にマージされること"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=False, yes=True)
+        dest_jsonl = tmp_path / "camera1" / "detections.jsonl"
+        assert dest_jsonl.exists()
+        assert b'{"id": "1"}' in dest_jsonl.read_bytes()
+
+    def test_migrate_yes_renames_source_dir(self, tmp_path, capsys):
+        """yes=True で元ディレクトリが .migrated_ サフィックス付きにリネームされること"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=False, yes=True)
+        renamed_dirs = [d for d in tmp_path.iterdir() if "camera1_10_0_1_15.migrated_" in d.name]
+        assert len(renamed_dirs) == 1
+
+    def test_migrate_with_db_updates_records(self, tmp_path, capsys):
+        """DBが存在する場合にカメラ名が更新されること"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        db_path = tmp_path / "detections.db"
+        self._make_db(db_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=False, yes=True)
+        conn = sqlite3.connect(db_path)
+        row = conn.execute("SELECT camera FROM detections WHERE id = 'det_001'").fetchone()
+        conn.close()
+        assert row[0] == "camera1"
+
+    def test_migrate_with_db_creates_backup(self, tmp_path, capsys):
+        """DBが存在する場合にバックアップが作成されること"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        db_path = tmp_path / "detections.db"
+        self._make_db(db_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=False, yes=True)
+        bak_files = [f for f in tmp_path.iterdir() if f.name.startswith("detections.db.bak_")]
+        assert len(bak_files) == 1
+
+    def test_migrate_dry_run_with_jsonl_prints_info(self, tmp_path, capsys):
+        """dry_run=True でJSONLが存在する場合にその旨が出力されること"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=True, yes=False)
+        captured = capsys.readouterr()
+        assert "detections.jsonl" in captured.out
+
+    def test_migrate_dry_run_with_db_prints_db_info(self, tmp_path, capsys):
+        """dry_run=True でDBが存在する場合にその旨が出力されること"""
+        self._make_detection_dir(tmp_path, "camera1_10_0_1_15")
+        db_path = tmp_path / "detections.db"
+        self._make_db(db_path, "camera1_10_0_1_15")
+        migrate(tmp_path, dry_run=True, yes=False)
+        captured = capsys.readouterr()
+        assert "detections.db" in captured.out
