@@ -27,6 +27,11 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.11.2 - apply_settings マスク上書きバグ修正
+
+- **修正**: `http_handlers.py` — `apply_settings` エンドポイントで手動更新済みマスクが上書きされるバグを修正。`_is_mask_manually_modified()` ヘルパーによる SHA256 ハッシュ比較ガードを追加し、`generate_compose.py` と同等の保護を実現
+- **追加**: `tests/test_http_handlers.py` — `_is_mask_manually_modified()` の6ケーステスト追加
+
 ### v3.11.1 - ドキュメント全面改版
 
 - **変更**: `documents/` 配下 全リファレンスを v3.6〜v3.11 の累積変更（SQLite 化・検出エンジン責務分割・マスク自動保護・カメラ名インデックス化）に追従して改版

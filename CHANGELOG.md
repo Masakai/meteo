@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.2] - 2026-04-18
+### Fixed
+- `http_handlers.py` — `apply_settings` エンドポイントで手動更新済みマスクが上書きされるバグを修正。`masks/.generated_hashes.json` のハッシュ比較ガード（`_is_mask_manually_modified()`）を追加し、`generate_compose.py` と同等の保護を実現。
+
 ## [3.11.1] - 2026-04-18
 ### Changed
 - ドキュメント全面改版: v3.6〜v3.11 の累積変更（SQLite 化・検出エンジン責務分割・マスク自動保護・カメラ名インデックス化）を `documents/` 配下の各リファレンスへ反映。

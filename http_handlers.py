@@ -6,6 +6,7 @@ detection_state.state を通じてグローバル状態にアクセスする。
 recording_manager の録画関数を呼び出す。
 """
 import cv2
+import hashlib
 import json
 import numpy as np
 import socket
@@ -46,6 +47,29 @@ try:
 except ValueError:
     STREAM_MAX_FPS = 12.0
 STREAM_FRAME_INTERVAL = 1.0 / STREAM_MAX_FPS
+
+
+def _is_mask_manually_modified(mask_save_path: str, hashes_json_path: str) -> bool:
+    """手動更新済みマスクかどうかをハッシュで判定する。
+    ハッシュ記録が存在しない・読み込みエラーの場合は False（上書き許可）を返す。
+    """
+    if not mask_save_path or not hashes_json_path:
+        return False
+    try:
+        hashes_path = Path(hashes_json_path)
+        hashes = json.loads(hashes_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    mask_path = Path(mask_save_path)
+    filename = mask_path.name
+    stored_hash = hashes.get(filename, "")
+    if not stored_hash:
+        return False
+    try:
+        current_hash = hashlib.sha256(mask_path.read_bytes()).hexdigest()
+    except (OSError, FileNotFoundError):
+        return False
+    return current_hash != stored_hash
 
 
 def _write_mask_to_build_dir(mask_build_dir: str, pending_save_path, pending_mask) -> None:
@@ -825,6 +849,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
 
             applied = {}
             errors = []
+            skipped = {}
             params = state.current_detector.params
             restart_required = False
             restart_triggers = []
@@ -935,20 +960,25 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                     applied["mask_image"] = mask_image
                     overrides_update["mask_image"] = mask_image
                 elif mask_from_day:
-                    new_mask = build_exclusion_mask(
-                        mask_from_day,
-                        (proc_w, proc_h),
-                        dilate_px=state.current_mask_dilate,
-                        save_path=state.current_mask_save,
-                    )
-                    if new_mask is None:
-                        raise ValueError(f"mask_from_day not readable: {mask_from_day}")
-                    state.current_detector.update_exclusion_mask(new_mask)
-                    with state.current_pending_mask_lock:
-                        state.current_pending_exclusion_mask = None
-                        state.current_pending_mask_save_path = None
-                    applied["mask_from_day"] = mask_from_day
-                    overrides_update["mask_from_day"] = mask_from_day
+                    mask_build_dir = os.environ.get("MASK_BUILD_DIR", "")
+                    hashes_json_path = os.path.join(mask_build_dir, ".generated_hashes.json") if mask_build_dir else ""
+                    if _is_mask_manually_modified(str(state.current_mask_save) if state.current_mask_save else "", hashes_json_path):
+                        skipped["mask_from_day"] = "manually_modified"
+                    else:
+                        new_mask = build_exclusion_mask(
+                            mask_from_day,
+                            (proc_w, proc_h),
+                            dilate_px=state.current_mask_dilate,
+                            save_path=state.current_mask_save,
+                        )
+                        if new_mask is None:
+                            raise ValueError(f"mask_from_day not readable: {mask_from_day}")
+                        state.current_detector.update_exclusion_mask(new_mask)
+                        with state.current_pending_mask_lock:
+                            state.current_pending_exclusion_mask = None
+                            state.current_pending_mask_save_path = None
+                        applied["mask_from_day"] = mask_from_day
+                        overrides_update["mask_from_day"] = mask_from_day
             except Exception as e:
                 errors.append(str(e))
 
@@ -965,18 +995,27 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                     overrides_update["nuisance_mask_image"] = nuisance_mask_image
 
                 if nuisance_from_night:
-                    auto_nuisance = build_nuisance_mask_from_night(
-                        nuisance_from_night,
-                        (proc_w, proc_h),
-                        dilate_px=state.current_nuisance_dilate,
-                    )
-                    if auto_nuisance is None:
-                        raise ValueError(f"nuisance_from_night not readable: {nuisance_from_night}")
-                    new_nuisance_mask = auto_nuisance if new_nuisance_mask is None else cv2.bitwise_or(
-                        new_nuisance_mask, auto_nuisance
-                    )
-                    applied["nuisance_from_night"] = nuisance_from_night
-                    overrides_update["nuisance_from_night"] = nuisance_from_night
+                    mask_build_dir = os.environ.get("MASK_BUILD_DIR", "")
+                    hashes_json_path = os.path.join(mask_build_dir, ".generated_hashes.json") if mask_build_dir else ""
+                    nuisance_save_path = ""
+                    if state.current_mask_save:
+                        base_name = Path(state.current_mask_save).stem.removesuffix("_mask")
+                        nuisance_save_path = str(Path(state.current_mask_save).parent / f"{base_name}_nuisance_mask.png")
+                    if _is_mask_manually_modified(nuisance_save_path, hashes_json_path):
+                        skipped["nuisance_from_night"] = "manually_modified"
+                    else:
+                        auto_nuisance = build_nuisance_mask_from_night(
+                            nuisance_from_night,
+                            (proc_w, proc_h),
+                            dilate_px=state.current_nuisance_dilate,
+                        )
+                        if auto_nuisance is None:
+                            raise ValueError(f"nuisance_from_night not readable: {nuisance_from_night}")
+                        new_nuisance_mask = auto_nuisance if new_nuisance_mask is None else cv2.bitwise_or(
+                            new_nuisance_mask, auto_nuisance
+                        )
+                        applied["nuisance_from_night"] = nuisance_from_night
+                        overrides_update["nuisance_from_night"] = nuisance_from_night
 
                 if new_nuisance_mask is not None:
                     state.current_detector.update_nuisance_mask(new_nuisance_mask)
@@ -1134,6 +1173,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
             self.wfile.write(json.dumps({
                 "success": len(errors) == 0,
                 "applied": applied,
+                "skipped": skipped,
                 "errors": errors,
                 "restart_required": restart_required,
                 "restart_requested": restart_requested,

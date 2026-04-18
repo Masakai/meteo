@@ -1,3 +1,5 @@
+import hashlib
+import json
 import numpy as np
 import pytest
 from pathlib import Path
@@ -80,3 +82,82 @@ def test_write_mask_to_build_dir_blocks_path_traversal(tmp_path, monkeypatch):
         assert Path(written["path"]).resolve().parent == build_dir.resolve()
     # 親ディレクトリ（tmp_path）へは書き込まれていないこと
     assert not outside.exists()
+
+
+# --- _is_mask_manually_modified ---
+
+def _write_hashes_json(hashes_path: Path, data: dict):
+    hashes_path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_is_mask_manually_modified_returns_true_when_hash_differs(tmp_path):
+    """現在のハッシュと記録済みハッシュが異なる場合（手動更新済み）は True を返す"""
+    import http_handlers
+
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(b"original content")
+    stored_hash = hashlib.sha256(b"different original content").hexdigest()
+
+    hashes_path = tmp_path / ".generated_hashes.json"
+    _write_hashes_json(hashes_path, {"camera1_mask.png": stored_hash})
+
+    assert http_handlers._is_mask_manually_modified(str(mask_file), str(hashes_path)) is True
+
+
+def test_is_mask_manually_modified_returns_false_when_hash_matches(tmp_path):
+    """現在のハッシュと記録済みハッシュが一致する場合（自動生成のまま）は False を返す"""
+    import http_handlers
+
+    content = b"auto generated mask"
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(content)
+    stored_hash = hashlib.sha256(content).hexdigest()
+
+    hashes_path = tmp_path / ".generated_hashes.json"
+    _write_hashes_json(hashes_path, {"camera1_mask.png": stored_hash})
+
+    assert http_handlers._is_mask_manually_modified(str(mask_file), str(hashes_path)) is False
+
+
+def test_is_mask_manually_modified_returns_false_when_no_hashes_json(tmp_path):
+    """ハッシュJSONが存在しない場合は False（上書き許可）を返す"""
+    import http_handlers
+
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(b"some content")
+    missing_json = tmp_path / ".generated_hashes.json"
+
+    assert http_handlers._is_mask_manually_modified(str(mask_file), str(missing_json)) is False
+
+
+def test_is_mask_manually_modified_returns_false_when_no_hash_record(tmp_path):
+    """ハッシュJSONにキーが存在しない場合は False を返す"""
+    import http_handlers
+
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(b"some content")
+
+    hashes_path = tmp_path / ".generated_hashes.json"
+    _write_hashes_json(hashes_path, {})  # キーなし
+
+    assert http_handlers._is_mask_manually_modified(str(mask_file), str(hashes_path)) is False
+
+
+def test_is_mask_manually_modified_returns_false_when_mask_save_path_empty(tmp_path):
+    """mask_save_path が空文字の場合は False を返す"""
+    import http_handlers
+
+    hashes_path = tmp_path / ".generated_hashes.json"
+    _write_hashes_json(hashes_path, {"camera1_mask.png": "abc"})
+
+    assert http_handlers._is_mask_manually_modified("", str(hashes_path)) is False
+
+
+def test_is_mask_manually_modified_returns_false_when_hashes_json_path_empty(tmp_path):
+    """hashes_json_path が空文字の場合は False を返す（MASK_BUILD_DIR 未設定相当）"""
+    import http_handlers
+
+    mask_file = tmp_path / "camera1_mask.png"
+    mask_file.write_bytes(b"some content")
+
+    assert http_handlers._is_mask_manually_modified(str(mask_file), "") is False
