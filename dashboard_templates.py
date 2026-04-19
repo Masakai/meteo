@@ -457,7 +457,7 @@ def render_stats_html(version):
                     linecolor: '#d8e4ef',
                     dtick: 1,
                 }},
-                legend: {{ orientation: 'h', x: 0, y: 1.12 }},
+                legend: {{ orientation: 'h', x: 0, y: 1.12, traceorder: 'normal' }},
                 margin: {{ t: 40, b: 80, l: 50, r: 20 }},
                 height: 280,
             }};
@@ -472,7 +472,8 @@ def render_stats_html(version):
             const chartEl = document.getElementById('hourly-chart');
             const hours = hourly.hours || [...Array(24).keys()];
             const hourLabels = hours.map(h => h + '時');
-            const traces = hourly.cameras.map((cam) => ({{
+            const orderedCams = cameras.filter(cam => hourly.cameras.includes(cam));
+            const traces = orderedCams.map((cam) => ({{
                 x: hourLabels,
                 y: hourly.by_hour[cam] || new Array(24).fill(0),
                 name: cam,

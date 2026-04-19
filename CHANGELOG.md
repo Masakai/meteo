@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.13.1] - 2026-04-20
+### Fixed
+- `dashboard_templates.py` — 統計グラフ（夜別）の凡例に `traceorder: 'normal'` を追加し、West→East の逆順表示を修正。
+- `dashboard_templates.py` — 統計グラフ（時間帯別）のトレース順序を `cameras` 引数順に統一。
+
 ## [3.13.0] - 2026-04-20
 ### Added
 - `dashboard_templates.py` — 検出一覧で同一カメラ・同一時刻の検出を一括連動選択する機能を追加。チェックボックスに `data-camera` / `data-time` 属性を付与し、`toggleSelectItem` に連動選択ロジックを追加。
