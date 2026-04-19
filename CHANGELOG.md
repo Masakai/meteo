@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.3] - 2026-04-19
+### Fixed
+- `dashboard_templates.py` — 夜別検出統計グラフ（時間帯別）の凡例カラーがカメラ全体のインデックスではなく `hourly.cameras` 内のインデックスで決まっていたバグを修正。`renderHourlyChart` に `cameras` 配列を渡し、`cameras.indexOf(cam)` でカメラ名からグローバルインデックスを取得するよう変更。
+
 ## [3.11.2] - 2026-04-18
 ### Fixed
 - `http_handlers.py` — `apply_settings` エンドポイントで手動更新済みマスクが上書きされるバグを修正。`masks/.generated_hashes.json` のハッシュ比較ガード（`_is_mask_manually_modified()`）を追加し、`generate_compose.py` と同等の保護を実現。

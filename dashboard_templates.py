@@ -419,7 +419,7 @@ def render_stats_html(version):
 
             // Plotly 積み重ねグラフ
             renderChart(nights, cameras);
-            renderHourlyChart(data.hourly);
+            renderHourlyChart(data.hourly, cameras);
         }}
 
         const CAMERA_COLORS = ['#1a8fc4', '#d4860a', '#1d9e60', '#cc3333', '#7b4dc4'];
@@ -467,17 +467,17 @@ def render_stats_html(version):
             document.getElementById('chart-wrap').style.display = '';
         }}
 
-        function renderHourlyChart(hourly) {{
+        function renderHourlyChart(hourly, cameras) {{
             if (!hourly || !hourly.cameras || hourly.cameras.length === 0) return;
             const chartEl = document.getElementById('hourly-chart');
             const hours = hourly.hours || [...Array(24).keys()];
             const hourLabels = hours.map(h => h + '時');
-            const traces = hourly.cameras.map((cam, i) => ({{
+            const traces = hourly.cameras.map((cam) => ({{
                 x: hourLabels,
                 y: hourly.by_hour[cam] || new Array(24).fill(0),
                 name: cam,
                 type: 'bar',
-                marker: {{ color: CAMERA_COLORS[i % CAMERA_COLORS.length] }},
+                marker: {{ color: CAMERA_COLORS[Math.max(0, cameras.indexOf(cam)) % CAMERA_COLORS.length] }},
             }}));
             const layout = {{
                 barmode: 'group',

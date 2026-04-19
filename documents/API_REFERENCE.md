@@ -27,6 +27,10 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.11.3 - 夜別検出統計グラフ凡例カラー統一修正
+
+- **修正**: `dashboard_templates.py` — 時間帯別グラフの `renderHourlyChart` に全カメラ配列を渡し、`cameras.indexOf(cam)` でグローバルインデックスを取得するよう変更。凡例カラーが夜別グラフと一致しない問題を解消
+
 ### v3.11.2 - apply_settings マスク上書きバグ修正
 
 - **修正**: `http_handlers.py` — `apply_settings` エンドポイントで手動更新済みマスクが上書きされるバグを修正。`_is_mask_manually_modified()` ヘルパーによる SHA256 ハッシュ比較ガードを追加し、`generate_compose.py` と同等の保護を実現
