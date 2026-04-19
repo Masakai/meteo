@@ -27,6 +27,11 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.12.0 - logrotate.conf 自動生成機能追加
+
+- **追加**: `generate_compose.py` — `generate_logrotate_conf()` 関数を新規追加。日次ローテーション・90日保持・圧縮設定（`compress` / `delaycompress` / `copytruncate`）を生成する純粋関数
+- **追加**: `generate_compose.py` — `main()` 実行時に `logrotate.conf` を自動生成し、`cron` 設定例を標準出力に表示
+
 ### v3.11.3 - 夜別検出統計グラフ凡例カラー統一修正
 
 - **修正**: `dashboard_templates.py` — 時間帯別グラフの `renderHourlyChart` に全カメラ配列を渡し、`cameras.indexOf(cam)` でグローバルインデックスを取得するよう変更。凡例カラーが夜別グラフと一致しない問題を解消

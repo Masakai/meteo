@@ -378,6 +378,24 @@ def generate_station_reporter(station_config_path: str) -> str:
 """
 
 
+def generate_logrotate_conf(cwd: str, log_patterns: list[str]) -> str:
+    """logrotate設定ファイルの内容を返す純粋関数"""
+    patterns = "\n".join(f"{cwd}/{p}" for p in log_patterns)
+    return f"""{patterns}
+{{
+    daily
+    rotate 90
+    dateext
+    dateformat -%Y%m%d
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}}
+"""
+
+
 def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
     """go2rtc設定ファイルを生成"""
 
@@ -654,6 +672,18 @@ streamersファイルの形式:
 
     # logsディレクトリを作成
     Path("logs").mkdir(exist_ok=True)
+
+    # logrotate.conf を生成
+    cwd = os.path.abspath(".")
+    log_patterns = ["logs/camera*.log", "logs/dashboard.log", "logs/ffmpeg_youtube*.log"]
+    logrotate_content = generate_logrotate_conf(cwd, log_patterns)
+    output_dir = Path(args.output).parent
+    logrotate_path = output_dir / "logrotate.conf"
+    abs_logrotate_path = logrotate_path.resolve()
+    with open(logrotate_path, 'w', encoding='utf-8') as f:
+        f.write(logrotate_content)
+    print("logrotate設定生成: logrotate.conf")
+    print(f"cron設定例: 0 4 * * * /usr/sbin/logrotate {abs_logrotate_path}")
 
     # 出力
     with open(args.output, 'w') as f:

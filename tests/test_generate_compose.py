@@ -7,6 +7,7 @@ from generate_compose import (
     should_generate_mask,
     generate_compose,
     generate_go2rtc_config,
+    generate_logrotate_conf,
     _is_usable_candidate_ip,
     generate_service,
     generate_station_reporter,
@@ -352,3 +353,43 @@ def test_should_generate_mask_force(tmp_path):
     stored = hashlib.sha256(b"original content").hexdigest()
     result = should_generate_mask(mask_file, stored, force=True)
     assert result == (True, "force")
+
+
+# --- generate_logrotate_conf のテスト ---
+
+def test_generate_logrotate_conf_contains_daily():
+    result = generate_logrotate_conf("/home/user/meteo", ["logs/camera*.log"])
+    assert "daily" in result
+
+
+def test_generate_logrotate_conf_contains_dateext():
+    result = generate_logrotate_conf("/home/user/meteo", ["logs/camera*.log"])
+    assert "dateext" in result
+
+
+def test_generate_logrotate_conf_contains_copytruncate():
+    result = generate_logrotate_conf("/home/user/meteo", ["logs/camera*.log"])
+    assert "copytruncate" in result
+
+
+def test_generate_logrotate_conf_contains_rotate_90():
+    result = generate_logrotate_conf("/home/user/meteo", ["logs/camera*.log"])
+    assert "rotate 90" in result
+
+
+def test_generate_logrotate_conf_contains_dateformat():
+    result = generate_logrotate_conf("/home/user/meteo", ["logs/camera*.log"])
+    assert "dateformat -%Y%m%d" in result
+
+
+def test_generate_logrotate_conf_contains_all_patterns():
+    patterns = ["logs/camera*.log", "logs/dashboard.log", "logs/ffmpeg_youtube*.log"]
+    result = generate_logrotate_conf("/srv/meteo", patterns)
+    assert "/srv/meteo/logs/camera*.log" in result
+    assert "/srv/meteo/logs/dashboard.log" in result
+    assert "/srv/meteo/logs/ffmpeg_youtube*.log" in result
+
+
+def test_generate_logrotate_conf_path_uses_cwd():
+    result = generate_logrotate_conf("/custom/path", ["logs/camera*.log"])
+    assert "/custom/path/logs/camera*.log" in result

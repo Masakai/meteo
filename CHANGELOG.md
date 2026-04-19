@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-04-19
+### Added
+- `generate_compose.py` — `generate_logrotate_conf()` 関数を新規追加。ログファイルの日次ローテーション・90日保持・圧縮設定を生成する純粋関数。
+- `generate_compose.py` — `main()` で `logrotate.conf` を自動生成するようになった。生成後に `cron` 設定例を標準出力に表示する。
+
 ## [3.11.3] - 2026-04-19
 ### Fixed
 - `dashboard_templates.py` — 夜別検出統計グラフ（時間帯別）の凡例カラーがカメラ全体のインデックスではなく `hourly.cameras` 内のインデックスで決まっていたバグを修正。`renderHourlyChart` に `cameras` 配列を渡し、`cameras.indexOf(cam)` でカメラ名からグローバルインデックスを取得するよう変更。
