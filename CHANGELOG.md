@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.13.0] - 2026-04-20
+### Added
+- `dashboard_templates.py` — 検出一覧で同一カメラ・同一時刻の検出を一括連動選択する機能を追加。チェックボックスに `data-camera` / `data-time` 属性を付与し、`toggleSelectItem` に連動選択ロジックを追加。
+
+### Security
+- `dashboard_templates.py` — HTML 属性値内の `"` を `&quot;` にエスケープし、XSS リスクを排除。
+
 ## [3.12.0] - 2026-04-19
 ### Added
 - `generate_compose.py` — `generate_logrotate_conf()` 関数を新規追加。ログファイルの日次ローテーション・90日保持・圧縮設定を生成する純粋関数。

@@ -3137,6 +3137,25 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             }} else {{
                 selectedDetectionIds.delete(key);
             }}
+            // 同一カメラ・同一時刻の検出を連動選択
+            const cb = document.querySelector(`.detection-select-cb[data-key="${{CSS.escape(key)}}"]`);
+            if (cb) {{
+                const camera = cb.dataset.camera;
+                const time = cb.dataset.time;
+                if (camera && time) {{
+                    document.querySelectorAll(`.detection-select-cb[data-camera="${{CSS.escape(camera)}}"][data-time="${{CSS.escape(time)}}"]`).forEach(otherCb => {{
+                        if (otherCb.dataset.key === key) return;
+                        otherCb.checked = checked;
+                        const otherKey = otherCb.dataset.key;
+                        if (checked) {{
+                            selectedDetectionIds.add(otherKey);
+                        }} else {{
+                            selectedDetectionIds.delete(otherKey);
+                        }}
+                        otherCb.closest('.detection-item')?.classList.toggle('sel-selected', checked);
+                    }});
+                }}
+            }}
             updateSelectDeleteButton();
         }}
 
@@ -3554,7 +3573,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                                 <button class="delete-btn" style="${{normalizedLabel === 'detected' ? 'display:none' : ''}}" onclick="deleteDetection('${{cameraKey}}', '${{d.id}}', '${{d.time}}', event)">削除</button>
                             </div>
                 `;
-                const cbHtml = `<input type="checkbox" class="detection-select-cb" data-key="${{selKey}}" ${{isSelected ? 'checked' : ''}}
+                const cbHtml = `<input type="checkbox" class="detection-select-cb" data-key="${{selKey}}" data-camera="${{d.camera.replace(/"/g, '&quot;')}}" data-time="${{d.time.replace(/"/g, '&quot;')}}" ${{isSelected ? 'checked' : ''}}
                            onchange="toggleSelectItem('${{selKey}}', this.checked); this.closest('.detection-item').classList.toggle('sel-selected', this.checked)">`;
                 const bodyContent = `
                         <div class="time">${{d.time}} | ${{cameraLabel}}</div>
