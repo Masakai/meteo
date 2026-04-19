@@ -64,7 +64,7 @@ Licensed under the MIT License
 ここでは「画面上で何を測っているか」を図で示します。
 
 ```mermaid
-flowchart LR
+graph LR
     A["差分で見つかった発光部分<br/>輪郭 contour"] --> B["重心 centroid"]
     A --> C["面積 area"]
     B --> D["時系列で連結"]
@@ -107,7 +107,7 @@ MP4検出では以下のパラメータを直接調整できます。
 どちらも幾何量ではありませんが、どの発光部分を候補として形状計測の対象にするかを決めます。
 
 ```mermaid
-flowchart LR
+graph LR
     A["前フレーム"] --> C["フレーム差分"]
     B["現在フレーム"] --> C
     C --> D["明るく変化した画素だけ残す"]
@@ -126,7 +126,7 @@ flowchart LR
 1 フレーム内で見えた発光部分の大きさです。コード上では輪郭面積 `cv2.contourArea(contour)` を使っています。
 
 ```mermaid
-flowchart LR
+graph LR
     subgraph F1["小さい面積"]
         A1[".."]
     end
@@ -155,7 +155,7 @@ flowchart LR
 `length` は軌跡の始点と終点の直線距離、`speed` はその距離を継続フレーム数または継続時間で割ったものです。
 
 ```mermaid
-flowchart LR
+graph LR
     A["始点"] -->|"length"| B["終点"]
     C["frame 10"] --> D["frame 11"]
     D --> E["frame 12"]
@@ -168,7 +168,7 @@ flowchart LR
 ```
 
 ```mermaid
-flowchart LR
+graph LR
     S1["短い軌跡<br/>start ----- end"] --> T1["min_length を下げると通しやすい"]
     S2["長い軌跡<br/>start --------------- end"] --> T2["長い流星はそのまま通りやすい"]
     S3["同じ長さで長時間"] --> T3["speed は低くなる"]
@@ -210,7 +210,7 @@ RTSP版は CLI から調整できる項目が限定されています。
 `--scale` は「どの解像度で検出処理するか」を決めます。大きいほど細い流星に有利ですが、CPU負荷は増えます。
 
 ```mermaid
-flowchart LR
+graph LR
     S1["元画像 1920x1080"] --> S2["scale 0.5<br/>960x540 で検出"]
     S1 --> S3["scale 1.0<br/>1920x1080 で検出"]
     S2 --> S4["高速<br/>細い線は潰れやすい"]
@@ -225,7 +225,7 @@ flowchart LR
 これらは「検出対象に含める画面領域」を変えます。
 
 ```mermaid
-flowchart LR
+graph LR
     A["画面上端"] --> B["検出対象"]
     B --> C["検出対象"]
     C --> D["検出対象"]
@@ -247,7 +247,7 @@ flowchart LR
 追跡中の物体について、前回の重心位置と今回の重心位置がどれくらい離れていても同一物体とみなすか、という距離です。
 
 ```mermaid
-flowchart LR
+graph LR
     A["前フレームの重心"] -->|"近い移動"| B["次フレームの重心"]
     A -->|"遠すぎる移動"| C["別物体として新規トラック"]
     D["許容半径 = max_distance"] --> A
@@ -292,7 +292,7 @@ RTSP版には以下の抑制が追加されています。
 ノイズ帯マスクと候補輪郭の面積がどれだけ重なっているかの比率です。
 
 ```mermaid
-flowchart LR
+graph LR
     A["候補輪郭"] --> C["重なり面積 / 候補面積"]
     B["ノイズ帯マスク"] --> C
     C --> D["overlap_ratio"]
@@ -312,7 +312,7 @@ flowchart LR
 軌跡点が一直線に並んでいる度合いです。1.0 に近いほど直線的です。
 
 ```mermaid
-flowchart LR
+graph LR
     A["ほぼ一直線の点列<br/>o----o----o----o"] --> B["linearity が高い"]
     C["曲がる点列<br/>o---o<br/>   \\<br/>    o---o"] --> D["linearity が低い"]
 

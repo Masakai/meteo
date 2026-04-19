@@ -241,7 +241,7 @@ class RealtimeMeteorDetector:
 #### 検出アルゴリズムフロー
 
 ```mermaid
-flowchart TD
+graph TD
     Start["フレーム取得<br/>(gray, prev_gray)"]
     Diff["差分計算<br/>cv2.absdiff()"]
     Thresh["二値化<br/>threshold > 30"]
@@ -512,7 +512,7 @@ class MeteorEvent:
 #### 処理フロー
 
 ```mermaid
-flowchart TD
+graph TD
     Start["スレッド開始"]
     Init["初期化<br/>RingBuffer, Detector"]
 

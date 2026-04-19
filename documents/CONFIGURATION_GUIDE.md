@@ -792,7 +792,7 @@ min_linearity = 0.6  # 多少曲がってもOK
 ### 推奨設定
 
 ```mermaid
-flowchart TD
+graph TD
     Start["ハードウェア性能"]
     CheckCPU{"CPUコア数"}
     CheckMem{"メモリ容量"}

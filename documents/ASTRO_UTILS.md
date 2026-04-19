@@ -101,7 +101,7 @@ def get_detection_window(
 
 **動作**:
 ```mermaid
-flowchart TD
+graph TD
     Start["関数呼び出し"]
     GetNow["現在時刻を取得<br/>(指定タイムゾーン)"]
     CalcSun["太陽情報を計算<br/>- 昨日<br/>- 今日<br/>- 明日"]
@@ -176,7 +176,7 @@ def is_detection_active(
 
 **動作**:
 ```mermaid
-flowchart TD
+graph TD
     Start["関数呼び出し"]
     GetWindow["get_detection_window()を呼び出し"]
     GetNow["現在時刻を取得"]

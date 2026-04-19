@@ -42,7 +42,7 @@ Licensed under the MIT License
 ### 基本フロー
 
 ```mermaid
-flowchart TD
+graph TD
     Start["システム起動"]
     Check1{"streamersファイル<br/>存在確認"}
     Generate["docker-compose.yml<br/>生成"]
@@ -856,7 +856,7 @@ find ./detections -path "*/manual_recordings/*" -mtime +7 -delete
 ### トラブルシューティングフロー
 
 ```mermaid
-flowchart TD
+graph TD
     Start["問題発生"]
     CheckContainer{"コンテナが<br/>起動している？"}
     CheckLogs["ログを確認"]

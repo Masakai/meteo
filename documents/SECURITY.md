@@ -709,7 +709,7 @@ docker compose logs dashboard | grep -v "127.0.0.1"
 ### インシデント発生時の対応
 
 ```mermaid
-flowchart TD
+graph TD
     Detect["不正アクセス検知"]
     Stop["システム停止"]
     Preserve["ログ保全"]
