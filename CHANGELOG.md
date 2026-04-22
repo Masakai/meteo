@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.14.0] - 2026-04-22
+### Added
+- `dashboard_routes.py` — `compute_nightly_stats()` の各夜の辞書に `night_hours`（日没〜日の出の時間数、小数2桁）フィールドを追加。
+- `dashboard_templates.py` — 統計テーブルに「観測時間」（日没〜日の出の時間数）と「検出/時」（時間あたり検出数）列を追加。
+- `tests/test_stats.py` — `night_hours` フィールドの計算値・精度を検証するテストを2件追加。
+- `documents/API_REFERENCE.md` — `GET /stats_data` レスポンスの `nights` 配列要素に `night_hours` フィールドを追記。
+
+### Changed
+- `dashboard_templates.py` — カメラ列クリーンアップ処理をクラスベースのセレクタに改善。
+
 ## [3.13.1] - 2026-04-20
 ### Fixed
 - `dashboard_templates.py` — 統計グラフ（夜別）の凡例に `traceorder: 'normal'` を追加し、West→East の逆順表示を修正。

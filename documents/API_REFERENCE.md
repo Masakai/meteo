@@ -1284,7 +1284,8 @@ http://localhost:8080/stats
         "West": 2
       },
       "duplicates": 2,
-      "ongoing": false
+      "ongoing": false,
+      "night_hours": 10.83
     }
   ],
   "cameras": ["East", "South", "West"],
@@ -1309,6 +1310,7 @@ http://localhost:8080/stats
 | `nights[].by_camera` | カメラ表示名ごとの検出数 |
 | `nights[].duplicates` | 重複として除去した件数 |
 | `nights[].ongoing` | 現在進行中の夜（日の出前）の場合 true |
+| `nights[].night_hours` | 日没から日の出までの時間数（時間単位・小数2桁） |
 | `cameras` | カメラ表示名一覧 |
 | `total_events` | 全期間の流星総数（重複除去後） |
 | `hourly` | 時間帯別集計（集計期間全体の合算） |

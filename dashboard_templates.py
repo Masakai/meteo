@@ -323,6 +323,8 @@ def render_stats_html(version):
                     <th>日没</th>
                     <th>日の出</th>
                     <th id="th-total">合計</th>
+                    <th>観測時間</th>
+                    <th>検出/時</th>
                 </tr>
             </thead>
             <tbody id="stats-tbody"></tbody>
@@ -359,15 +361,13 @@ def render_stats_html(version):
 
             // ヘッダー更新
             const theadRow = document.getElementById('stats-thead-row');
-            // カメラ列を再構築
-            const fixedCols = 4; // 夜・日没・日の出・合計
-            while (theadRow.children.length > fixedCols) {{
-                theadRow.removeChild(theadRow.children[fixedCols - 1]);
-            }}
+            // 以前挿入したカメラ列を除去
+            theadRow.querySelectorAll('.camera-col').forEach(el => el.remove());
             // 合計の前にカメラ列を挿入
             const thTotal = document.getElementById('th-total');
             cameras.forEach(cam => {{
                 const th = document.createElement('th');
+                th.className = 'camera-col';
                 th.textContent = cam;
                 theadRow.insertBefore(th, thTotal);
             }});
@@ -410,6 +410,25 @@ def render_stats_html(version):
                 tdTotal.className = 'count-total';
                 tdTotal.textContent = night.total;
                 tr.appendChild(tdTotal);
+
+                const nh = night.night_hours || 0;
+                const tdHours = document.createElement('td');
+                if (nh > 0) {{
+                    const hrs = Math.floor(nh);
+                    const mins = Math.round((nh - hrs) * 60);
+                    tdHours.textContent = hrs + 'h' + String(mins).padStart(2, '0') + 'm';
+                }} else {{
+                    tdHours.textContent = '';
+                }}
+                tr.appendChild(tdHours);
+
+                const tdRate = document.createElement('td');
+                if (nh > 0) {{
+                    tdRate.textContent = (night.total / nh).toFixed(1);
+                }} else {{
+                    tdRate.textContent = '';
+                }}
+                tr.appendChild(tdRate);
 
                 tbody.appendChild(tr);
             }});

@@ -1406,11 +1406,13 @@ def compute_nightly_stats(db_path, camera_display_names, days=30):
                 by_camera[display] = 1
 
         total_events += unique_count
+        night_hours = (sunrise - sunset).total_seconds() / 3600
 
         nights.append({
             "date": target_date.isoformat(),
             "sunset": sunset.astimezone(tz).strftime("%Y-%m-%d %H:%M"),
             "sunrise": sunrise.astimezone(tz).strftime("%Y-%m-%d %H:%M"),
+            "night_hours": round(night_hours, 2),
             "total": unique_count,
             "by_camera": by_camera,
             "duplicates": duplicates,

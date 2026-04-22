@@ -146,6 +146,20 @@ class TestComputeNightlyStats:
         result = self._run([[]])
         assert set(result["cameras"]) == {"East", "South"}
 
+    def test_night_hours_present(self):
+        """各夜に night_hours（日没〜日の出の時間数）が含まれる"""
+        result = self._run([[]])
+        night = result["nights"][0]
+        assert "night_hours" in night
+        assert night["night_hours"] == 11.0
+
+    def test_night_hours_multiple_nights(self):
+        """複数夜すべてに night_hours が含まれる"""
+        result = self._run([[], []], days=2)
+        for night in result["nights"]:
+            assert "night_hours" in night
+            assert night["night_hours"] == 11.0
+
     def test_astro_utils_unavailable(self, monkeypatch):
         """_get_detection_window_for_date が None の場合は nights が空"""
         monkeypatch.setattr(dr, "_get_detection_window_for_date", None)
