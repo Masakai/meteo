@@ -459,17 +459,19 @@ def render_stats_html(version):
             }}));
 
             const totals = sorted.map(n => n.total != null ? n.total : cameras.reduce((s, cam) => s + ((n.by_camera && n.by_camera[cam]) || 0), 0));
-            const annotations = dates.map((date, i) => totals[i] > 0 ? {{
-                x: date,
-                xref: 'x',
-                y: 1.04,
-                yref: 'paper',
-                text: String(totals[i]),
-                showarrow: false,
-                font: {{ size: 11, color: '#4e6880' }},
-                xanchor: 'center',
-                yanchor: 'bottom',
-            }} : null).filter(a => a !== null);
+            traces.push({{
+                x: dates,
+                y: totals,
+                text: totals.map(v => v > 0 ? String(v) : ''),
+                textposition: 'outside',
+                textfont: {{ size: 11, color: '#4e6880' }},
+                cliponaxis: false,
+                type: 'bar',
+                marker: {{ color: 'rgba(0,0,0,0)' }},
+                hoverinfo: 'skip',
+                showlegend: false,
+                name: '_total',
+            }});
 
             const layout = {{
                 barmode: 'stack',
@@ -491,7 +493,6 @@ def render_stats_html(version):
                     tickmode: 'auto',
                     tickformat: 'd',
                 }},
-                annotations: annotations,
                 legend: {{ orientation: 'h', x: 0, y: 1.12, traceorder: 'normal' }},
                 margin: {{ t: 40, b: 80, l: 50, r: 20 }},
                 height: 280,

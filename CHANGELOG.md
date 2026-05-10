@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.4] - 2026-05-10
+### Fixed
+- `dashboard_templates.py` — 夜別検出数グラフの合計値ラベルを透明trace + `cliponaxis: false` 方式に変更。各棒の上端から一定オフセットの位置にラベルが表示されるようになった。
+
 ## [3.15.3] - 2026-05-10
 ### Fixed
 - `dashboard_templates.py` — 夜別検出数グラフの合計値ラベルを透明trace方式からannotations方式（`yref: 'paper'` 固定位置）に変更。データ値に関わらず常にグラフ上部の固定位置に表示されるようになった。
