@@ -458,6 +458,20 @@ def render_stats_html(version):
                 marker: {{ color: CAMERA_COLORS[i % CAMERA_COLORS.length] }},
             }}));
 
+            const totals = sorted.map(n => n.total != null ? n.total : cameras.reduce((s, cam) => s + ((n.by_camera && n.by_camera[cam]) || 0), 0));
+            traces.push({{
+                x: dates,
+                y: totals,
+                text: totals.map(v => v > 0 ? String(v) : ''),
+                textposition: 'outside',
+                textfont: {{ size: 11, color: '#4e6880' }},
+                type: 'bar',
+                marker: {{ color: 'rgba(0,0,0,0)' }},
+                hoverinfo: 'skip',
+                showlegend: false,
+                name: '_total',
+            }});
+
             const layout = {{
                 barmode: 'stack',
                 autosize: true,
@@ -475,10 +489,12 @@ def render_stats_html(version):
                     title: '検出数',
                     gridcolor: '#d8e4ef',
                     linecolor: '#d8e4ef',
+                    tickmode: 'linear',
+                    tickformat: 'd',
                     dtick: 1,
                 }},
                 legend: {{ orientation: 'h', x: 0, y: 1.12, traceorder: 'normal' }},
-                margin: {{ t: 40, b: 80, l: 50, r: 20 }},
+                margin: {{ t: 50, b: 80, l: 50, r: 20 }},
                 height: 280,
             }};
 
@@ -516,6 +532,8 @@ def render_stats_html(version):
                     title: '検出数',
                     gridcolor: '#d8e4ef',
                     linecolor: '#d8e4ef',
+                    tickmode: 'linear',
+                    tickformat: 'd',
                     dtick: 1,
                 }},
                 legend: {{ orientation: 'h', x: 0, y: 1.12 }},

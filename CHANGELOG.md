@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.1] - 2026-05-10
+### Fixed
+- `dashboard_templates.py` — 統計グラフ縦軸を整数のみ・1刻み表示に修正（`tickmode: 'linear'` + `tickformat: 'd'` + `dtick: 1`、夜別・時間帯別両グラフ）。
+
+### Changed
+- `dashboard_templates.py` — 夜別検出数グラフの積み上げ棒上部に合計値を表示（透明trace方式、`hoverinfo: 'skip'`）。
+
 ## [3.15.0] - 2026-05-10
 ### Added
 - `dashboard_templates.py` — 統計期間選択に「7夜」ボタンを先頭に追加。
