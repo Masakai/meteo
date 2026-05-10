@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.2] - 2026-05-10
+### Fixed
+- `dashboard_templates.py` — 統計グラフ縦軸を自動スケール（`tickmode: 'auto'` + `tickformat: 'd'`）に変更し、データが少ない場合に縦軸ラベルが詰まる問題を修正（夜別・時間帯別両グラフ）。
+
 ## [3.15.1] - 2026-05-10
 ### Fixed
 - `dashboard_templates.py` — 統計グラフ縦軸を整数のみ・1刻み表示に修正（`tickmode: 'linear'` + `tickformat: 'd'` + `dtick: 1`、夜別・時間帯別両グラフ）。
