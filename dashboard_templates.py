@@ -461,7 +461,7 @@ def render_stats_html(version):
             const totals = sorted.map(n => n.total != null ? n.total : cameras.reduce((s, cam) => s + ((n.by_camera && n.by_camera[cam]) || 0), 0));
             traces.push({{
                 x: dates,
-                y: totals,
+                y: totals.map(v => v > 0 ? 4 : 0),
                 text: totals.map(v => v > 0 ? String(v) : ''),
                 textposition: 'outside',
                 textfont: {{ size: 11, color: '#4e6880' }},
