@@ -300,7 +300,8 @@ def render_stats_html(version):
     </div>
 
     <div class="stats-controls">
-        <button class="range-btn active" data-days="30" onclick="loadStats(30, this)">30夜</button>
+        <button class="range-btn active" data-days="7" onclick="loadStats(7, this)">7夜</button>
+        <button class="range-btn" data-days="30" onclick="loadStats(30, this)">30夜</button>
         <button class="range-btn" data-days="90" onclick="loadStats(90, this)">90夜</button>
         <button class="range-btn" data-days="180" onclick="loadStats(180, this)">180夜</button>
         <button class="range-btn" data-days="365" onclick="loadStats(365, this)">1年</button>
@@ -336,7 +337,7 @@ def render_stats_html(version):
     </div>
 
     <script>
-        let _currentDays = 30;
+        let _currentDays = 7;
 
         function loadStats(days, btn) {{
             _currentDays = days;
@@ -527,7 +528,7 @@ def render_stats_html(version):
             document.getElementById('hourly-chart-wrap').style.display = '';
         }}
 
-        loadStats(30, document.querySelector('.range-btn[data-days="30"]'));
+        loadStats(7, document.querySelector('.range-btn[data-days="7"]'));
     </script>
     </main>
 </body>

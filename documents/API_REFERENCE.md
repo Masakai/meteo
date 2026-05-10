@@ -27,6 +27,11 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.15.0 - 統計ビューに7夜ボタン追加・デフォルト期間変更
+
+- **追加**: `dashboard_templates.py` — 統計期間選択に「7夜」ボタンを先頭に追加
+- **変更**: `dashboard_templates.py` — 統計ビューのデフォルト表示期間を30夜から7夜に変更
+
 ### v3.12.0 - logrotate.conf 自動生成機能追加
 
 - **追加**: `generate_compose.py` — `generate_logrotate_conf()` 関数を新規追加。日次ローテーション・90日保持・圧縮設定（`compress` / `delaycompress` / `copytruncate`）を生成する純粋関数
@@ -1244,6 +1249,7 @@ curl http://localhost:8080/changelog
 
 **説明**: カメラ別・夜別（日没〜翌日の日の出）の流星統計を表示するHTMLページ。
 ナビゲーションバーの「統計」タブから遷移する。データは `/stats_data` から非同期取得する。
+初期表示は過去7夜分のデータ（ページロード時に `days=7` で `/stats_data` を呼び出す）。
 
 **レスポンス**:
 - Content-Type: `text/html; charset=utf-8`

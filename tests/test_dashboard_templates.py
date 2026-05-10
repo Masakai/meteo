@@ -1,4 +1,4 @@
-from dashboard_templates import render_dashboard_html
+from dashboard_templates import render_dashboard_html, render_stats_html
 
 
 def test_render_dashboard_uses_server_side_monitoring_ui():
@@ -147,3 +147,27 @@ def test_render_dashboard_detection_view_supports_manual_recordings():
     assert "種別: 手動録画" in html
     assert "deleteManualRecording" in html
     assert "プレビュー" in html
+
+
+def test_render_stats_html_default_active_button_is_7_days():
+    html = render_stats_html("0.0.0")
+    assert 'class="range-btn active" data-days="7"' in html
+
+
+def test_render_stats_html_initial_current_days_is_7():
+    html = render_stats_html("0.0.0")
+    assert "let _currentDays = 7;" in html
+
+
+def test_render_stats_html_initial_load_call_uses_7_days():
+    html = render_stats_html("0.0.0")
+    assert 'loadStats(7, document.querySelector(\'.range-btn[data-days="7"]\'))' in html
+
+
+def test_render_stats_html_has_five_range_buttons():
+    html = render_stats_html("0.0.0")
+    assert "7夜" in html
+    assert "30夜" in html
+    assert "90夜" in html
+    assert "180夜" in html
+    assert "1年" in html

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.0] - 2026-05-10
+### Added
+- `dashboard_templates.py` — 統計期間選択に「7夜」ボタンを先頭に追加。
+- `tests/test_dashboard_templates.py` — `render_stats_html` の表示・デフォルト動作を検証するテストを4件追加。
+- `documents/API_REFERENCE.md` — `/stats` エンドポイントの説明に初期表示7夜（`days=7` で `/stats_data` を呼び出す）の旨を追記。
+
+### Changed
+- `dashboard_templates.py` — 統計ビューのデフォルト表示期間を30夜から7夜に変更。
+
 ## [3.14.0] - 2026-04-22
 ### Added
 - `dashboard_routes.py` — `compute_nightly_stats()` の各夜の辞書に `night_hours`（日没〜日の出の時間数、小数2桁）フィールドを追加。
