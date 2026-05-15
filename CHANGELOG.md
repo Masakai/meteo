@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.6] - 2026-05-15
+### Fixed
+- `meteor_detector_rtsp_web.py` — 再起動後に永続マスク（`/output/masks/<camera>_mask.png`）が `MASK_IMAGE` 環境変数のマスクで上書きされてしまうバグを修正。永続マスクが存在する場合は常に優先して読み込むよう変更した。
+
 ## [3.15.5] - 2026-05-10
 ### Fixed
 - `dashboard_templates.py` — 夜別検出数グラフの合計値ラベル表示で透明traceのy値を合計値から固定値4に変更。棒の上端から常に一定距離の位置にラベルが表示されるようになった。

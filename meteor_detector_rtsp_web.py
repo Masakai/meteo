@@ -117,7 +117,7 @@ def detection_thread_worker(  # pragma: no cover
     persistent_mask_path = None
     if output_path:
         persistent_mask_path = Path(output_path) / "masks" / f"{_storage_camera_name(state.camera_name)}_mask.png"
-        if mask_image is None and persistent_mask_path.exists():
+        if persistent_mask_path.exists():
             mask_image = str(persistent_mask_path)
     if mask_image:
         mask_img = cv2.imread(mask_image, cv2.IMREAD_GRAYSCALE)
