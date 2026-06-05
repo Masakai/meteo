@@ -406,15 +406,19 @@ def generate_go2rtc_config(cameras: list, settings: dict | None = None) -> str:
     ]
     candidate_host = str(settings.get("go2rtc_candidate_host", "")).strip()
     candidate_port = int(settings.get("go2rtc_webrtc_port", 8555))
+    webrtc_lines = [
+        "",
+        "webrtc:",
+        f"  listen: \":{candidate_port}\"",
+    ]
     if candidate_host:
-        lines.extend(
+        webrtc_lines.extend(
             [
-                "",
-                "webrtc:",
                 "  candidates:",
                 f"    - {candidate_host}:{candidate_port}",
             ]
         )
+    lines.extend(webrtc_lines)
     lines.extend(["", "streams:"])
     youtube_cameras = []
     for i, cam in enumerate(cameras, 1):
