@@ -193,9 +193,7 @@ def create_app() -> Flask:
 
     @app.get("/detections_mtime")
     def detections_mtime() -> Response:
-        snapshot = routes.get_detection_cache_snapshot()
-        response = jsonify({"mtime": snapshot["mtime"]})
-        return _apply_no_cache_headers(response)
+        return _dispatch(routes.handle_detections_mtime, path="/detections_mtime")
 
     @app.get("/dashboard_stats")
     def dashboard_stats() -> Response:

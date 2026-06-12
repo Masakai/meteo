@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.15.7] - 2026-06-13
+### Fixed
+- `dashboard.py` — `/detections_mtime` エンドポイントが常に HTTP 500（`KeyError: 'mtime'`）を返していたバグを修正。Flask ルートが `get_detection_cache_snapshot()` の返り値に存在しない `mtime` キーを参照していたため。既存の `handle_detections_mtime`（`detections.db` の更新時刻を返す正しい実装）へ `_dispatch` で委譲するよう変更した。この 500 によりフロント側の更新ポーリングが毎回 `SyntaxError`（500 の HTML を `r.json()` でパース）で失敗し、バックオフでポーリング間隔が最大 30 秒まで伸び続け、検出一覧・動画の更新が「だんだん遅くなる」症状を引き起こしていた。
+
 ## [3.15.6] - 2026-05-15
 ### Fixed
 - `meteor_detector_rtsp_web.py` — 再起動後に永続マスク（`/output/masks/<camera>_mask.png`）が `MASK_IMAGE` 環境変数のマスクで上書きされてしまうバグを修正。永続マスクが存在する場合は常に優先して読み込むよう変更した。
