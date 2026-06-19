@@ -388,6 +388,224 @@ def test_handle_camera_settings_apply_all(monkeypatch):
     assert payload["applied_count"] == 1
 
 
+def test_handle_camera_settings_current_includes_per_camera_process_min_dim(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        return _DummyResponse(b'{"settings":{"diff_threshold":20},"process_min_dim":540}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    handler = _DummyHandler("/camera_settings/current")
+    assert dr.handle_camera_settings_current(handler) is True
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    # 各 results[i] にカメラ別 process_min_dim が含まれること
+    assert payload["results"][0]["process_min_dim"] == 540
+
+
+def test_handle_camera_settings_apply_one_success(monkeypatch):
+    monkeypatch.setattr(
+        dr,
+        "CAMERAS",
+        [
+            {"name": "cam1", "url": "http://localhost:8081"},
+            {"name": "cam2", "url": "http://localhost:8082"},
+        ],
+    )
+
+    calls = []
+
+    def _fake_urlopen(req, timeout=0):
+        calls.append(req.full_url)
+        assert req.full_url.endswith("/apply_settings")
+        assert req.get_method() == "POST"
+        return _DummyResponse(b'{"success": true, "applied": {"diff_threshold": 20}}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps({"camera": "cam1", "settings": {"diff_threshold": 20}}).encode("utf-8")
+    handler = _DummyHandler(
+        "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+    )
+    assert dr.handle_camera_settings_apply_one(handler) is True
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["camera"] == "cam1"
+    assert payload["applied_count"] == 1
+    assert payload["total"] == 1
+    # 対象カメラ1台にのみ中継されること
+    assert len(calls) == 1
+
+
+def test_handle_camera_settings_apply_one_does_not_touch_others(monkeypatch):
+    monkeypatch.setattr(
+        dr,
+        "CAMERAS",
+        [
+            {"name": "cam1", "url": "http://localhost:8081"},
+            {"name": "cam2", "url": "http://localhost:8082"},
+        ],
+    )
+
+    calls = []
+
+    def _fake_urlopen(req, timeout=0):
+        calls.append(req.full_url)
+        return _DummyResponse(b'{"success": true}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps({"camera": "cam2", "settings": {"min_brightness": 180}}).encode("utf-8")
+    handler = _DummyHandler(
+        "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+    )
+    assert dr.handle_camera_settings_apply_one(handler) is True
+    # cam2(index=1) のURLにのみアクセスし、cam1には触れないこと
+    assert len(calls) == 1
+    assert "camera2" in calls[0] or "8082" in calls[0]
+
+
+def test_handle_camera_settings_apply_one_invalid_camera(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        raise AssertionError("存在しないカメラでは中継してはならない")
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps({"camera": "nonexistent", "settings": {"diff_threshold": 20}}).encode("utf-8")
+    handler = _DummyHandler(
+        "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+    )
+    assert dr.handle_camera_settings_apply_one(handler) is True
+    assert handler.status == 400
+
+
+def test_handle_camera_settings_apply_one_missing_settings(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        raise AssertionError("settings欠落では中継してはならない")
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps({"camera": "cam1"}).encode("utf-8")
+    handler = _DummyHandler(
+        "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+    )
+    assert dr.handle_camera_settings_apply_one(handler) is True
+    assert handler.status == 400
+
+
+def test_handle_camera_settings_apply_one_invalid_json(monkeypatch):
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+    monkeypatch.setattr(dr, "urlopen", lambda *a, **k: None)
+    handler = _DummyHandler(
+        "/camera_settings/apply_one", body=b"{ broken json", headers={"Content-Type": "application/json"}
+    )
+    assert dr.handle_camera_settings_apply_one(handler) is True
+    assert handler.status == 400
+
+
+def test_handle_camera_settings_apply_one_by_index(monkeypatch):
+    """camera_index（整数）経由で対象カメラを解決できること"""
+    monkeypatch.setattr(
+        dr,
+        "CAMERAS",
+        [
+            {"name": "cam1", "url": "http://localhost:8081"},
+            {"name": "cam2", "url": "http://localhost:8082"},
+        ],
+    )
+
+    calls = []
+
+    def _fake_urlopen(req, timeout=0):
+        calls.append(req.full_url)
+        return _DummyResponse(b'{"success": true}')
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    body = json.dumps({"camera_index": 1, "settings": {"diff_threshold": 20}}).encode("utf-8")
+    handler = _DummyHandler(
+        "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+    )
+    assert dr.handle_camera_settings_apply_one(handler) is True
+    payload = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert payload["success"] is True
+    assert payload["camera"] == "cam2"
+    assert len(calls) == 1
+
+
+def test_handle_camera_settings_apply_one_rejects_bool_index(monkeypatch):
+    """camera_index に真偽値を渡しても int として誤解釈せず400を返すこと"""
+    monkeypatch.setattr(
+        dr,
+        "CAMERAS",
+        [
+            {"name": "cam1", "url": "http://localhost:8081"},
+            {"name": "cam2", "url": "http://localhost:8082"},
+        ],
+    )
+
+    def _fake_urlopen(req, timeout=0):
+        raise AssertionError("bool の camera_index では中継してはならない")
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    # True は int サブクラスとして 1 に解釈されうるため、明示除外を検証
+    body = json.dumps({"camera_index": True, "settings": {"diff_threshold": 20}}).encode("utf-8")
+    handler = _DummyHandler(
+        "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+    )
+    assert dr.handle_camera_settings_apply_one(handler) is True
+    assert handler.status == 400
+
+
+def test_handle_camera_settings_apply_one_index_out_of_range(monkeypatch):
+    """範囲外の camera_index は400を返し中継しないこと"""
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        raise AssertionError("範囲外indexでは中継してはならない")
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    for bad_index in (-1, 5):
+        body = json.dumps({"camera_index": bad_index, "settings": {"x": 1}}).encode("utf-8")
+        handler = _DummyHandler(
+            "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+        )
+        assert dr.handle_camera_settings_apply_one(handler) is True
+        assert handler.status == 400
+
+
+def test_handle_camera_settings_apply_one_empty_camera(monkeypatch):
+    """空文字 / null の camera は400を返すこと"""
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        raise AssertionError("空/null camera では中継してはならない")
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    for bad_camera in ("", None):
+        body = json.dumps({"camera": bad_camera, "settings": {"x": 1}}).encode("utf-8")
+        handler = _DummyHandler(
+            "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+        )
+        assert dr.handle_camera_settings_apply_one(handler) is True
+        assert handler.status == 400
+
+
+def test_handle_camera_settings_apply_one_settings_wrong_type(monkeypatch):
+    """settings が null / 配列など非objectの場合は400を返すこと"""
+    monkeypatch.setattr(dr, "CAMERAS", [{"name": "cam1", "url": "http://localhost:8081"}])
+
+    def _fake_urlopen(req, timeout=0):
+        raise AssertionError("非object settings では中継してはならない")
+
+    monkeypatch.setattr(dr, "urlopen", _fake_urlopen)
+    for bad_settings in (None, [1, 2], "x", 5):
+        body = json.dumps({"camera": "cam1", "settings": bad_settings}).encode("utf-8")
+        handler = _DummyHandler(
+            "/camera_settings/apply_one", body=body, headers={"Content-Type": "application/json"}
+        )
+        assert dr.handle_camera_settings_apply_one(handler) is True
+        assert handler.status == 400
+
+
 def test_handle_bulk_delete_non_meteor_success(monkeypatch, tmp_path, sqlite_db):
     monkeypatch.setattr(dr, "DETECTIONS_DIR", str(tmp_path))
     cam_dir = tmp_path / "camera1"

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.16.0] - 2026-06-19
+### Added
+- `dashboard.py` / `dashboard_routes.py` — 検出設定を特定の1カメラのみへ適用する新規エンドポイント `POST /camera_settings/apply_one` を追加。リクエスト形式は `{camera, settings}` で、対象カメラは内部名または `camera_index` で指定する。既存の全カメラ一括適用 `apply_all` は無変更で温存（後方互換）。
+- `dashboard_camera_handlers.py` — `handle_camera_settings_apply_one` を新設。対象カメラを線形解決し当該カメラのみへ設定を中継する。不正JSON・非object payload・カメラ解決不可・`settings` 非dict の各ケースは中継前に 400 を返し、対象外カメラへは到達しない。
+- `dashboard_templates_settings.py` — `/settings` 画面に「対象カメラ」ドロップダウンと「現在値を読み込む」ボタンを追加。`__all__` 選択時は `apply_all`、個別カメラ選択時は `apply_one` を呼ぶ。カメラ表示名・内部名は `html.escape`（value は `quote=True`）でXSS対策済み。
+- `tests/test_dashboard_routes.py` / `tests/test_dashboard_templates_settings.py` — `apply_one` の正常系・異常系、`current` の `process_min_dim`、ドロップダウン存在・XSSエスケープを検証するテストを追加。
+- `documents/API_REFERENCE.md` / `documents/ARCHITECTURE.md` / `documents/CONFIGURATION_GUIDE.md` — 個別適用エンドポイント・設定反映2経路・対象カメラ選択の推奨手順を追記。
+
+### Changed
+- `dashboard_camera_handlers.py` — `GET /camera_settings/current` のレスポンス `results[i]` に `process_min_dim` を追加（既存フィールドは無変更）。これにより個別カメラ選択時に当該カメラの `process_min_dim` を基準に `exclude_edge_ratio` のpx換算ができるようになり精度が向上した。
+
 ## [3.15.7] - 2026-06-13
 ### Fixed
 - `dashboard.py` — `/detections_mtime` エンドポイントが常に HTTP 500（`KeyError: 'mtime'`）を返していたバグを修正。Flask ルートが `get_detection_cache_snapshot()` の返り値に存在しない `mtime` キーを参照していたため。既存の `handle_detections_mtime`（`detections.db` の更新時刻を返す正しい実装）へ `_dispatch` で委譲するよう変更した。この 500 によりフロント側の更新ポーリングが毎回 `SyntaxError`（500 の HTML を `r.json()` でパース）で失敗し、バックオフでポーリング間隔が最大 30 秒まで伸び続け、検出一覧・動画の更新が「だんだん遅くなる」症状を引き起こしていた。

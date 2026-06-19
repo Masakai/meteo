@@ -1,6 +1,7 @@
 """Settings page HTML rendering."""
 
 import base64
+import html
 from pathlib import Path
 
 
@@ -11,6 +12,20 @@ def render_settings_html(cameras, version):
         logotype_bytes = logotype_path.read_bytes()
         logotype_src = "data:image/svg+xml;base64," + base64.b64encode(logotype_bytes).decode("ascii")
     brand_logo_html = f'<img src="{logotype_src}" alt="METEO">' if logotype_src else '<span class="brand-text">METEO</span>'
+
+    # 対象カメラ選択ドロップダウンのoptionを安全に組み立てる（XSS対策でラベル・valueをエスケープ）
+    camera_options = ['<option value="__all__">全カメラ</option>']
+    for cam in cameras:
+        internal_name = cam.get("name", "")
+        display_name = cam.get("display_name") or internal_name
+        if display_name and display_name != internal_name:
+            label = f"{display_name}（{internal_name}）"
+        else:
+            label = internal_name
+        camera_options.append(
+            f'<option value="{html.escape(internal_name, quote=True)}">{html.escape(label)}</option>'
+        )
+    camera_options_html = "\n            ".join(camera_options)
 
     return f'''<!DOCTYPE html>
 <html lang="ja">
@@ -243,14 +258,18 @@ def render_settings_html(cameras, version):
     </nav>
     <main>
     <div class="wrap">
-        <h1>全カメラ設定</h1>
-        <div class="sub">検出パラメータを一括適用します（対象: {len(cameras)} カメラ） / v{version}</div>
+        <h1>カメラ設定</h1>
+        <div class="sub" id="settings_sub">検出パラメータを一括適用します（対象: {len(cameras)} カメラ） / v{version}</div>
         <div class="toolbar">
             <a class="btn" href="/">ダッシュボードへ戻る</a>
             <a class="btn" href="/stats">統計</a>
-            <button class="btn" type="button" onclick="loadCurrent()">現在値を取得</button>
+            <label for="target_camera" style="align-self:center;">対象カメラ:</label>
+            <select id="target_camera" class="btn" onchange="onTargetChange()">
+            {camera_options_html}
+            </select>
+            <button class="btn" type="button" onclick="loadCurrent()">現在値を読み込む</button>
             <button class="btn" type="button" onclick="applyDefaults()">デフォルト値に戻す</button>
-            <button class="btn" type="button" onclick="applyAll()">全カメラに適用</button>
+            <button class="btn" id="apply_btn" type="button" onclick="applyTarget()">全カメラに適用</button>
         </div>
 
         <div class="panel">
@@ -617,7 +636,29 @@ def render_settings_html(cameras, version):
             return fallbackMessage;
         }}
 
+        function getTargetCamera() {{
+            const sel = document.getElementById('target_camera');
+            return sel ? sel.value : '__all__';
+        }}
+
+        // 対象カメラ変更時はフォームを自動上書きせず、ボタンラベル・説明文だけ更新する
+        function onTargetChange() {{
+            const target = getTargetCamera();
+            const btn = document.getElementById('apply_btn');
+            const sub = document.getElementById('settings_sub');
+            if (target === '__all__') {{
+                if (btn) btn.textContent = '全カメラに適用';
+                if (sub) sub.textContent = '検出パラメータを全カメラに一括適用します';
+            }} else {{
+                const sel = document.getElementById('target_camera');
+                const label = sel && sel.selectedOptions.length ? sel.selectedOptions[0].textContent : target;
+                if (btn) btn.textContent = label + ' に適用';
+                if (sub) sub.textContent = label + ' のみに適用します（他カメラは変化しません）。「現在値を読み込む」で対象カメラの設定を反映できます';
+            }}
+        }}
+
         async function loadCurrent() {{
+            const target = getTargetCamera();
             setStatus('現在値を取得中...');
             try {{
                 const res = await fetch('/camera_settings/current', {{ cache: 'no-store' }});
@@ -625,9 +666,22 @@ def render_settings_html(cameras, version):
                 if (!res.ok || data.success === false) {{
                     throw new Error(extractApiError(data, '現在値の取得に失敗しました'));
                 }}
-                if (data.process_min_dim > 0) processMinDim = data.process_min_dim;
-                fillForm(data.settings || {{}});
-                setStatus('現在値を取得しました');
+                let settings = data.settings || {{}};
+                let dim = data.process_min_dim || 0;
+                if (target !== '__all__' && Array.isArray(data.results)) {{
+                    const found = data.results.find((r) => r && r.camera === target);
+                    if (!found) {{
+                        throw new Error('対象カメラの設定が見つかりません: ' + target);
+                    }}
+                    if (found.success === false) {{
+                        throw new Error(found.error || (target + ' の現在値を取得できませんでした'));
+                    }}
+                    settings = found.settings || {{}};
+                    if (found.process_min_dim > 0) dim = found.process_min_dim;
+                }}
+                if (dim > 0) processMinDim = dim;
+                fillForm(settings);
+                setStatus('現在値を読み込みました' + (target === '__all__' ? '（全カメラ: 1台目基準）' : '（' + target + '）'));
             }} catch (e) {{
                 setStatus('取得失敗: ' + e);
             }}
@@ -636,6 +690,16 @@ def render_settings_html(cameras, version):
         function applyDefaults() {{
             fillForm(defaultSettings);
             setStatus('デフォルト値をフォームに反映しました（まだ適用していません）');
+        }}
+
+        // 対象カメラに応じて一括(apply_all)または個別(apply_one)へ振り分ける
+        async function applyTarget() {{
+            const target = getTargetCamera();
+            if (target === '__all__') {{
+                await applyAll();
+            }} else {{
+                await applyOne(target);
+            }}
         }}
 
         async function applyAll() {{
@@ -662,6 +726,29 @@ def render_settings_html(cameras, version):
             }}
         }}
 
+        async function applyOne(camera) {{
+            const payload = collectPayload();
+            setStatus(camera + ' へ適用中...');
+            try {{
+                const res = await fetch('/camera_settings/apply_one', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ camera: camera, settings: payload }}),
+                }});
+                const data = await res.json();
+                if (!res.ok || data.success === false) {{
+                    throw new Error(extractApiError(data, '設定適用に失敗しました'));
+                }}
+                alert(`反映完了: ${{camera}}`);
+                setStatus(
+                    '適用完了（' + camera + '）\\n' +
+                    JSON.stringify(data.results, null, 2)
+                );
+            }} catch (e) {{
+                setStatus('適用失敗: ' + e);
+            }}
+        }}
+
         fields.forEach((name) => {{
             const el = document.getElementById(name);
             if (!el) return;
@@ -673,6 +760,7 @@ def render_settings_html(cameras, version):
             el.addEventListener('change', () => updateFieldDiffState(name));
         }});
 
+        onTargetChange();
         loadCurrent();
     </script>
     </div>

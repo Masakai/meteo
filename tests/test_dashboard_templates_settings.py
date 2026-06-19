@@ -28,6 +28,37 @@ def test_render_settings_html_with_cameras():
     assert "2.0.0" in html
 
 
+def test_render_settings_html_has_target_camera_select():
+    """対象カメラ選択ドロップダウンと各カメラのoptionが出力されること"""
+    from dashboard_templates_settings import render_settings_html
+
+    cameras = [
+        {"name": "camera1", "url": "http://camera1:8080", "display_name": "北空"},
+        {"name": "camera2", "url": "http://camera2:8080"},
+    ]
+    html = render_settings_html(cameras=cameras, version="1.0.0")
+    assert 'id="target_camera"' in html
+    assert 'value="__all__"' in html
+    assert 'value="camera1"' in html
+    assert 'value="camera2"' in html
+    # 表示名が内部名と併記されること
+    assert "北空" in html
+    # 個別適用の経路が存在すること
+    assert "/camera_settings/apply_one" in html
+    assert "applyTarget" in html
+
+
+def test_render_settings_html_escapes_camera_label():
+    """カメラ表示名にHTML特殊文字が含まれてもエスケープされること（XSS対策）"""
+    from dashboard_templates_settings import render_settings_html
+
+    cameras = [{"name": "camera1", "url": "http://camera1:8080", "display_name": "<script>x</script>"}]
+    html = render_settings_html(cameras=cameras, version="1.0.0")
+    # 生の<script>タグとして出力されず、エスケープされていること
+    assert "<script>x</script>" not in html
+    assert "&lt;script&gt;" in html
+
+
 def test_render_settings_html_text_fallback_when_no_svg(tmp_path, monkeypatch):
     """SVGファイルが存在しない場合はテキストフォールバックが使われること"""
     import dashboard_templates_settings as mod

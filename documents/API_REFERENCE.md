@@ -27,6 +27,12 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.16.0 - カメラ個別検出設定
+
+- **新規エンドポイント**: `POST /camera_settings/apply_one` — 指定した 1 カメラのみに検出設定を適用（リクエスト形式 `{camera, settings}`）。既存の `apply_all`（全カメラ一括）と併存し後方互換。
+- **拡張**: `GET /camera_settings/current` のレスポンス `results[i]` に `process_min_dim` を追加（カメラ別の `exclude_edge_ratio` ピクセル換算用）。既存フィールドは無変更。
+- **UI**: `/settings` 画面に「対象カメラ」選択ドロップダウンと「現在値を読み込む」ボタンを追加。`__all__`（全カメラ）選択時は従来どおり `apply_all`、個別カメラ選択時は `apply_one` を呼ぶ。
+
 ### v3.15.0 - 統計ビューに7夜ボタン追加・デフォルト期間変更
 
 - **追加**: `dashboard_templates.py` — 統計期間選択に「7夜」ボタンを先頭に追加
@@ -272,6 +278,7 @@ Licensed under the MIT License
 | `/go2rtc_asset/{name}` | GET | go2rtc フロント資産プロキシ |
 | `/camera_settings/current` | GET | カメラ設定の現在値取得 |
 | `/camera_settings/apply_all` | POST | 設定を全カメラへ一括適用 |
+| `/camera_settings/apply_one` | POST | 設定を指定1カメラのみへ適用（v3.16.0+） |
 | `/camera_snapshot/{index}` | GET | カメラスナップショット取得（`?download=1` でDL） |
 | `/camera_recording_status/{index}` | GET | カメラ手動録画状態取得 |
 | `/camera_recording_schedule/{index}` | POST | カメラ手動録画の予約/即時開始 |
@@ -913,19 +920,23 @@ curl "http://localhost:8080/youtube_status/2" | jq
     "diff_threshold": 20,
     "nuisance_overlap_threshold": 0.6
   },
+  "process_min_dim": 540,
   "results": [
     {
       "camera": "camera1",
       "success": true,
       "settings": {
         "diff_threshold": 20
-      }
+      },
+      "process_min_dim": 540
     }
   ],
   "ok_count": 1,
   "total": 1
 }
 ```
+
+各 `results[i]` には `process_min_dim`（そのカメラの処理解像度 `min(幅, 高さ)`）が含まれる（v3.16.0+）。設定ページで `exclude_edge_ratio` をカメラごとに正確なピクセル値へ換算するために使う。トップレベルの `settings` / `process_min_dim` は従来どおり「1台目（先頭の取得成功カメラ）」の値で後方互換。
 
 **使用例**:
 ```bash
@@ -982,6 +993,65 @@ curl -s http://localhost:8080/camera_settings/current | jq
 curl -X POST "http://localhost:8080/camera_settings/apply_all" \
   -H "Content-Type: application/json" \
   -d '{"diff_threshold":20,"nuisance_overlap_threshold":0.60}' | jq
+```
+
+---
+
+### POST /camera_settings/apply_one
+
+**説明**（v3.16.0+）: 指定した **1 カメラのみ** に設定を適用する（対象カメラの `POST /apply_settings` のみを呼び出し、他カメラには影響しない）。カメラ交換時など、特定カメラだけパラメータを調整したい場合に使う。
+
+**リクエストボディ**:
+```json
+{
+  "camera": "camera1",
+  "settings": {
+    "diff_threshold": 20,
+    "min_brightness": 180,
+    "min_linearity": 0.8
+  }
+}
+```
+- `camera`: 対象カメラの **内部名**（`camera1`, `camera2`, ...）。後方互換のため `camera_index`（0 始まり整数）も受理する。
+- `settings`: 適用する検出パラメータ（`apply_all` のリクエストボディと同一スキーマ）。**ネスト必須**（`settings` キーの直下に並べる）。
+
+**バリデーション**:
+- `camera`（または `camera_index`）が存在しない / 範囲外 → 400
+- `settings` が欠落 / オブジェクトでない → 400
+- リクエストボディが不正な JSON → 400
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK（適用処理を実行した場合。中継先カメラの失敗は `results[].success=false` で表現）
+
+**レスポンスボディ（例）**:
+```json
+{
+  "success": true,
+  "camera": "camera1",
+  "applied_count": 1,
+  "total": 1,
+  "results": [
+    {
+      "camera": "camera1",
+      "success": true,
+      "response": {
+        "success": true,
+        "restart_required": true,
+        "restart_requested": true,
+        "restart_triggers": ["sensitivity", "scale"]
+      }
+    }
+  ]
+}
+```
+`results[]` 形式は `apply_all` と同一で、ダッシュボード UI のエラー抽出ロジックを共用できる。
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/camera_settings/apply_one" \
+  -H "Content-Type: application/json" \
+  -d '{"camera":"camera1","settings":{"min_brightness":180}}' | jq
 ```
 
 ---

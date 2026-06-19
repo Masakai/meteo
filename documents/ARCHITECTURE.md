@@ -416,11 +416,12 @@ HTTP エンドポイントの完全仕様は [API_REFERENCE.md](API_REFERENCE.md
 - 検出時間の最適化
 
 ### 6. 設定反映アーキテクチャ（再ビルド不要）
-- ダッシュボード `/settings` から全カメラへ一括設定を送信
-- ダッシュボードは各カメラの `POST /apply_settings` を呼び出し
+- ダッシュボード `/settings` から設定を送信。適用先は「全カメラ一括」または「特定 1 カメラ個別」を選択可能（個別はv3.16.0+）
+  - 一括: `POST /camera_settings/apply_all` → ダッシュボードが全カメラの `POST /apply_settings` をループ呼び出し
+  - 個別: `POST /camera_settings/apply_one`（`{camera, settings}`）→ 対象 1 カメラの `POST /apply_settings` のみ呼び出し（他カメラは不変）
 - 即時反映可能項目はその場で更新
 - `sensitivity` / `scale` / `buffer` など起動時依存項目は自動再起動で反映
-- 起動時依存項目は `output/runtime_settings/<camera>.json` に保存し、再起動後も維持
+- 起動時依存項目は `output/runtime_settings/<camera>.json` に保存し、再起動後も維持。保存ファイルはカメラ単位で独立しているため、一括・個別いずれの経路でも書き分けはカメラ側の同一ロジックで成立する
 
 ### 7. 手動録画アーキテクチャ（v3.2.0+）
 - ダッシュボードが `POST /camera_recording_schedule/{index}` を受け付け、カメラコンテナの `POST /recording/schedule` へ中継

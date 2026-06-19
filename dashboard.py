@@ -225,6 +225,10 @@ def create_app() -> Flask:
     def camera_settings_apply_all() -> Response:
         return _dispatch(routes.handle_camera_settings_apply_all, path="/camera_settings/apply_all")
 
+    @app.post("/camera_settings/apply_one")
+    def camera_settings_apply_one() -> Response:
+        return _dispatch(routes.handle_camera_settings_apply_one, path="/camera_settings/apply_one")
+
     @app.route("/camera_mask/<int:camera_index>", methods=["GET", "POST"])
     def camera_mask(camera_index: int) -> Response:
         return _dispatch(routes.handle_camera_mask, path=f"/camera_mask/{camera_index}")

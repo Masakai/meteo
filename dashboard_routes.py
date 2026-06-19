@@ -1218,6 +1218,16 @@ def handle_camera_settings_apply_all(handler):
     )
 
 
+def handle_camera_settings_apply_one(handler):
+    return camera_handlers.handle_camera_settings_apply_one(
+        handler,
+        CAMERAS,
+        _camera_apply_settings_target,
+        Request,
+        urlopen,
+    )
+
+
 def handle_bulk_delete_non_meteor(handler):
     parsed_path = urlparse(handler.path).path
     prefix = "/bulk_delete_non_meteor/"

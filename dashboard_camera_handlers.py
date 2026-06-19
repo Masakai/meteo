@@ -300,13 +300,16 @@ def handle_camera_settings_current(handler, cameras, camera_stats_target, reques
                 payload = response.read()
             data = json.loads(payload.decode("utf-8")) if payload else {}
             settings = data.get("settings", {}) if isinstance(data, dict) else {}
+            # カメラ別のprocess_min_dim（exclude_edge_ratioのpx換算用）
+            cam_process_min_dim = int(data.get("process_min_dim", 0)) if isinstance(data, dict) else 0
             if not first_settings and isinstance(settings, dict) and settings:
                 first_settings = settings
-                first_process_min_dim = int(data.get("process_min_dim", 0)) if isinstance(data, dict) else 0
+                first_process_min_dim = cam_process_min_dim
             results.append({
                 "camera": cam["name"],
                 "success": True,
                 "settings": settings,
+                "process_min_dim": cam_process_min_dim,
             })
         except Exception as e:
             results.append({
@@ -393,6 +396,98 @@ def handle_camera_settings_apply_all(handler, cameras, camera_apply_settings_tar
                 "applied_count": applied_count,
                 "total": len(cameras),
                 "results": results,
+            }
+        ).encode("utf-8")
+    )
+    return True
+
+
+def handle_camera_settings_apply_one(handler, cameras, camera_apply_settings_target, request_cls, urlopen_fn):
+    """指定した1カメラのみに検出設定を適用する。
+
+    リクエストボディは {"camera": "<内部名>", "settings": {...}} のネスト形式。
+    対象カメラの /apply_settings のみへ settings を中継し、他カメラには影響しない。
+    レスポンスは apply_all と同形（results[] / applied_count / total）に揃える。
+    """
+    if handler.path != "/camera_settings/apply_one":
+        return False
+
+    def _error(status, message):
+        handler.send_response(status)
+        handler.send_header("Content-type", "application/json")
+        handler.end_headers()
+        handler.wfile.write(json.dumps({"success": False, "error": message}).encode("utf-8"))
+        return True
+
+    try:
+        length = int(handler.headers.get("Content-Length", "0"))
+        raw_body = handler.rfile.read(length) if length > 0 else b""
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+        if not isinstance(payload, dict):
+            raise ValueError("payload must be object")
+    except Exception as e:
+        return _error(400, f"invalid payload: {e}")
+
+    # 対象カメラの解決（内部名で受ける。後方互換でcamera_index整数も許容）
+    camera_name = payload.get("camera")
+    camera_index = None
+    raw_index = payload.get("camera_index")
+    if isinstance(camera_name, str) and camera_name:
+        for idx, cam in enumerate(cameras):
+            if cam["name"] == camera_name:
+                camera_index = idx
+                break
+    # boolはintのサブクラスのため明示的に除外（camera_index: true を 1 と誤解釈しない）
+    elif isinstance(raw_index, int) and not isinstance(raw_index, bool):
+        if 0 <= raw_index < len(cameras):
+            camera_index = raw_index
+    if camera_index is None:
+        return _error(400, "invalid camera: not found")
+
+    # settingsはネスト固定。非objectは不正
+    settings = payload.get("settings")
+    if not isinstance(settings, dict):
+        return _error(400, "invalid settings: object required")
+
+    cam = cameras[camera_index]
+    request_body = json.dumps(settings).encode("utf-8")
+    target_url = camera_apply_settings_target(camera_index)
+    try:
+        req = request_cls(
+            target_url,
+            data=request_body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen_fn(req, timeout=8) as response:
+            resp_payload = response.read()
+        data = json.loads(resp_payload.decode("utf-8")) if resp_payload else {}
+        success = bool(data.get("success", False))
+        result = {
+            "camera": cam["name"],
+            "success": success,
+            "response": data,
+        }
+    except Exception as e:
+        success = False
+        result = {
+            "camera": cam["name"],
+            "success": False,
+            "error": str(e),
+        }
+
+    handler.send_response(200)
+    handler.send_header("Content-type", "application/json")
+    handler.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+    handler.end_headers()
+    handler.wfile.write(
+        json.dumps(
+            {
+                "success": success,
+                "camera": cam["name"],
+                "applied_count": 1 if success else 0,
+                "total": 1,
+                "results": [result],
             }
         ).encode("utf-8")
     )
