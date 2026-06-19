@@ -6,7 +6,6 @@
 out
 gen
 .env
-.claude
 /.idea/
 .venv/
 __pycache__/
@@ -20,6 +19,18 @@ tests/__pycache__/
 /detections/
 /meteor_detections/
 /.claude/
+# .claude/ は原則除外だが、チーム共有したい設定だけ明示的に追跡する
+!/.claude/
+/.claude/*
+!/.claude/agents/
+!/.claude/settings.json
+!/.claude/skills/
+!/.claude/hooks/
+# ローカル固有・揮発物はコミットしない
+/.claude/settings.local.json
+/.claude/agent-memory/
+/.claude/worktrees/
+/.claude/launch.json
 /output/
 /tmp/
 /meteor_*.mov
