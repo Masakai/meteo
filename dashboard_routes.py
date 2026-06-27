@@ -1128,6 +1128,17 @@ def handle_camera_mask_discard(handler):
     )
 
 
+def handle_camera_mask_reset(handler):
+    return camera_handlers.handle_camera_mask_reset(
+        handler,
+        CAMERAS,
+        _IN_DOCKER,
+        _parse_camera_index,
+        Request,
+        urlopen,
+    )
+
+
 def handle_camera_restart(handler):
     return camera_handlers.handle_camera_restart(
         handler,

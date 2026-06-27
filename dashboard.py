@@ -241,6 +241,10 @@ def create_app() -> Flask:
     def camera_mask_discard(camera_index: int) -> Response:
         return _dispatch(routes.handle_camera_mask_discard, path=f"/camera_mask_discard/{camera_index}")
 
+    @app.post("/camera_mask_reset/<int:camera_index>")
+    def camera_mask_reset(camera_index: int) -> Response:
+        return _dispatch(routes.handle_camera_mask_reset, path=f"/camera_mask_reset/{camera_index}")
+
     @app.get("/camera_mask_image/<int:camera_index>")
     def camera_mask_image(camera_index: int) -> Response:
         query = request.query_string.decode("utf-8")

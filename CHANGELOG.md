@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.0] - 2026-06-27
+### Added
+- `http_handlers.py` / `dashboard_camera_handlers.py` / `dashboard_routes.py` / `dashboard.py` — カメラ単位のマスクリセット機能を追加（`POST /reset_mask` / `POST /camera_mask_reset/{index}`）。実行中の検出マスクを無効化し、保存済みマスク画像を削除する。既存の `/update_mask` / `/confirm_mask` / `/discard_mask` 系と同じ4レイヤープロキシ構造・レスポンス形式を踏襲。
+- プレビュー画面に「マスクリセット」ボタンを追加。
+- `tests/test_http_handlers.py` — マスク削除ヘルパー（パストラバーサル防御含む）のテストを追加。
+- `documents/API_REFERENCE.md` — `/reset_mask` / `/camera_mask_reset/{index}` のエンドポイント仕様を追記。
+
 ## [3.16.0] - 2026-06-19
 ### Added
 - `dashboard.py` / `dashboard_routes.py` — 検出設定を特定の1カメラのみへ適用する新規エンドポイント `POST /camera_settings/apply_one` を追加。リクエスト形式は `{camera, settings}` で、対象カメラは内部名または `camera_index` で指定する。既存の全カメラ一括適用 `apply_all` は無変更で温存（後方互換）。

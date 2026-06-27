@@ -27,6 +27,12 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.17.0 - カメラ単位のマスクリセット
+
+- **新規エンドポイント（カメラ層）**: `POST /reset_mask` — 指定カメラの除外マスクを無効化する。detector の `exclusion_mask` を `None` に戻し、出力ディレクトリ側（`/output/<camera>/masks/<camera>_mask.png`）とホスト `masks/`（`MASK_BUILD_DIR`）の保存済みマスク画像を削除し、pending 状態もクリアする。実行後は `/stats` の `mask_active` が `false` になる。`/update_mask`→`/confirm_mask_update` の対称操作。
+- **新規エンドポイント（ダッシュボード層）**: `POST /camera_mask_reset/{index}` — 指定インデックスのカメラコンテナへ `/reset_mask` をプロキシする。
+- **UI**: カメラプレビュー画面に「マスクリセット」ボタンを追加。確認ダイアログののち `/reset_mask` を呼び、マスクオーバーレイ表示を OFF にする。
+
 ### v3.16.0 - カメラ個別検出設定
 
 - **新規エンドポイント**: `POST /camera_settings/apply_one` — 指定した 1 カメラのみに検出設定を適用（リクエスト形式 `{camera, settings}`）。既存の `apply_all`（全カメラ一括）と併存し後方互換。
@@ -283,6 +289,7 @@ Licensed under the MIT License
 | `/camera_recording_status/{index}` | GET | カメラ手動録画状態取得 |
 | `/camera_recording_schedule/{index}` | POST | カメラ手動録画の予約/即時開始 |
 | `/camera_recording_stop/{index}` | POST | カメラ手動録画の停止 |
+| `/camera_mask_reset/{index}` | POST | カメラの除外マスクをリセット（v3.17.0+） |
 | `/camera_restart/{index}` | POST | カメラ再起動要求 |
 | `/youtube_start/{index}` | POST | YouTube Live配信を開始 |
 | `/youtube_stop/{index}` | POST | YouTube Live配信を停止 |
@@ -794,6 +801,29 @@ curl -X POST "http://localhost:8080/camera_recording_schedule/0" \
 **使用例**:
 ```bash
 curl -X POST "http://localhost:8080/camera_recording_stop/0" | jq
+```
+
+---
+
+### POST /camera_mask_reset/{index}
+
+**説明**: 指定カメラの除外マスクをリセットする（v3.17.0+）。カメラコンテナの `/reset_mask` へプロキシする。
+
+**URLパラメータ**:
+
+| パラメータ | 型 | 説明 | 例 |
+|-----------|-----|------|-----|
+| `index` | integer | カメラインデックス（0始まり） | `1` |
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**: カメラ層 `/reset_mask` のレスポンスをそのまま返す（[POST /reset_mask](#post-reset_mask) 参照）。
+
+**使用例**:
+```bash
+curl -X POST "http://localhost:8080/camera_mask_reset/1" | jq
 ```
 
 ---
@@ -1421,6 +1451,7 @@ curl "http://localhost:8080/stats_data?days=90"
 | `/recording/schedule` | POST | 手動録画の予約/即時開始 |
 | `/recording/stop` | POST | 手動録画の停止 |
 | `/update_mask` | POST | 現在フレームからマスク再生成 |
+| `/reset_mask` | POST | 除外マスクをリセット（v3.17.0+） |
 | `/apply_settings` | POST | 設定値をランタイム反映 |
 | `/restart` | POST | プロセス再起動要求 |
 
@@ -1733,6 +1764,41 @@ curl "http://localhost:8081/snapshot" --output camera1_snapshot.jpg
 ```bash
 # マスク更新
 curl -X POST http://localhost:8081/update_mask | jq
+```
+
+---
+
+### POST /reset_mask
+
+**説明**: 除外マスクをリセットする（v3.17.0+）。`/update_mask`→`/confirm_mask_update` の対称操作。detector の `exclusion_mask` を `None` に戻し、出力ディレクトリ側（`/output/<camera>/masks/<camera>_mask.png`）とホスト `masks/`（`MASK_BUILD_DIR`）の保存済みマスク画像を削除し、pending 状態もクリアする。実行後は `/stats` の `mask_active` が `false` になる。
+
+**レスポンス**:
+- Content-Type: `application/json`
+- Status: 200 OK
+
+**レスポンスボディ**:
+```json
+{
+  "success": true,
+  "message": "mask reset",
+  "deleted": ["/output/camera1/masks/camera1_mask.png"]
+}
+```
+
+detector 未初期化時は `{"success": false, "error": "detector not ready"}` を返す。
+
+**フィールド説明**:
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `success` | boolean | リセット成功/失敗 |
+| `message` | string | 結果メッセージ |
+| `deleted` | array | 削除した出力ディレクトリ側ファイルパスの一覧 |
+
+**使用例**:
+```bash
+# マスクリセット
+curl -X POST http://localhost:8081/reset_mask | jq
 ```
 
 ---

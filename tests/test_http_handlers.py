@@ -84,6 +84,46 @@ def test_write_mask_to_build_dir_blocks_path_traversal(tmp_path, monkeypatch):
     assert not outside.exists()
 
 
+# --- _delete_mask_from_build_dir ---
+
+def test_delete_mask_from_build_dir_deletes_file(tmp_path):
+    """MASK_BUILD_DIR 配下のマスク画像が削除されること"""
+    import http_handlers
+
+    build_dir = tmp_path / "masks"
+    build_dir.mkdir()
+    target = build_dir / "camera1_mask.png"
+    target.write_bytes(b"dummy")
+
+    http_handlers._delete_mask_from_build_dir(str(build_dir), "camera1_mask.png")
+
+    assert not target.exists()
+
+
+def test_delete_mask_from_build_dir_no_op_when_no_build_dir(tmp_path):
+    """MASK_BUILD_DIR が未設定（空文字）の場合は何もしない（例外を出さない）こと"""
+    import http_handlers
+
+    # 例外が送出されないことのみ確認する
+    http_handlers._delete_mask_from_build_dir("", "camera1_mask.png")
+
+
+def test_delete_mask_from_build_dir_blocks_path_traversal(tmp_path):
+    """パストラバーサル（../）を含む名前で build_dir 外のファイルを削除しないこと"""
+    import http_handlers
+
+    build_dir = tmp_path / "masks"
+    build_dir.mkdir()
+    outside = tmp_path / "secret.png"
+    outside.write_bytes(b"secret")
+
+    # "../secret.png" の name は "secret.png" になるため build_dir 直下を指す。
+    # build_dir 外（tmp_path）の secret.png は削除されないことを確認する。
+    http_handlers._delete_mask_from_build_dir(str(build_dir), "../secret.png")
+
+    assert outside.exists()
+
+
 # --- _is_mask_manually_modified ---
 
 def _write_hashes_json(hashes_path: Path, data: dict):

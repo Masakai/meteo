@@ -217,6 +217,12 @@ def handle_camera_mask_discard(handler, *args):
     return _proxy_camera_post(handler, "/discard_mask_update", 200, *args)
 
 
+def handle_camera_mask_reset(handler, *args):
+    if not handler.path.startswith("/camera_mask_reset/"):
+        return False
+    return _proxy_camera_post(handler, "/reset_mask", 200, *args)
+
+
 def handle_camera_restart(handler, cameras, in_docker, parse_index, request_cls, urlopen_fn):
     if not handler.path.startswith("/camera_restart/"):
         return False

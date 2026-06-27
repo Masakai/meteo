@@ -88,6 +88,21 @@ def _write_mask_to_build_dir(mask_build_dir: str, pending_save_path, pending_mas
         pass
 
 
+def _delete_mask_from_build_dir(mask_build_dir: str, save_path_name) -> None:
+    """MASK_BUILD_DIR が設定されている場合、masks/ 配下の同名マスク画像を削除する。
+    パストラバーサルを防ぐため dest が build_dir 直下であることを確認する。
+    """
+    if not (mask_build_dir and save_path_name):
+        return
+    try:
+        build_dir = Path(mask_build_dir).resolve()
+        dest = (build_dir / Path(save_path_name).name).resolve()
+        if str(dest).startswith(str(build_dir) + os.sep) or dest.parent == build_dir:
+            dest.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
     """MJPEG ストリーミングハンドラ"""
 
@@ -207,6 +222,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
         </div>
         <div class="actions">
             <button class="mask-btn" id="mask-update-btn" onclick="updateMask()">マスク更新</button>
+            <button class="mask-btn" id="mask-reset-btn" onclick="resetMask()">マスクリセット</button>
             <button class="mask-toggle-btn" id="mask-toggle-btn" onclick="toggleMask()" disabled>マスク表示</button>
         </div>
         <div class="stats">
@@ -284,6 +300,37 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 .finally(() => {{
                     setTimeout(() => {{
                         btn.textContent = 'マスク更新';
+                        btn.disabled = false;
+                    }}, 1500);
+                }});
+        }}
+
+        function resetMask() {{
+            const btn = document.getElementById('mask-reset-btn');
+            if (!btn) return;
+            if (!confirm('マスクをリセットします。よろしいですか？')) return;
+            const overlay = document.getElementById('mask-overlay');
+            btn.disabled = true;
+            btn.textContent = 'リセット中...';
+            fetch('/reset_mask', {{ method: 'POST' }})
+                .then(r => r.json())
+                .then((data) => {{
+                    if (!data.success) {{
+                        btn.textContent = '失敗';
+                        return;
+                    }}
+                    if (overlay) {{
+                        overlay.dataset.src = '/mask';
+                        setMaskOverlay(false);
+                    }}
+                    btn.textContent = 'リセット完了';
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = 'マスクリセット';
                         btn.disabled = false;
                     }}, 1500);
                 }});
@@ -646,6 +693,53 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
             self.wfile.write(json.dumps({
                 "success": True,
                 "message": "pending mask discarded" if had_pending else "no pending mask",
+            }).encode())
+            return
+
+        if path == '/reset_mask':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+
+            if state.current_detector is None:
+                self.wfile.write(json.dumps({
+                    "success": False,
+                    "error": "detector not ready"
+                }).encode())
+                return
+
+            # detector のマスクを無効化する
+            state.current_detector.update_exclusion_mask(None)
+
+            deleted = []
+
+            # 出力ディレクトリ側の保存済みマスク画像を削除する
+            if state.current_output_dir and state.current_camera_name:
+                mask_name = f"{_storage_camera_name(state.current_camera_name)}_mask.png"
+                out_mask_path = state.current_output_dir / "masks" / mask_name
+                try:
+                    if out_mask_path.exists():
+                        out_mask_path.unlink(missing_ok=True)
+                        deleted.append(str(out_mask_path))
+                except Exception:
+                    pass
+
+                # masks/（MASK_BUILD_DIR）側の同名ファイルも削除する
+                _delete_mask_from_build_dir(
+                    os.environ.get("MASK_BUILD_DIR", ""),
+                    mask_name,
+                )
+
+            # pending 状態もクリアする
+            with state.current_pending_mask_lock:
+                state.current_pending_exclusion_mask = None
+                state.current_pending_mask_save_path = None
+
+            self.wfile.write(json.dumps({
+                "success": True,
+                "message": "mask reset",
+                "deleted": deleted,
             }).encode())
             return
 
