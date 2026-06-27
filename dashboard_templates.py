@@ -594,6 +594,7 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                         </label>
                         <button class="record-btn" id="record-btn{i}" onclick="toggleRecordingPanel({i})">録画予約</button>
                         <button class="mask-btn" onclick="updateMask({i})">マスク更新</button>
+                        <button class="mask-reset-btn" id="mask-reset-btn{i}" onclick="resetMask({i})">マスクリセット</button>
                         <button class="snapshot-btn" onclick="downloadSnapshot({i})">スナップショット保存</button>
                         <button class="restart-btn" onclick="restartCamera({i})">再起動</button>
                         <button class="mask-preview-btn" id="mask-btn{i}" onclick="toggleMask({i})">マスク表示</button>
@@ -1024,6 +1025,24 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
             color: #ffffff;
         }}
         .mask-btn:disabled {{
+            opacity: 0.6;
+            cursor: wait;
+        }}
+        .mask-reset-btn {{
+            background: #fef8ed;
+            border: 1px solid #d4860a;
+            color: #8a5800;
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8em;
+            min-height: 44px;
+        }}
+        .mask-reset-btn:hover {{
+            background: #d4860a;
+            color: #ffffff;
+        }}
+        .mask-reset-btn:disabled {{
             opacity: 0.6;
             cursor: wait;
         }}
@@ -2883,6 +2902,38 @@ def render_dashboard_html(cameras, version, server_start_time, page_mode="detect
                 .finally(() => {{
                     setTimeout(() => {{
                         btn.textContent = 'マスク更新';
+                        btn.disabled = false;
+                    }}, 1500);
+                }});
+        }}
+
+        // マスクリセット
+        function resetMask(i) {{
+            const btn = document.getElementById('mask-reset-btn' + i);
+            if (!btn) return;
+            if (!confirm('マスクをリセットします。よろしいですか？')) return;
+            const overlay = document.getElementById('mask' + i);
+            btn.disabled = true;
+            btn.textContent = 'リセット中...';
+            fetch('/camera_mask_reset/' + i, {{ method: 'POST' }})
+                .then(r => r.json())
+                .then((data) => {{
+                    if (!data.success) {{
+                        btn.textContent = '失敗';
+                        return;
+                    }}
+                    if (overlay) {{
+                        overlay.dataset.src = '/camera_mask_image/' + i;
+                        setMaskOverlay(i, false);
+                    }}
+                    btn.textContent = 'リセット完了';
+                }})
+                .catch(() => {{
+                    btn.textContent = '失敗';
+                }})
+                .finally(() => {{
+                    setTimeout(() => {{
+                        btn.textContent = 'マスクリセット';
                         btn.disabled = false;
                     }}, 1500);
                 }});

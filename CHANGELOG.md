@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.1] - 2026-06-27
+### Added
+- `dashboard_templates.py` — ダッシュボードWebUIのカメラ一覧画面に「マスクリセット」ボタンを追加（各カメラの除外マスクを画面から無効化可能に）。バックエンドはv3.17.0で追加済みの `POST /camera_mask_reset/{index}` を利用。
+
 ## [3.17.0] - 2026-06-27
 ### Added
 - `http_handlers.py` / `dashboard_camera_handlers.py` / `dashboard_routes.py` / `dashboard.py` — カメラ単位のマスクリセット機能を追加（`POST /reset_mask` / `POST /camera_mask_reset/{index}`）。実行中の検出マスクを無効化し、保存済みマスク画像を削除する。既存の `/update_mask` / `/confirm_mask` / `/discard_mask` 系と同じ4レイヤープロキシ構造・レスポンス形式を踏襲。
