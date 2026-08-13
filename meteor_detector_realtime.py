@@ -36,7 +36,6 @@ def write_mp4_clip_ffmpeg(
     """ffmpegで目的メタデータに近いMP4を直接出力する。"""
     width, height = size
     target_fps = sanitize_fps(fps, default=30.0)
-    target_fps = 30.0 if abs(target_fps - 30.0) > 0.01 else 30.0
     gop = int(target_fps * 2)
     cmd = [
         "ffmpeg",

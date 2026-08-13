@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.2] - 2026-08-13
+### Fixed
+- `meteor_detector_realtime.py` — `write_mp4_clip_ffmpeg` 内で実測fpsを常に30.0へ上書きしていたバグを修正（`target_fps = 30.0 if abs(target_fps - 30.0) > 0.01 else 30.0` という三項演算子が両分岐とも30.0を返すため実質無意味な代入になっていた行を削除）。v1.22.0（コミット `86f8586`）から存在していた既存バグで、Tapo C120カメラへの交換をきっかけに顕在化した。Tapo C120は夜間IRモードで実効fpsが10〜20fps程度まで自動低下する仕様のため、実測fpsを無視して常に30fps固定でMP4のタイムスタンプ・GOP長を書き出した結果、検出動画の再生速度が実際の2〜3倍速に見える症状が発生していた。修正後は `sanitize_fps()` が返す実測fpsをそのまま使用する。本関数は全カメラ共通の検出動画書き出しコードのため、影響範囲はカメラ種別を問わず全カメラに及ぶ。
+
 ## [3.17.1] - 2026-06-27
 ### Added
 - `dashboard_templates.py` — ダッシュボードWebUIのカメラ一覧画面に「マスクリセット」ボタンを追加（各カメラの除外マスクを画面から無効化可能に）。バックエンドはv3.17.0で追加済みの `POST /camera_mask_reset/{index}` を利用。
