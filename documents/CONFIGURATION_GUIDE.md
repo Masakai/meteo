@@ -126,6 +126,7 @@ docker-compose.ymlで設定される環境変数:
 | `TWILIGHT_BIRD_MIN_BRIGHTNESS` | `80` | 薄明時の除外輝度閾値（0-255、これ未満を除外） | `40` ~ `120` |
 | `BIRD_FILTER_ENABLED` | `false` | 通常時の黒点フィルタ（opt-in） | `true` / `false` |
 | `BIRD_MIN_BRIGHTNESS` | `80` | 通常時の除外輝度閾値 | `40` ~ `120` |
+| `STREAM_TIMEOUT` | `30.0` | ストリーム監視ウォッチドッグのタイムアウト秒数（v3.17.3+）。`last_frame_time` がこの秒数更新されないとストール（ストリーム断）とみなし検出プロセスを再起動する | `20` ~ `60` |
 
 !!! warning "高閾値のリスク"
     `BIRD_MIN_BRIGHTNESS` および `TWILIGHT_BIRD_MIN_BRIGHTNESS` を 120 以上に設定すると暗い流星を誤除外するリスクがある。`faint` プリセット使用時は特に注意。

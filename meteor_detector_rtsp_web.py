@@ -438,6 +438,7 @@ def process_rtsp_stream(  # pragma: no cover
     params = params or DetectionParams()
     state.camera_name = _storage_camera_name(cam_name)
     state.camera_display_name = os.environ.get("CAMERA_NAME_DISPLAY", "")
+    state.stream_timeout = float(os.environ.get("STREAM_TIMEOUT", str(state.stream_timeout)))
 
     override_paths = _runtime_override_paths(output_dir, cam_name)
     state.current_runtime_overrides_paths = override_paths

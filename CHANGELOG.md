@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.3] - 2026-08-15
+### Changed
+- `detection_state.py` — `stream_timeout` のデフォルト値を `10.0` 秒 → `30.0` 秒に変更。
+- `meteor_detector_rtsp_web.py` — `STREAM_TIMEOUT` 環境変数で `state.stream_timeout` を上書き可能にした。
+
+本番機greeng4（Intel N100, 4コア）で3カメラ同時稼働時、CPU使用率が各カメラコンテナ99%前後に達しており、まれにOpenCVの`cap.read()`が10秒以上ブロックされることがあった。ダッシュボードのカメラ監視ウォッチドッグ（`stream_alive`判定、`state.last_frame_time`が`stream_timeout`秒更新されないとストールとみなす）がこれを誤ってストリーム断と誤検知し、検出プロセスを強制再起動させていた。再起動の瞬間に内部バッファのフレームが一括で流れ込み、タイムスタンプが極端に圧縮された状態で処理されることで、1回のイベントで6件もの流星が誤って連続検出され、書き出されるMP4のfpsも実際のカメラ映像より大幅に速く（異常値に）なる副作用が生じていた。stream_timeoutを30秒に緩和することで、CPU飽和による一時的な遅延を誤検知しにくくする。
+
 ## [3.17.2] - 2026-08-13
 ### Fixed
 - `meteor_detector_realtime.py` — `write_mp4_clip_ffmpeg` 内で実測fpsを常に30.0へ上書きしていたバグを修正（`target_fps = 30.0 if abs(target_fps - 30.0) > 0.01 else 30.0` という三項演算子が両分岐とも30.0を返すため実質無意味な代入になっていた行を削除）。v1.22.0（コミット `86f8586`）から存在していた既存バグで、Tapo C120カメラへの交換をきっかけに顕在化した。Tapo C120は夜間IRモードで実効fpsが10〜20fps程度まで自動低下する仕様のため、実測fpsを無視して常に30fps固定でMP4のタイムスタンプ・GOP長を書き出した結果、検出動画の再生速度が実際の2〜3倍速に見える症状が発生していた。修正後は `sanitize_fps()` が返す実測fpsをそのまま使用する。本関数は全カメラ共通の検出動画書き出しコードのため、影響範囲はカメラ種別を問わず全カメラに及ぶ。

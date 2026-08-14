@@ -36,7 +36,7 @@ class DetectionState:
     current_camera_name: str = ""  # 保存先・永続化用の識別子。display名は使わない
 
     # ストリーム設定
-    stream_timeout: float = 10.0
+    stream_timeout: float = 30.0
     current_rtsp_url: str = ""
 
     # 検出状態フラグ
