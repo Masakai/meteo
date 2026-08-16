@@ -248,6 +248,7 @@ environment:
 
 **即時反映（再起動不要）:**
   - **検出パラメータ**: `diff_threshold`, `min_brightness`, `min_linearity`, `min_length`, `min_speed`, `min_duration`, `max_duration`, `min_area`, `max_area`
+  - **イベント結合・バースト抑制パラメータ（v3.18.0+）**: `merge_max_gap_time`, `merge_max_distance`, `merge_max_speed_ratio`, `burst_window_time`（バースト判定の最大到着間隔、既定1.0秒）, `burst_max_events`（1バーストで許容するイベント数、既定5件。超えた塊は破棄）
   - **ノイズ除外パラメータ**: `nuisance_overlap_threshold`, `nuisance_path_overlap_threshold`, `min_track_points`, `max_stationary_ratio`, `small_area_threshold`
   - **録画マージン設定（v1.14.0+）**: `clip_margin_before`, `clip_margin_after`
   - **マスク設定**: `mask_dilate`, `nuisance_dilate`, `mask_*`, `nuisance_*` の画像パス

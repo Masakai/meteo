@@ -61,6 +61,11 @@ from http_handlers import MJPEGHandler, ThreadedHTTPServer, STREAM_JPEG_QUALITY
 
 VERSION = "3.6.1"
 
+# 終了処理で残イベントの保存にかけてよい時間の上限（秒）。
+# メインスレッドは detection_thread.join(timeout=5.0) で待つため、これを大きく
+# 超えると検出スレッドが孤児化して「終了」ログの後も保存を続けることになる。
+SHUTDOWN_SAVE_BUDGET_SEC = 4.0
+
 # 天文薄暮期間の判定用
 try:
     from astro_utils import is_detection_active
@@ -308,8 +313,17 @@ def detection_thread_worker(  # pragma: no cover
         events = detector.track_objects(objects, timestamp)
 
         for event in events:
+            if stop_flag.is_set():
+                break
             merged_events = merger.add_event(event)
             for merged_event in merged_events:
+                # 1周の内側で多数のイベントが確定すると save_meteor_event() の
+                # MP4書き出しが件数分だけ直列に走り、停止要求が来てもループを
+                # 抜けられずメインスレッドの join(timeout=5.0) がタイムアウトする。
+                # その結果「終了」ログの後もこのスレッドが保存を続けてしまうため、
+                # 保存のたびに停止要求を確認する。
+                if stop_flag.is_set():
+                    break
                 state.detection_count += 1
                 print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{state.detection_count}")
                 print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
@@ -326,6 +340,8 @@ def detection_thread_worker(  # pragma: no cover
 
         expired_events = merger.flush_expired(timestamp)
         for expired_event in expired_events:
+            if stop_flag.is_set():
+                break
             state.detection_count += 1
             print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{state.detection_count}")
             print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
@@ -396,7 +412,20 @@ def detection_thread_worker(  # pragma: no cover
                 composite_after=state.current_clip_margin_after,
             )
 
-    for event in merger.flush_all():
+    # 終了時に残ったイベントを保存する。ここは stop_flag で打ち切らない
+    # （停止要求そのものが到達のきっかけなので、打ち切ると常に保存0件になる）。
+    # ただしメインスレッドの join(timeout=5.0) を大きく超えないよう、
+    # 保存にかけてよい時間の上限を設ける。
+    remaining = merger.flush_all()
+    shutdown_save_deadline = time.time() + SHUTDOWN_SAVE_BUDGET_SEC
+    for idx, event in enumerate(remaining):
+        if idx > 0 and time.time() > shutdown_save_deadline:
+            print(
+                f"[WARN] 終了処理の保存が{SHUTDOWN_SAVE_BUDGET_SEC}秒を超えたため"
+                f"残り{len(remaining) - idx}件の保存を打ち切りました",
+                flush=True,
+            )
+            break
         state.detection_count += 1
         clip_path = save_meteor_event(
             event,
@@ -506,6 +535,8 @@ def process_rtsp_stream(  # pragma: no cover
         "merge_max_gap_time",
         "merge_max_distance",
         "merge_max_speed_ratio",
+        "burst_window_time",
+        "burst_max_events",
         "exclude_edge_ratio",
         "nuisance_path_overlap_threshold",
         "min_track_points",
@@ -575,6 +606,8 @@ def process_rtsp_stream(  # pragma: no cover
         "merge_max_gap_time": params.merge_max_gap_time,
         "merge_max_distance": params.merge_max_distance,
         "merge_max_speed_ratio": params.merge_max_speed_ratio,
+        "burst_window_time": params.burst_window_time,
+        "burst_max_events": params.burst_max_events,
         "nuisance_path_overlap_threshold": params.nuisance_path_overlap_threshold,
         "min_track_points": params.min_track_points,
         "max_stationary_ratio": params.max_stationary_ratio,
@@ -726,6 +759,15 @@ def process_rtsp_stream(  # pragma: no cover
 
     # 検出スレッドの終了を待機
     detection_thread.join(timeout=5.0)
+    if detection_thread.is_alive():
+        # ここに来ると検出スレッドが生き残ったまま以降の後始末が進む。
+        # 過去に、バーストで多数のイベントが確定した際にMP4書き出しが直列に走って
+        # 5秒では抜けきれず、「終了」ログの後もスレッドが検出結果を書き続けた事例がある。
+        print(
+            "[WARN] 検出スレッドが5秒以内に終了しませんでした。"
+            "保存処理が継続している可能性があります",
+            flush=True,
+        )
 
     with state.current_recording_lock:
         job = state.current_recording_job

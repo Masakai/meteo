@@ -430,6 +430,8 @@ def render_settings_html(cameras, version):
                         <tr><td>merge_max_gap_time</td><td>イベント結合の時間条件</td><td>上げると近接イベントをまとめやすい</td></tr>
                         <tr><td>merge_max_distance</td><td>イベント結合の距離条件</td><td>上げると近い軌跡をまとめやすい</td></tr>
                         <tr><td>merge_max_speed_ratio</td><td>イベント結合の速度差条件</td><td>上げると速度差があっても結合しやすい</td></tr>
+                        <tr><td>burst_window_time</td><td>バースト判定の最大到着間隔</td><td>雷・雲の明滅で多数の点が同時検出される現象の抑制用。この間隔以内で連なった塊をひとつのバーストとみなす</td></tr>
+                        <tr><td>burst_max_events</td><td>1バーストで許容するイベント数</td><td>超えた塊は丸ごと破棄。下げると抑制が強いが実流星も落ちうる</td></tr>
                     </tbody>
                 </table>
             </details>
@@ -441,6 +443,8 @@ def render_settings_html(cameras, version):
                 <div><label>結合最大ギャップ(秒)（merge_max_gap_time）</label><input id="merge_max_gap_time" type="number" step="0.1"></div>
                 <div><label>結合最大距離(px)（merge_max_distance）</label><input id="merge_max_distance" type="number" step="0.1"></div>
                 <div><label>結合速度差比率（merge_max_speed_ratio）</label><input id="merge_max_speed_ratio" type="number" step="0.01"></div>
+                <div><label>バースト最大到着間隔(秒)（burst_window_time）</label><input id="burst_window_time" type="number" step="0.1"></div>
+                <div><label>バースト許容件数（burst_max_events）</label><input id="burst_max_events" type="number" step="1"></div>
             </div>
         </div>
 
@@ -496,6 +500,7 @@ def render_settings_html(cameras, version):
             'min_linearity', 'exclude_bottom_ratio', 'exclude_edge_ratio',
             'min_area', 'max_area', 'max_gap_time', 'max_distance',
             'merge_max_gap_time', 'merge_max_distance', 'merge_max_speed_ratio',
+            'burst_window_time', 'burst_max_events',
             'nuisance_overlap_threshold', 'nuisance_path_overlap_threshold',
             'min_track_points', 'max_stationary_ratio', 'small_area_threshold',
             'mask_dilate', 'nuisance_dilate',
@@ -526,6 +531,8 @@ def render_settings_html(cameras, version):
             merge_max_gap_time: 1.5,
             merge_max_distance: 80.0,
             merge_max_speed_ratio: 0.5,
+            burst_window_time: 1.0,
+            burst_max_events: 5,
             nuisance_overlap_threshold: 0.60,
             nuisance_path_overlap_threshold: 0.70,
             min_track_points: 4,

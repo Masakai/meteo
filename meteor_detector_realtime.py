@@ -161,10 +161,23 @@ def sanitize_fps(value: Optional[float], default: float = 30.0) -> float:
 def estimate_fps_from_frames(
     frames: List[Tuple[float, np.ndarray]],
     fallback_fps: float = 30.0,
+    max_ratio_to_fallback: float = 1.5,
 ) -> float:
-    """フレーム時刻差の中央値から実効FPSを推定"""
+    """フレーム時刻差の中央値から実効FPSを推定
+
+    fallback_fpsはRTSP接続時にネゴシエートされたカメラ本来のfpsを想定する。
+    CPU飽和等でcap.read()の呼び出し間隔が乱れると、フレームに付与される
+    受信時刻が実際の撮影間隔より詰まり、推定fpsがカメラの実効fpsを大きく
+    上回ることがある（2026-08-16の本番greeng4で、接続時20.0fpsのカメラに対し
+    108fps・117fpsで書き出された事例）。これらはsanitize_fps()の上限120.0の
+    内側にあるため上限だけでは弾けない。カメラのネゴシエーション値を基準に
+    max_ratio_to_fallback倍を超える推定値を退けることで、実効fpsの正常な変動
+    （夜間IRモードでの低下など）は保ちつつ非物理的な値のみ除外する。
+    """
+    sanitized_fallback = sanitize_fps(fallback_fps, default=30.0)
+
     if len(frames) < 2:
-        return sanitize_fps(fallback_fps, default=30.0)
+        return sanitized_fallback
 
     deltas: List[float] = []
     for idx in range(1, len(frames)):
@@ -173,13 +186,17 @@ def estimate_fps_from_frames(
             deltas.append(dt)
 
     if not deltas:
-        return sanitize_fps(fallback_fps, default=30.0)
+        return sanitized_fallback
 
     median_dt = float(np.median(np.array(deltas, dtype=np.float64)))
     if median_dt <= 0:
-        return sanitize_fps(fallback_fps, default=30.0)
+        return sanitized_fallback
 
-    return sanitize_fps(1.0 / median_dt, default=sanitize_fps(fallback_fps, default=30.0))
+    estimated_fps = sanitize_fps(1.0 / median_dt, default=sanitized_fallback)
+    if estimated_fps > sanitized_fallback * max_ratio_to_fallback:
+        return sanitized_fallback
+
+    return estimated_fps
 
 
 def probe_rtsp_endpoint(url: str, timeout: float = 3.0) -> str:
@@ -291,6 +308,12 @@ class DetectionParams:
     merge_max_gap_time: float = 1.5
     merge_max_distance: float = 80
     merge_max_speed_ratio: float = 0.5
+    # 同時刻バースト抑制: 到着間隔が burst_window_time 秒以内で連なった
+    # イベントの塊（クラスタ）のサイズが burst_max_events 件を超えた場合、
+    # 流星ではなく画面全体の輝度急変（雷のフラッシュ、雲の明滅など）由来の
+    # ノイズとみなしてクラスタ内のイベントをすべて破棄する。
+    burst_window_time: float = 1.0
+    burst_max_events: int = 5
     exclude_bottom_ratio: float = 1 / 16
     exclude_edge_ratio: float = 0.0  # 四辺から除外する割合（0.0〜0.5）。UIからはpx指定→ratio変換で設定される。例: 20px / min(幅,高さ)
     nuisance_overlap_threshold: float = 0.60
@@ -729,15 +752,28 @@ class EventMerger:
     def __init__(self, params: DetectionParams):
         self.params = params
         self.pending: deque[MeteorEvent] = deque()
+        # 同時刻バースト判定用: 受理したイベントの到着時刻履歴（昇順とは限らない）。
+        # 確定（flush）のたびにギャップでクラスタリングして判定する。
+        self._arrival_times: List[float] = []
+        self._burst_dropped = 0
 
     def add_event(self, event: MeteorEvent) -> List[MeteorEvent]:
         finalized = []
 
+        # バースト判定用の到着ログには「新規に成立したイベント」の到着だけを
+        # 積む。トラッキングの瞬断等で1つの流星が複数の断片に分かれ、
+        # _is_mergeable の条件（時間・距離・速度差）で1件に結合される場合、
+        # 断片の数だけ到着として数えてしまうと、正常な単一の流星がバースト
+        # 判定に巻き込まれて誤って破棄される（実測で6断片の単一流星が
+        # burst_max_events=5を超えて全破棄される事例を確認した）。
+        # マージが成立した場合は新規到着として扱わない。
         if self.pending and self._is_mergeable(self.pending[-1], event):
             self.pending[-1] = self._merge(self.pending[-1], event)
         else:
+            self._arrival_times.append(event.start_time)
             self.pending.append(event)
 
+        self._prune_arrival_times(event.start_time)
         finalized.extend(self.flush_expired(event.start_time))
         return finalized
 
@@ -746,12 +782,111 @@ class EventMerger:
         cutoff = current_time - self.params.merge_max_gap_time
         while self.pending and self.pending[0].end_time < cutoff:
             finalized.append(self.pending.popleft())
-        return finalized
+        return self._reject_bursts(finalized)
 
     def flush_all(self) -> List[MeteorEvent]:
         finalized = list(self.pending)
         self.pending.clear()
-        return finalized
+        return self._reject_bursts(finalized)
+
+    def _prune_arrival_times(self, current_time: float) -> None:
+        """十分に古くなった到着記録を捨てる（メモリ肥大の防止）。
+
+        新規イベントの到着時（add_event）にのみ行う。基準は pending に残る
+        最古イベントの start_time（未確定なら current_time）より前。pending が
+        空でない間は、そこに滞留しているイベントの到着記録を消してはいけない
+        ——確定（flush）はまだ先で、そのとき _burst_start_times() が判定に
+        使うため。current_time を無条件の基準にすると、まだ確定していない
+        イベントが pending に残ったまま、時間的に離れた別イベントが先に
+        到着しただけでその到着記録が消え、後で確定した際に判定不能になる
+        （実際に、離れた孤立イベントの到着で発生することを検出した）。
+        """
+        window = self.params.burst_window_time
+        if window <= 0 or not self._arrival_times:
+            return
+        oldest_pending = self.pending[0].start_time if self.pending else current_time
+        horizon = min(oldest_pending, current_time)
+        keep_after = horizon - max(window, self.params.merge_max_gap_time) * 10
+        self._arrival_times = [t for t in self._arrival_times if t >= keep_after]
+
+    def _burst_start_times(self) -> set:
+        """到着ログを到着間隔(ギャップ)でクラスタリングし、バースト由来と
+        判定された start_time の集合を返す。
+
+        累積到着数を窓でカウントする方式（旧実装）は、バーストの両端で
+        必ず境界バグを生む構造的な欠陥があった。バースト末尾の到着記録が
+        残ると直後の孤立イベント1件で誤検知し（レビュー指摘）、逆に検知の
+        たびに記録をクリアすると継続中のバーストの末尾を取りこぼす。
+
+        ギャップベースのクラスタリングならこの矛盾が生じない。連続到着の
+        間隔が burst_window_time 秒以内の塊を1クラスタとみなし、そのサイズが
+        burst_max_events を超えたクラスタだけをバーストと判定する。継続中の
+        バーストは全体が1クラスタのままなので末尾の取りこぼしがない。
+
+        注意: バースト終息直後、burst_window_time 秒以内に到着した次のイベント
+        は単連結クラスタリングの定義上「同じクラスタの続き」として連結される
+        （旧実装のように無関係に誤判定されるのではなく、方式の定義通りの挙動）。
+        これは burst_window_time を「バースト検知後に一定時間は次のイベントも
+        警戒する」設計として意図的に許容している。実データでの安全マージンは
+        以下の通り大きい。
+
+        実データの裏付け: 158件バーストの到着間隔は約0.095秒。目視で流星と
+        確認された記録同士の最小間隔は297秒。既定のburst_window_time(1.0秒)は
+        この間にあり両側に桁違いのマージンがある。
+
+        到着記録のprune（メモリ肥大対策）は add_event() 側でのみ行う。ここで
+        current_time を基準に刈ると、pending に長く滞留した古いイベントが
+        確定するタイミングでその到着記録自体を消してしまい判定できなくなる。
+        """
+        window = self.params.burst_window_time
+        limit = self.params.burst_max_events
+        if window <= 0 or limit <= 0 or not self._arrival_times:
+            return set()
+
+        ordered = sorted(self._arrival_times)
+        burst_times: set = set()
+        cluster = [ordered[0]]
+        for t in ordered[1:]:
+            if t - cluster[-1] <= window:
+                cluster.append(t)
+            else:
+                if len(cluster) > limit:
+                    burst_times.update(cluster)
+                cluster = [t]
+        if len(cluster) > limit:
+            burst_times.update(cluster)
+        return burst_times
+
+    def _reject_bursts(self, events: List[MeteorEvent]) -> List[MeteorEvent]:
+        """バーストと判定された時間帯に含まれるイベントを除外する。
+
+        雷のフラッシュや雲の明滅で画面全体の輝度が急変すると、空間的に散在する
+        多数の点が同一フレーム群の中で同時に「軌跡」として成立し、1秒未満の間に
+        数十〜百数十件のイベントが確定することがある（2026-08-15 01:55:00に
+        camera2で158件、start_timeの幅0.192秒の実例）。個々のイベントは
+        _is_mergeable の距離条件を満たさないため EventMerger では結合できず、
+        そのまま全件がMP4書き出しに回ってCPU飽和を増幅する。
+
+        判定自体は _burst_start_times() が到着ログのギャップクラスタリングで
+        行う。flush_expired() が確定を複数バッチに分割しても、到着ログは
+        add_event() のたびに蓄積されているため取りこぼさない。
+        """
+        burst_times = self._burst_start_times()
+        if not events or not burst_times:
+            return events
+
+        kept = [e for e in events if e.start_time not in burst_times]
+        dropped = len(events) - len(kept)
+        if dropped:
+            self._burst_dropped += dropped
+            print(
+                f"[WARN] 同時刻バーストを検出: {dropped}件のイベントを破棄"
+                f"（到着間隔{self.params.burst_window_time}秒以内の塊が"
+                f"{self.params.burst_max_events}件超、"
+                f"輝度急変由来のノイズと判断、累計{self._burst_dropped}件）",
+                flush=True,
+            )
+        return kept
 
     def _is_mergeable(self, prev: MeteorEvent, new: MeteorEvent) -> bool:
         gap = new.start_time - prev.end_time
