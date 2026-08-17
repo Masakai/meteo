@@ -214,15 +214,31 @@ sequenceDiagram
 
         alt トラック完了 (流星判定)
             Detector-->>DetectionThread: MeteorEvent
+            Note over Detector: 方式1a(蛇行)・方式3(速度上限)は<br/>_finalize_track()内で判定済み(v3.19.0)
 
-            DetectionThread->>RingBuffer: get_range(start-1s, end+1s)
-            RingBuffer-->>DetectionThread: frames[]
+            opt contrail_check_enabled (方式2, v3.19.0)
+                DetectionThread->>RingBuffer: get_range(end-window, end+window)
+                RingBuffer-->>DetectionThread: frames[]
+                DetectionThread->>DetectionThread: check_contrail_afterglow()<br/>経路上の残光を比較
+                alt 残光あり(飛行機雲疑い)
+                    DetectionThread->>DetectionThread: mitigation_rejected_counts<br/>[contrail_afterglow]++<br/>保存をスキップ
+                end
+            end
 
-            DetectionThread->>Storage: 動画保存 (オプション)
-            DetectionThread->>Storage: コンポジット画像保存
-            DetectionThread->>Storage: detections.jsonl追記
+            alt 残光なし/方式2無効/評価不能(fail-open)
+                DetectionThread->>RingBuffer: get_range(start-1s, end+1s)
+                RingBuffer-->>DetectionThread: frames[]
 
-            DetectionThread->>DetectionThread: detection_count++
+                DetectionThread->>Storage: 動画保存 (オプション)
+                DetectionThread->>Storage: コンポジット画像保存
+                DetectionThread->>Storage: detections.jsonl追記
+
+                DetectionThread->>DetectionThread: detection_count++
+
+                opt 薄明期間中 (方式4, v3.19.0)
+                    DetectionThread->>DetectionThread: TwilightRateLimiter.record_event()
+                end
+            end
         end
     end
 
@@ -366,6 +382,9 @@ JSONL はあくまで検出エンジン側の追記専用ログであり、`clip
   "composite_original_path": "meteor_20260202_065533_composite_original.jpg"
 }
 ```
+
+!!! note "track_points はrecord_track_points有効時のみ（v3.19.0、方式1b）"
+    カメラの`RECORD_TRACK_POINTS=true`（既定false）時のみ、上記に`"track_points": [[x1, y1], [x2, y2], ...]`が追加される。軌跡点列の観測専用フィールドで、SQLite取り込み・ダッシュボード表示には反映されない（検出エンジン側の効果測定用データ、詳細は`DETECTOR_COMPONENTS.md`「鳥・コウモリ・飛行機雲対策フィルタ」参照）。
 
 **SQLite 取り込み時に付与されるフィールド**（実装: `dashboard_routes._normalize_detection_record`）:
 

@@ -485,6 +485,43 @@ def render_settings_html(cameras, version):
             </div>
         </div>
 
+        <div class="panel">
+            <h2>鳥・コウモリ・飛行機雲対策</h2>
+            <details class="help">
+                <summary>HELP</summary>
+                <p class="help-note">軌跡の形状・速度・時間発展から鳥・コウモリ・飛行機雲を識別する4方式。いずれも既定は無効（0または false）で既存挙動に影響しない。</p>
+                <table class="help-table">
+                    <thead>
+                        <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>max_speed</td><td>方式3: 速度上限フィルタ</td><td>0で無効。超高速の鳥・飛行機雲を上限で棄却</td></tr>
+                        <tr><td>max_heading_variance</td><td>方式1a: 蛇行フィルタの分散閾値</td><td>0で無効。羽ばたきによる進行方向のぶれが大きい軌跡を棄却</td></tr>
+                        <tr><td>min_heading_variance_points</td><td>方式1a判定に必要な最小点数</td><td>これ未満は判定をスキップして通す（fail-open）</td></tr>
+                        <tr><td>record_track_points</td><td>方式1b: 軌跡点列の記録（観測専用、再起動要）</td><td>閾値決定用データ収集。検出結果には影響しない</td></tr>
+                        <tr><td>contrail_check_enabled</td><td>方式2: 飛行機雲の残光チェック（再起動要）</td><td>経路上の輝度残存を見て飛行機雲を棄却</td></tr>
+                        <tr><td>contrail_afterglow_window</td><td>方式2の観測窓（秒、再起動要）</td><td>既定2.0秒。長すぎるとRingBuffer取得コストが増える</td></tr>
+                        <tr><td>contrail_residual_brightness_ratio</td><td>方式2の残光判定比率（再起動要）</td><td>終了直前比でこの比率以上残っていれば残光ありと判定</td></tr>
+                        <tr><td>twilight_rate_suppress_enabled</td><td>方式4: 薄明期間バーストレート抑制の発動（再起動要）</td><td>既定false（観測モード）。有効化すると感度を一時的に下げる</td></tr>
+                        <tr><td>twilight_rate_window_sec</td><td>方式4のレート監視窓（秒、再起動要）</td><td>既定300秒（5分）</td></tr>
+                        <tr><td>twilight_rate_max_events</td><td>方式4の抑制発動閾値（再起動要）</td><td>0は観測専用モード（抑制なし）</td></tr>
+                    </tbody>
+                </table>
+            </details>
+            <div class="grid">
+                <div><label>速度上限 px/秒（max_speed）</label><input id="max_speed" type="number" step="1" min="0"></div>
+                <div><label>蛇行角度分散閾値（max_heading_variance）</label><input id="max_heading_variance" type="number" step="0.01" min="0"></div>
+                <div><label>蛇行判定の最小点数（min_heading_variance_points）</label><input id="min_heading_variance_points" type="number" step="1" min="3"></div>
+                <div><label><input id="record_track_points" type="checkbox"> 軌跡点列を記録する（観測専用、record_track_points）</label></div>
+                <div><label><input id="contrail_check_enabled" type="checkbox"> 飛行機雲の残光チェックを有効にする（contrail_check_enabled）</label></div>
+                <div><label>残光観測窓 秒（contrail_afterglow_window）</label><input id="contrail_afterglow_window" type="number" step="0.1" min="0" max="10"></div>
+                <div><label>残光判定比率（contrail_residual_brightness_ratio）</label><input id="contrail_residual_brightness_ratio" type="number" step="0.01" min="0" max="1"></div>
+                <div><label><input id="twilight_rate_suppress_enabled" type="checkbox"> 薄明レート抑制を発動する（twilight_rate_suppress_enabled）</label></div>
+                <div><label>薄明レート監視窓 秒（twilight_rate_window_sec）</label><input id="twilight_rate_window_sec" type="number" step="1" min="1"></div>
+                <div><label>薄明レート抑制閾値（twilight_rate_max_events）</label><input id="twilight_rate_max_events" type="number" step="1" min="0"></div>
+            </div>
+        </div>
+
         <div class="status" id="status">準備完了</div>
     </div>
     <script>
@@ -504,7 +541,10 @@ def render_settings_html(cameras, version):
             'nuisance_overlap_threshold', 'nuisance_path_overlap_threshold',
             'min_track_points', 'max_stationary_ratio', 'small_area_threshold',
             'mask_dilate', 'nuisance_dilate',
-            'mask_image', 'mask_from_day', 'nuisance_mask_image', 'nuisance_from_night'
+            'mask_image', 'mask_from_day', 'nuisance_mask_image', 'nuisance_from_night',
+            'max_speed', 'max_heading_variance', 'min_heading_variance_points', 'record_track_points',
+            'contrail_check_enabled', 'contrail_afterglow_window', 'contrail_residual_brightness_ratio',
+            'twilight_rate_suppress_enabled', 'twilight_rate_window_sec', 'twilight_rate_max_events'
         ];
         const defaultSettings = {{
             sensitivity: 'medium',
@@ -551,7 +591,17 @@ def render_settings_html(cameras, version):
             bird_filter_enabled: false,
             bird_min_brightness: 80,
             twilight_bird_filter_enabled: true,
-            twilight_bird_min_brightness: 80
+            twilight_bird_min_brightness: 80,
+            max_speed: 0.0,
+            max_heading_variance: 0.0,
+            min_heading_variance_points: 5,
+            record_track_points: false,
+            contrail_check_enabled: false,
+            contrail_afterglow_window: 2.0,
+            contrail_residual_brightness_ratio: 0.5,
+            twilight_rate_suppress_enabled: false,
+            twilight_rate_window_sec: 300,
+            twilight_rate_max_events: 0
         }};
 
         function setStatus(message) {{

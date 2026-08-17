@@ -5,7 +5,7 @@ Copyright (c) 2026 Masanori Sakai
 Licensed under the MIT License
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 import hashlib
 from pathlib import Path
@@ -26,7 +26,12 @@ from urllib.parse import urlparse
 import cv2
 import numpy as np
 
-from meteor_detector_common import calculate_linearity, calculate_confidence, open_video_writer
+from meteor_detector_common import (
+    calculate_confidence,
+    calculate_heading_variance,
+    calculate_linearity,
+    open_video_writer,
+)
 
 # FFmpegバックエンドのTCP読み書きタイムアウト（マイクロ秒）。TCP接続が生きたまま
 # ストリームが停止すると cap.read() が無期限にブロックしうるため、
@@ -319,6 +324,10 @@ class MeteorEvent:
     peak_brightness: float
     confidence: float
     frames: List[Tuple[float, np.ndarray]]
+    # 方式1b（軌跡点列の記録、観測専用）。record_track_points有効時のみ
+    # _finalize_track() から渡される。既定は空リストで後方互換を維持する。
+    track_xs: List[int] = field(default_factory=list)
+    track_ys: List[int] = field(default_factory=list)
 
     @property
     def duration(self) -> float:
@@ -331,7 +340,7 @@ class MeteorEvent:
         return np.sqrt(dx**2 + dy**2)
 
     def to_dict(self) -> dict:
-        return {
+        record = {
             "timestamp": self.timestamp.isoformat(),
             "start_time": round(self.start_time, 3),
             "end_time": round(self.end_time, 3),
@@ -342,6 +351,13 @@ class MeteorEvent:
             "peak_brightness": round(self.peak_brightness, 1),
             "confidence": round(self.confidence, 2),
         }
+        # track_xs/track_ysはrecord_track_points有効時のみ_finalize_track()が
+        # 渡すため、非空であることをそのままオプトインの判定に使う（既存呼び出し
+        # 元のsave_meteor_event()がto_dict()を引数なしで呼ぶため、データ駆動で
+        # 判定する必要がある）。
+        if self.track_xs and self.track_ys:
+            record["track_points"] = [[x, y] for x, y in zip(self.track_xs, self.track_ys)]
+        return record
 
 
 @dataclass
@@ -376,6 +392,16 @@ class DetectionParams:
     min_track_points: int = 4
     max_stationary_ratio: float = 0.40
     small_area_threshold: int = 40
+    # 方式3（薄明期間速度上限フィルタ）: 0.0=無効。既存min_speedと対称の上限判定。
+    max_speed: float = 0.0
+    # 方式1a（蛇行フィルタ）: 0.0=無効。calculate_heading_varianceの閾値。
+    max_heading_variance: float = 0.0
+    # 方式1aの判定に必要な最小軌跡点数。これ未満は統計的に不安定なため
+    # 判定をスキップして通す（fail-open）。
+    min_heading_variance_points: int = 5
+    # 方式1b（軌跡点列の記録、観測専用）: 既定False=記録しない。
+    # データ構造が変わるため起動時反映（http_handlers.pyのstartup_bool_fields）。
+    record_track_points: bool = False
 
     def __post_init__(self):
         if self.min_brightness_tracking is None:
@@ -411,6 +437,15 @@ class DetectionParams:
         )
         self.burst_max_events = int(
             self._clamp_and_warn("burst_max_events", self.burst_max_events, 1, None)
+        )
+        self.max_speed = self._clamp_and_warn("max_speed", self.max_speed, 0.0, None)
+        self.max_heading_variance = self._clamp_and_warn(
+            "max_heading_variance", self.max_heading_variance, 0.0, None
+        )
+        self.min_heading_variance_points = int(
+            self._clamp_and_warn(
+                "min_heading_variance_points", self.min_heading_variance_points, 3, None
+            )
         )
 
         # burst_max_events × burst_window_time が _prune_arrival_times() の
@@ -460,6 +495,48 @@ class RingBuffer:
     def get_range(self, start_time: float, end_time: float) -> List[Tuple[float, np.ndarray]]:
         with self.lock:
             return [(t, f.copy()) for t, f in self.buffer if start_time <= t <= end_time]
+
+    def get_nearest_in_range(
+        self,
+        target_time: float,
+        start_time: float,
+        end_time: float,
+        *,
+        end_exclusive: bool = False,
+    ) -> Optional[Tuple[float, np.ndarray]]:
+        """[start_time, end_time]（end_exclusive=Trueなら[start_time, end_time)）の
+        範囲内で、target_timeに最も近いフレームだけを複製して返す。
+
+        get_range()は範囲内の全フレームをf.copy()で複製したリストとして返すため、
+        呼び出し側が1フレームしか使わない場合でも範囲内の全フレーム分のメモリ
+        コピーが発生する（第3回レビュー新規指摘C）。本メソッドはタイムスタンプの
+        比較のみで最も近い1件を特定し、複製はその1フレームに限定する。
+
+        走査中はコピーせず、最後に選ばれた1件のみをコピーする。範囲内に候補が
+        無ければNoneを返す（get_range()に空リストを渡した場合と同じ挙動）。
+        同距離の候補が複数ある場合はバッファ内で時刻が古い方を優先する
+        （get_range()の結果に対するmin()のタイブレークと同じ、挿入順=時刻順の
+        dequeにおける最初の最小値を採用する動作に合わせる）。
+        """
+        best: Optional[Tuple[float, np.ndarray]] = None
+        best_dist = None
+        with self.lock:
+            for t, f in self.buffer:
+                if t < start_time:
+                    continue
+                if end_exclusive:
+                    if t >= end_time:
+                        continue
+                else:
+                    if t > end_time:
+                        continue
+                dist = abs(t - target_time)
+                if best is None or dist < best_dist:
+                    best = (t, f)
+                    best_dist = dist
+            if best is None:
+                return None
+            return (best[0], best[1].copy())
 
 
 class RTSPReader:
@@ -593,6 +670,10 @@ class RealtimeMeteorDetector:
         self.next_track_id = 0
         self.lock = Lock()
         self.mask_lock = Lock()
+        # 方式1a・方式3の棄却カウンタ。meteor_detector_realtime.pyはdetection_state
+        # へ依存させない方針（変更禁止ファイルへの追加カップリングを避けるため）。
+        # meteor_detector_rtsp_web.py側がこの辞書を読んでstate側の統計へ合算する。
+        self.rejected_counts: Dict[str, int] = {"heading_variance": 0, "max_speed": 0}
 
     def detect_bright_objects(self, frame: np.ndarray, prev_frame: np.ndarray, tracking_mode: bool = False) -> List[dict]:
         """明るい移動物体を検出"""
@@ -794,10 +875,33 @@ class RealtimeMeteorDetector:
             _debug_log(f"[DEBUG] rejected_by=speed speed={speed:.1f}")
             return None
 
+        # 方式3（薄明期間速度上限フィルタ）: max_speed=0.0は無効（fail-open）。
+        # 既存min_speed判定と対称の上限判定で、鳥・飛行機雲等の高速移動体を棄却する。
+        if self.params.max_speed > 0 and speed > self.params.max_speed:
+            _debug_log(f"[DEBUG] rejected_by=max_speed speed={speed:.1f}")
+            self.rejected_counts["max_speed"] = self.rejected_counts.get("max_speed", 0) + 1
+            print(f"[INFO] rejected_by=max_speed speed={speed:.1f} max={self.params.max_speed:.1f}", flush=True)
+            return None
+
         linearity = calculate_linearity(xs, ys)
         if linearity < self.params.min_linearity:
             _debug_log(f"[DEBUG] rejected_by=linearity linearity={linearity:.2f}")
             return None
+
+        # 方式1a（蛇行フィルタ）: max_heading_variance=0.0は無効（fail-open）。
+        # min_heading_variance_points未満の点数では統計的に不安定なため判定を
+        # スキップして通す（fail-open、確定流星の誤棄却を避けるための必須条件）。
+        if self.params.max_heading_variance > 0 and len(xs) >= self.params.min_heading_variance_points:
+            heading_variance = calculate_heading_variance(xs, ys)
+            if heading_variance > self.params.max_heading_variance:
+                _debug_log(f"[DEBUG] rejected_by=heading_variance variance={heading_variance:.3f}")
+                self.rejected_counts["heading_variance"] = self.rejected_counts.get("heading_variance", 0) + 1
+                print(
+                    f"[INFO] rejected_by=heading_variance variance={heading_variance:.3f} "
+                    f"max={self.params.max_heading_variance:.3f}",
+                    flush=True,
+                )
+                return None
 
         confidence = calculate_confidence(
             length,
@@ -820,6 +924,10 @@ class RealtimeMeteorDetector:
             peak_brightness=max(brightness),
             confidence=confidence,
             frames=[],
+            # 方式1b（観測専用）。record_track_points有効時のみ記録する
+            # （既定は空リストのままでdetections.jsonlのフォーマットを変えない）。
+            track_xs=list(xs) if self.params.record_track_points else [],
+            track_ys=list(ys) if self.params.record_track_points else [],
         )
 
     def finalize_all(self) -> List[MeteorEvent]:
@@ -1047,6 +1155,10 @@ class EventMerger:
             peak_brightness=max(prev.peak_brightness, new.peak_brightness),
             confidence=max(prev.confidence, new.confidence),
             frames=[],
+            # 方式1b（観測専用）: 断片マージ時は軌跡点列も連結する。どちらかが
+            # 空リスト（record_track_points無効）ならそのまま空リストになる。
+            track_xs=prev.track_xs + new.track_xs,
+            track_ys=prev.track_ys + new.track_ys,
         )
 
 

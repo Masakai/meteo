@@ -8,12 +8,20 @@ from meteor_detector_realtime import (
     EventMerger,
     MeteorEvent,
     RealtimeMeteorDetector,
+    RingBuffer,
     estimate_fps_from_frames,
     make_detection_base_name,
     make_detection_id,
     probe_rtsp_endpoint,
     sanitize_fps,
 )
+
+
+def _build_detector_with_track(params, track_points):
+    """active_tracksに1本のトラックを仕込んだdetectorを作り_finalize_track()を呼ぶ。"""
+    detector = RealtimeMeteorDetector(params, fps=20)
+    detector.active_tracks[0] = track_points
+    return detector._finalize_track(0)
 
 
 def _event(start_time, end_time, start_point, end_point, confidence=0.7):
@@ -342,6 +350,187 @@ def test_detection_params_warns_when_burst_span_exceeds_prune_retention(capsys):
     assert "[WARN] バースト抑制の設定が保持幅を超えています" in captured.out
 
 
+def _straight_fast_track_points(n=6):
+    """直線・高速・高輝度の確定流星相当トラック点列（デフォルトparamsで確実に通る）。"""
+    return [(i * 0.02, 100 + i * 60, 100 + i * 60, 220.0) for i in range(n)]
+
+
+def test_finalize_track_default_params_accepts_straight_fast_track():
+    # 4方式すべて既定値（無効）のとき、直線・高速な確定流星相当トラックが
+    # 従来通り棄却されないことを確認する（既定で無効という要件のfalse-negative
+    # 側の保証）。
+    params = DetectionParams()
+    event = _build_detector_with_track(params, _straight_fast_track_points())
+    assert event is not None
+    assert event.track_xs == []
+    assert event.track_ys == []
+
+
+def test_finalize_track_max_speed_zero_disables_filter():
+    # max_speed=0.0（既定）は無効。高速トラックでも棄却されない。
+    params = DetectionParams(max_speed=0.0)
+    event = _build_detector_with_track(params, _straight_fast_track_points())
+    assert event is not None
+
+
+def test_finalize_track_rejects_when_speed_exceeds_max_speed():
+    params = DetectionParams(max_speed=100.0)
+    detector = RealtimeMeteorDetector(params, fps=20)
+    track_points = _straight_fast_track_points()
+    detector.active_tracks[0] = track_points
+    event = detector._finalize_track(0)
+    assert event is None
+    assert detector.rejected_counts["max_speed"] == 1
+
+
+def test_finalize_track_max_speed_does_not_reject_slow_track():
+    # 既存min_speed(50.0)は満たしつつmax_speedの範囲内に収まる速度のトラック。
+    # 対角移動のため実速度は成分速度の約1.41倍になる点に注意
+    # （speed = length(start-end直線距離) / duration）。
+    params = DetectionParams(max_speed=100.0)
+    track_points = [(i * 0.2, 100 + i * 10, 100 + i * 10, 220.0) for i in range(6)]
+    event = _build_detector_with_track(params, track_points)
+    assert event is not None
+
+
+def test_finalize_track_heading_variance_zero_disables_filter():
+    # max_heading_variance=0.0（既定）は無効。蛇行トラックでも棄却されない。
+    params = DetectionParams(max_heading_variance=0.0, min_track_points=2)
+    zigzag = [
+        (0.0, 100, 100, 220.0),
+        (0.05, 160, 100, 220.0),
+        (0.10, 160, 160, 220.0),
+        (0.15, 220, 160, 220.0),
+        (0.20, 220, 220, 220.0),
+        (0.25, 280, 220, 220.0),
+    ]
+    event = _build_detector_with_track(params, zigzag)
+    assert event is not None
+
+
+def test_finalize_track_rejects_high_heading_variance():
+    params = DetectionParams(max_heading_variance=0.5, min_heading_variance_points=5, min_track_points=2)
+    zigzag = [
+        (0.0, 100, 100, 220.0),
+        (0.05, 160, 100, 220.0),
+        (0.10, 160, 160, 220.0),
+        (0.15, 220, 160, 220.0),
+        (0.20, 220, 220, 220.0),
+        (0.25, 280, 220, 220.0),
+    ]
+    detector = RealtimeMeteorDetector(params, fps=20)
+    detector.active_tracks[0] = zigzag
+    event = detector._finalize_track(0)
+    assert event is None
+    assert detector.rejected_counts["heading_variance"] == 1
+
+
+def test_finalize_track_heading_variance_fail_open_below_min_points():
+    # min_heading_variance_points未満の点数では判定をスキップして通す（fail-open）。
+    # zigzagの点数(6)よりmin_heading_variance_pointsを大きく設定して確認する。
+    params = DetectionParams(max_heading_variance=0.01, min_heading_variance_points=10, min_track_points=2)
+    zigzag = [
+        (0.0, 100, 100, 220.0),
+        (0.05, 160, 100, 220.0),
+        (0.10, 160, 160, 220.0),
+        (0.15, 220, 160, 220.0),
+        (0.20, 220, 220, 220.0),
+        (0.25, 280, 220, 220.0),
+    ]
+    event = _build_detector_with_track(params, zigzag)
+    assert event is not None
+
+
+def test_finalize_track_records_track_points_when_enabled():
+    params = DetectionParams(record_track_points=True)
+    track_points = _straight_fast_track_points()
+    event = _build_detector_with_track(params, track_points)
+    assert event is not None
+    assert event.track_xs == [p[1] for p in track_points]
+    assert event.track_ys == [p[2] for p in track_points]
+
+
+def test_meteor_event_to_dict_omits_track_points_by_default():
+    event = MeteorEvent(
+        timestamp=datetime(2026, 8, 17, 4, 0, 0),
+        start_time=0.0,
+        end_time=0.1,
+        start_point=(0, 0),
+        end_point=(10, 10),
+        peak_brightness=220.0,
+        confidence=0.8,
+        frames=[],
+    )
+    assert "track_points" not in event.to_dict()
+
+
+def test_meteor_event_to_dict_includes_track_points_when_recorded():
+    event = MeteorEvent(
+        timestamp=datetime(2026, 8, 17, 4, 0, 0),
+        start_time=0.0,
+        end_time=0.1,
+        start_point=(0, 0),
+        end_point=(10, 10),
+        peak_brightness=220.0,
+        confidence=0.8,
+        frames=[],
+        track_xs=[0, 5, 10],
+        track_ys=[0, 5, 10],
+    )
+    assert event.to_dict()["track_points"] == [[0, 0], [5, 5], [10, 10]]
+
+
+def test_event_merger_merge_concatenates_track_points():
+    params = DetectionParams()
+    merger = EventMerger(params)
+    prev = _event(100.0, 100.1, (10, 10), (20, 20))
+    prev.track_xs = [10, 20]
+    prev.track_ys = [10, 20]
+    new = _event(100.2, 100.3, (25, 25), (35, 35))
+    new.track_xs = [25, 35]
+    new.track_ys = [25, 35]
+    merged = merger._merge(prev, new)
+    assert merged.track_xs == [10, 20, 25, 35]
+    assert merged.track_ys == [10, 20, 25, 35]
+
+
+def test_detection_params_new_fields_default_values_are_not_clamped():
+    params = DetectionParams()
+    assert params.max_speed == 0.0
+    assert params.max_heading_variance == 0.0
+    assert params.min_heading_variance_points == 5
+    assert params.record_track_points is False
+
+
+def test_finalize_track_all_mitigation_defaults_accept_fast_zigzag_track():
+    # 4方式すべて既定値（無効）のとき、高速かつ蛇行した軌跡（本来なら方式1a・
+    # 方式3どちらの対象にもなりうる特徴を併せ持つ）でも既存の判定基準
+    # （min_track_points/min_linearity等）さえ満たせば棄却されないことを確認する。
+    # false-negative（確定流星の誤棄却）が既定で発生しないことの直接的な保証。
+    params = DetectionParams(min_track_points=2, min_linearity=0.0)
+    fast_zigzag = [
+        (0.00, 100, 100, 220.0),
+        (0.02, 400, 100, 220.0),
+        (0.04, 400, 400, 220.0),
+        (0.06, 700, 400, 220.0),
+        (0.08, 700, 700, 220.0),
+        (0.10, 1000, 700, 220.0),
+    ]
+    event = _build_detector_with_track(params, fast_zigzag)
+    assert event is not None
+
+
+def test_detection_params_clamps_negative_max_speed_and_heading_variance(capsys):
+    params = DetectionParams(max_speed=-10.0, max_heading_variance=-1.0, min_heading_variance_points=1)
+    assert params.max_speed == 0.0
+    assert params.max_heading_variance == 0.0
+    assert params.min_heading_variance_points == 3
+    captured = capsys.readouterr()
+    assert "max_speed" in captured.out
+    assert "max_heading_variance" in captured.out
+    assert "min_heading_variance_points" in captured.out
+
+
 def test_detect_bright_objects_roi_matches_full_frame_calculation():
     # detect_bright_objects の brightness / nuisance_overlap_ratio 計算を
     # 輪郭のROI(外接矩形)に限定した実装に変更したが、結果はフレーム全面で
@@ -410,3 +599,76 @@ def test_detect_bright_objects_roi_matches_full_frame_calculation():
     # 入れ替えといった実装ミスがあれば異なる値を返す（1pxずれなら0.5、
     # 座標入れ替えなら形状不一致でValueError）。
     assert round(by_brightness[205]["nuisance_overlap_ratio"], 4) == 0.5304
+
+
+class TestRingBufferGetNearestInRange:
+    """第3回レビュー指摘C是正: get_range()の3回呼び出し（範囲内の全フレームを
+    複製してからmin()で1件選ぶ）を、複製を1フレームに限定したget_nearest_in_range()
+    に置き換えた。get_range()+min()と同じ選択結果になること、コピー意味論
+    （返り値を書き換えてもバッファ内が汚れないこと）を確認する。
+    """
+
+    def _buffer_with_frames(self, entries):
+        rb = RingBuffer(max_seconds=10.0, fps=20)
+        for t, value in entries:
+            rb.add(t, np.full((2, 2), value, dtype=np.uint8))
+        return rb
+
+    def test_empty_buffer_returns_none(self):
+        rb = RingBuffer(max_seconds=10.0, fps=20)
+        assert rb.get_nearest_in_range(1.0, 0.0, 2.0) is None
+
+    def test_no_candidate_in_range_returns_none(self):
+        rb = self._buffer_with_frames([(0.1, 10), (5.0, 20)])
+        assert rb.get_nearest_in_range(1.0, 0.5, 0.9) is None
+
+    def test_selects_nearest_to_target_within_range(self):
+        rb = self._buffer_with_frames([(0.1, 10), (0.9, 20), (1.5, 30), (3.0, 40)])
+        # get_range(0.0, 2.0) + min(key=|t-1.0|) と同じ結果になるはず: t=0.9
+        result = rb.get_nearest_in_range(1.0, 0.0, 2.0)
+        assert result[0] == 0.9
+        assert result[1][0, 0] == 20
+
+    def test_matches_get_range_plus_min_semantics(self):
+        entries = [(0.1, 10), (0.4, 11), (0.9, 20), (1.5, 30), (3.0, 40)]
+        rb = self._buffer_with_frames(entries)
+        start, end, target = 0.0, 2.0, 1.2
+        expected = min(rb.get_range(start, end), key=lambda tf: abs(tf[0] - target))
+        result = rb.get_nearest_in_range(target, start, end)
+        assert result[0] == expected[0]
+        assert np.array_equal(result[1], expected[1])
+
+    def test_tie_break_prefers_older_frame_like_get_range_plus_min(self):
+        # target=1.0からt=0.5とt=1.5は等距離。get_range()+min()はdequeの
+        # 挿入順（時刻順）で最初の最小値、すなわち古い方(0.5)を返す。
+        rb = self._buffer_with_frames([(0.5, 10), (1.5, 20)])
+        result = rb.get_nearest_in_range(1.0, 0.0, 2.0)
+        assert result[0] == 0.5
+
+    def test_end_exclusive_excludes_boundary_frame(self):
+        rb = self._buffer_with_frames([(0.4, 10), (0.9, 20)])
+        # end_exclusive=Trueならt==0.9（target自身）は候補から除外され、
+        # t=0.4が選ばれる。
+        result = rb.get_nearest_in_range(0.9, 0.0, 0.9, end_exclusive=True)
+        assert result[0] == 0.4
+
+    def test_end_inclusive_by_default(self):
+        rb = self._buffer_with_frames([(0.4, 10), (0.9, 20)])
+        result = rb.get_nearest_in_range(0.9, 0.0, 0.9)
+        assert result[0] == 0.9
+
+    def test_negative_start_time_is_not_clamped(self):
+        # 第3回レビュー指摘D: get_nearest_in_rangeは範囲外を単に無視するため、
+        # 呼び出し側でmax(0.0, ...)によるクランプは不要。負の下限を渡しても
+        # 例外にならず、範囲内（下限も含む）の候補を正しく選ぶ。
+        rb = self._buffer_with_frames([(-1.5, 10), (0.0, 20)])
+        result = rb.get_nearest_in_range(0.0, -1.5, 0.0)
+        assert result[0] == 0.0
+
+    def test_returned_frame_is_a_copy_not_shared_with_buffer(self):
+        rb = self._buffer_with_frames([(0.5, 10)])
+        result = rb.get_nearest_in_range(0.5, 0.0, 1.0)
+        result[1][0, 0] = 255
+        # 返り値を書き換えても、バッファ内の実体には影響しない。
+        internal = rb.get_range(0.0, 1.0)[0][1]
+        assert internal[0, 0] == 10

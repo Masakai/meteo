@@ -232,6 +232,14 @@ def generate_service(index: int, rtsp_info: dict, settings: dict, web_port: int,
       - TWILIGHT_TYPE={settings.get('twilight_type', 'nautical')}
       - TWILIGHT_SENSITIVITY={settings.get('twilight_sensitivity', 'low')}
       - TWILIGHT_MIN_SPEED={settings.get('twilight_min_speed', '200')}
+      - TWILIGHT_MAX_SPEED={settings.get('twilight_max_speed', '0')}
+      - RECORD_TRACK_POINTS={settings.get('record_track_points', 'false')}
+      - CONTRAIL_CHECK_ENABLED={settings.get('contrail_check_enabled', 'false')}
+      - CONTRAIL_AFTERGLOW_WINDOW={settings.get('contrail_afterglow_window', '2.0')}
+      - CONTRAIL_RESIDUAL_BRIGHTNESS_RATIO={settings.get('contrail_residual_brightness_ratio', '0.5')}
+      - TWILIGHT_RATE_WINDOW_SEC={settings.get('twilight_rate_window_sec', '300')}
+      - TWILIGHT_RATE_MAX_EVENTS={settings.get('twilight_rate_max_events', '0')}
+      - TWILIGHT_RATE_SUPPRESS_ENABLED={settings.get('twilight_rate_suppress_enabled', 'false')}
       - WEB_PORT=8080
       - LOG_FILE=/logs/{service_name}.log
     ports:

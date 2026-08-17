@@ -492,6 +492,7 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 "twilight_active": state.current_twilight_active,
                 "twilight_detection_mode": state.current_twilight_detection_mode,
                 "twilight_type": state.current_twilight_type,
+                "mitigation_rejected_counts": dict(state.current_mitigation_rejected_counts),
             }
             self.wfile.write(json.dumps(stats).encode())
         elif path == '/recording/status':
@@ -907,6 +908,8 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 ("small_area_threshold", 1, None),
                 ("mask_dilate", 0, 255),
                 ("nuisance_dilate", 0, 255),
+                # 方式1a（蛇行フィルタ）。レンジはDetectionParams.validate()と一致させる。
+                ("min_heading_variance_points", 3, None),
             ]
             float_fields = [
                 ("min_duration", 0.0, None),
@@ -925,14 +928,38 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 ("max_stationary_ratio", 0.0, 1.0),
                 ("clip_margin_before", 0.0, 10.0),
                 ("clip_margin_after", 0.0, 10.0),
+                # 方式3（薄明期間速度上限フィルタ）。0.0=無効。
+                ("max_speed", 0.0, None),
+                # 方式1a（蛇行フィルタ）。0.0=無効。レンジはDetectionParams.validate()と一致。
+                ("max_heading_variance", 0.0, None),
             ]
             startup_float_fields = [
                 ("scale", 0.05, 1.0),
                 ("buffer", 1.0, 120.0),
                 ("bird_min_brightness", 0.0, 255.0),
                 ("twilight_bird_min_brightness", 0.0, 255.0),
+                # 方式2（飛行機雲の残光チェック）。データ構造変更を伴わないが、
+                # 追加のRingBuffer解析処理が起動時に組み込まれるため起動時反映。
+                ("contrail_afterglow_window", 0.0, 10.0),
+                ("contrail_residual_brightness_ratio", 0.0, 1.0),
+                # 方式4（薄明期間バーストレート抑制、観測モードから開始）。
+                ("twilight_rate_window_sec", 1.0, 3600.0),
             ]
-            startup_bool_fields = ("extract_clips", "bird_filter_enabled", "twilight_bird_filter_enabled")
+            startup_int_fields = [
+                ("twilight_rate_max_events", 0, None),
+            ]
+            startup_bool_fields = (
+                "extract_clips",
+                "bird_filter_enabled",
+                "twilight_bird_filter_enabled",
+                # 方式1b（軌跡点列の記録、観測専用）。MeteorEventのデータ構造が
+                # 変わるため起動時反映（再起動要）。
+                "record_track_points",
+                # 方式2（飛行機雲の残光チェック）。
+                "contrail_check_enabled",
+                # 方式4（薄明期間バーストレート抑制）の抑制発動フラグ。
+                "twilight_rate_suppress_enabled",
+            )
             startup_text_fields = ("sensitivity",)
             startup_path_fields = ("mask_image", "mask_from_day", "nuisance_mask_image", "nuisance_from_night")
 
@@ -1127,6 +1154,17 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 except Exception as e:
                     errors.append(str(e))
 
+            for field, min_v, max_v in startup_int_fields:
+                try:
+                    value = _to_int(field, min_v, max_v)
+                    if value is not None:
+                        overrides_update[field] = value
+                        applied[field] = value
+                        restart_required = True
+                        restart_triggers.append(field)
+                except Exception as e:
+                    errors.append(str(e))
+
             for field in startup_bool_fields:
                 try:
                     value = _to_bool_field(field)
@@ -1185,6 +1223,9 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 "min_track_points",
                 "max_stationary_ratio",
                 "small_area_threshold",
+                "max_speed",
+                "max_heading_variance",
+                "min_heading_variance_points",
             ):
                 if field in applied:
                     overrides_update[field] = applied[field]
@@ -1248,6 +1289,16 @@ class MJPEGHandler(BaseHTTPRequestHandler):  # pragma: no cover
                 "bird_min_brightness",
                 "twilight_bird_filter_enabled",
                 "twilight_bird_min_brightness",
+                "max_speed",
+                "max_heading_variance",
+                "min_heading_variance_points",
+                "record_track_points",
+                "contrail_check_enabled",
+                "contrail_afterglow_window",
+                "contrail_residual_brightness_ratio",
+                "twilight_rate_suppress_enabled",
+                "twilight_rate_window_sec",
+                "twilight_rate_max_events",
             ):
                 if key in applied:
                     settings_updates[key] = applied[key]

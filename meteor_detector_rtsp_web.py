@@ -15,7 +15,7 @@ Licensed under the MIT License
 import argparse
 import cv2
 import numpy as np
-from typing import List, Tuple, Optional, Dict
+from typing import List, Optional, Dict
 from threading import Thread, Event
 import time
 import signal
@@ -53,6 +53,7 @@ from detection_filters import (
     build_twilight_params,
     filter_dark_objects,
     apply_sensitivity_preset,
+    TwilightRateLimiter,
 )
 from recording_manager import (
     _stop_recording_process,
@@ -66,6 +67,16 @@ VERSION = "3.6.1"
 # 超えると検出スレッドが孤児化して「終了」ログの後も保存を続けることになる。
 SHUTDOWN_SAVE_BUDGET_SEC = 4.0
 
+# 方式4（薄明期間バーストレート抑制）: レート超過時に感度プリセットを一段階
+# 下げる（誤検出を減らす方向＝lowに近づける）ためのステップマッピング。
+# faint は薄明reduceモードのプリセットとしては通常使わないが念のため定義する。
+_TWILIGHT_SENSITIVITY_STEP_DOWN = {
+    "faint": "high",
+    "high": "medium",
+    "medium": "low",
+    "low": "low",
+}
+
 # 天文薄暮期間の判定用
 try:
     from astro_utils import is_detection_active
@@ -76,6 +87,239 @@ try:
     from astro_twilight_utils import is_twilight_active
 except ImportError:
     is_twilight_active = None
+
+
+def _clamp_env_value_and_warn(name, value, min_v, max_v):
+    """環境変数またはconfig.json(runtime_overrides)由来の値をレンジ外ならクランプし
+    [WARN]ログを出す。
+
+    contrail_afterglow_window / contrail_residual_brightness_ratio /
+    twilight_rate_window_sec / twilight_rate_max_events はDetectionParamsの
+    フィールドではないため、DetectionParams._clamp_and_warn()は使わずここに
+    ローカル実装する（メッセージにDetectionParamsではなく実際のパラメータ名を
+    正しく出すため）。process_rtsp_stream()内、runtime_overrides適用直後の
+    一箇所で呼び出すことで、main()のenv読み取り経路とconfig.json
+    (runtime_overrides)経由の上書き経路の両方をカバーする。レンジは
+    /apply_settingsの検証テーブル（http_handlers.pyのstartup_float_fields/
+    startup_int_fields）と一致させる。特にtwilight_rate_window_secの下限1.0は、
+    0や負値がTwilightRateLimiter._prune()のcutoff計算を破壊し記録を即座に
+    全消去する問題を防ぐために必須。
+    """
+    clamped = value
+    if min_v is not None and clamped < min_v:
+        clamped = min_v
+    if max_v is not None and clamped > max_v:
+        clamped = max_v
+    if clamped != value:
+        print(
+            f"[WARN] {name}={value} は許容範囲外のためクランプ: {clamped}",
+            flush=True,
+        )
+    return clamped
+
+
+def check_contrail_afterglow(
+    ring_buffer,
+    event,
+    params,
+    *,
+    window: float = 2.0,
+    residual_brightness_ratio: float = 0.5,
+    sample_points: int = 5,
+    frame_time_tolerance_ratio: float = 0.25,
+    min_excess_brightness: float = 8.0,
+) -> bool:
+    """飛行機雲の残光チェック（方式2）。真=飛行機雲疑いで棄却。
+
+    event.start_point〜end_pointを結ぶ経路上の数点について、イベント終了直後
+    のフレームでの「背景を差し引いた経路の輝度超過分」が終了直前フレームと
+    比べて有意に残存しているかを見る。飛行機雲は太陽光を反射し続けるため
+    軌跡経路に沿って輝度が残りやすく、流星は一瞬の発光のため直後には残らない
+    性質を利用する。
+
+    背景の推定には各サンプル点を中心としたリング状領域（経路パッチの外側、
+    中心からinner_radius〜outer_radius）の中央値を用いる。パッチ平均から
+    この背景推定値を差し引いた「超過輝度」をbefore/afterそれぞれで求める。
+    単純な絶対輝度比較では、背景そのものが明るい場合（薄明期間・月明かり等）
+    に流星が完全に消滅していてもafterのパッチ輝度がbeforeの一定割合を
+    超えてしまい、確定流星を誤棄却する（fail-open原則違反）。背景を
+    差し引くことでこの誤判定を避ける（リング差し引き、指摘1是正）。
+
+    ただしリング差し引きはパッチの周囲の輝度しか除去できない。パッチ内部に
+    恒常的に存在する高輝度源（恒星・ホットピクセル・固定光源）があると、
+    その輝度はbefore/after双方の超過輝度に等しく残ってしまい、静止成分が
+    十分明るいと消滅した流星でも「残光あり」と誤判定する（指摘1と同クラスの
+    fail-open違反、第2回レビュー新規指摘B）。これを避けるため、イベント
+    開始前（流星が写り込む前）のベースラインフレームでも同じ超過輝度
+    excess_baseを求め、before/afterそれぞれからexcess_baseを差し引いた
+    m_before（流星による輝度上昇分のみ）・m_afterで比を取る。before/after/
+    baseの3フレームすべてに等しく存在する静止成分（恒星等）はこの差し引きで
+    相殺されるため、residual_brightness_ratioの意味（「流星自身の寄与のうち
+    どれだけが残ったか」の比）は変わらない。
+
+    beforeの超過輝度（m_before、ベースライン差し引き後）がmin_excess_brightness
+    未満（流星由来の輝度上昇がパッチに観測できない）のサンプル点は判定不能
+    としてスキップする。これは前後フレームが完全に同一の静止シーンであっても
+    residual_hitsに数えられないことを保証する（fail-openの根幹）。さらに、
+    判定可能なサンプル点数（valid_samples）がsample_pointsの過半数に満たない
+    場合も評価不能として通す。単発ノイズによる残光っぽい値が1点だけ観測
+    できたケースで、その1点だけでresidual_hits/valid_samples比が跳ね上がり
+    誤棄却することを防ぐため。
+
+    params引数は現時点では未使用（判定に必要な閾値はすべてキーワード引数
+    window/residual_brightness_ratioで渡している）。呼び出し元のDetectionParams
+    を将来的な拡張のために受け取れるようシグネチャに残している。
+
+    座標系: event.start_point/end_pointはフル解像度座標（meteor_detector_rtsp_web.py
+    の scale_factor 変換後）であり、本関数はフル解像度フレームに対してそのまま
+    処理する（既存の_calculate_line_overlap_ratioのスケール不整合を新規コードに
+    持ち込まない設計方針）。
+
+    評価不能（フレーム不足、ストリーム終端付近でRingBufferがwindow秒後まで
+    到達していない、イベント開始前のベースラインフレームがRingBufferに
+    残っていない等）の場合はフィルタを適用せず通す（fail-open）。特に
+    frame_afterが要求時刻(event.end_time + window)から大きくずれている場合、
+    観測窓が実質的に縮小され残光判定の意味が変わってしまう
+    （終了直後の輝度をwindow秒後の輝度と誤って比較し、残光が実際は消えている
+    のに「残っている」と誤判定して確定流星を棄却するリスクがある）ため、
+    許容誤差を超えるずれは評価不能として扱う。ベースラインフレームについても
+    同じ許容誤差でevent.start_timeとの近さを要求する。
+
+    既知の限界:
+    - 飛行機雲がwindow秒以内に周囲へ拡散した場合、背景推定用のリング領域も
+      明るくなり超過輝度が過小評価されうる（見逃し方向でありfail-open原則
+      には反しない、感度上の制約）。痕の幅が概ね9px以上になるとリング
+      （半径6〜10px）が痕自身で汚染され、同様に見逃し方向へ働く。
+    - ベースラインフレームはevent.start_timeより前かつRingBuffer内に必要。
+      RingBufferの実効長は`min(buffer_seconds, max_duration + 2.0)`（既定値では
+      約12秒）に制限されるため、イベント継続時間がmax_durationに近づくほど
+      ベースライン取得の余裕が減る（見逃し方向でありfail-open原則には反しない）。
+
+    フレーム取得: baseline/before/afterの3フレームは、いずれもRingBuffer.
+    get_nearest_in_range()で目標時刻に最も近い1フレームのみを複製して取得する
+    （第3回レビュー指摘C是正）。従来はRingBuffer.get_range()で範囲内の全フレーム
+    を複製したリストを作ってから最も近い1件を選んでおり、1920x1080想定で
+    イベントごとに約946MBの不要な複製と約149msの検出スレッド停止が発生して
+    いた。get_nearest_in_range()はタイムスタンプの比較のみで走査し、選ばれた
+    1フレームだけを複製するため、同条件で約18MB・数msに削減される。
+    """
+    # get_nearest_in_rangeは範囲外を単に無視する実装のため、下限クランプ
+    # （旧: max(0.0, ...)）は不要（第3回レビュー指摘D）。event.start_time==0.0の
+    # ストリーム開始直後のイベントでも[start_time-window, start_time)がそのまま
+    # 渡り、ベースライン取得が不当に無効化されない。end_exclusive=Trueで
+    # t==event.start_timeのフレーム（流星が写り込んだ最初の追跡フレーム、
+    # start_time=min(times)）を誤ってベースラインに選ばないようにする。
+    baseline_entry = ring_buffer.get_nearest_in_range(
+        event.start_time, event.start_time - window, event.start_time, end_exclusive=True,
+    )
+
+    before_entry = ring_buffer.get_nearest_in_range(
+        event.end_time, event.end_time - window, event.end_time,
+    )
+    target_after_time = event.end_time + window
+    after_entry = ring_buffer.get_nearest_in_range(
+        target_after_time, event.end_time, target_after_time,
+    )
+
+    if before_entry is None or after_entry is None or baseline_entry is None:
+        return False
+
+    # RingBufferがwindow秒後まで到達していない（ストリーム終端付近、
+    # finalize_all()/flush_all()のシャットダウン経路等）場合、直後のフレームを
+    # window秒後の輝度と誤って比較すると観測窓が縮小し、実際にはまだ消えて
+    # いない一瞬の残光を「window秒後も残っている」と誤判定しうる。
+    # 許容誤差を超えるずれは評価不能としてfail-openで通す。
+    tolerance = max(window * frame_time_tolerance_ratio, 0.05)
+    if abs(after_entry[0] - target_after_time) > tolerance:
+        return False
+
+    # ベースラインフレームがevent.start_timeから大きく離れている場合
+    # （RingBufferの保持範囲が足りない等）も同様に評価不能としてfail-openで
+    # 通す。
+    if abs(baseline_entry[0] - event.start_time) > tolerance:
+        return False
+
+    frame_before, frame_after, frame_base = before_entry[1], after_entry[1], baseline_entry[1]
+
+    if frame_before.shape != frame_after.shape or frame_before.shape != frame_base.shape:
+        return False
+
+    height, width = frame_before.shape[:2]
+    sx, sy = event.start_point
+    ex, ey = event.end_point
+
+    # 背景推定用リング領域の半径。経路パッチ（半径patch_radius）の外側に
+    # 隙間（inner_radius）を空けてから外周（outer_radius）までを背景推定に
+    # 使う。パッチにすぐ隣接させると経路自体の輝度がリングに混入し背景推定が
+    # 汚染されるため、隙間を空けて分離する。
+    patch_radius = 3
+    ring_inner_radius = 6
+    ring_outer_radius = 10
+
+    residual_hits = 0
+    valid_samples = 0
+    for i in range(sample_points):
+        t = i / max(1, sample_points - 1)
+        x = int(round(sx + (ex - sx) * t))
+        y = int(round(sy + (ey - sy) * t))
+        if not (0 <= x < width and 0 <= y < height):
+            continue
+
+        px0, px1 = max(0, x - patch_radius), min(width, x + patch_radius + 1)
+        py0, py1 = max(0, y - patch_radius), min(height, y + patch_radius + 1)
+
+        rx0, rx1 = max(0, x - ring_outer_radius), min(width, x + ring_outer_radius + 1)
+        ry0, ry1 = max(0, y - ring_outer_radius), min(height, y + ring_outer_radius + 1)
+
+        yy, xx = np.mgrid[ry0:ry1, rx0:rx1]
+        dist = np.sqrt((xx - x) ** 2 + (yy - y) ** 2)
+        ring_mask = (dist >= ring_inner_radius) & (dist <= ring_outer_radius)
+        if not np.any(ring_mask):
+            continue
+
+        patch_before = frame_before[py0:py1, px0:px1]
+        patch_after = frame_after[py0:py1, px0:px1]
+        patch_base = frame_base[py0:py1, px0:px1]
+        ring_region_before = frame_before[ry0:ry1, rx0:rx1]
+        ring_region_after = frame_after[ry0:ry1, rx0:rx1]
+        ring_region_base = frame_base[ry0:ry1, rx0:rx1]
+
+        background_before = float(np.median(ring_region_before[ring_mask]))
+        background_after = float(np.median(ring_region_after[ring_mask]))
+        background_base = float(np.median(ring_region_base[ring_mask]))
+
+        excess_before = float(np.mean(patch_before)) - background_before
+        excess_after = float(np.mean(patch_after)) - background_after
+        excess_base = float(np.mean(patch_base)) - background_base
+
+        # excess_baseは恒星・ホットピクセル等、イベント開始前から恒常的に
+        # パッチ内に存在する静止輝度（リング差し引きでは除去できない成分）の
+        # 推定値。before/afterそれぞれから差し引くことで、静止成分をキャンセル
+        # し「流星自身の輝度寄与」だけを残す（新規指摘Bの是正）。
+        m_before = excess_before - excess_base
+        m_after = excess_after - excess_base
+
+        if m_before < min_excess_brightness:
+            # 流星由来の輝度超過がこのサンプル点に観測できない（判定不能）。
+            # 前後フレームが同一の静止シーンの場合や、ベースラインと変わらない
+            # 静止輝点しかない場合、常にこの分岐に入りresidual_hitsに
+            # 加算されない（fail-openの根幹）。
+            continue
+        valid_samples += 1
+        # m_afterが負（静止輝点未満まで暗くなった等）の場合もそのまま比較する。
+        # residual_brightness_ratioは0以上のためm_after<0なら残光ヒットには
+        # ならず、fail-open方向は維持される。
+        if m_after >= m_before * residual_brightness_ratio:
+            residual_hits += 1
+
+    # 判定可能なサンプル点（min_excess_brightnessをクリアした点）が少数の場合、
+    # 1点のノイズだけで比が跳ね上がり誤棄却しうる。sample_pointsの過半数
+    # （最低2点）に満たない場合は判定不能としてfail-openで通す。
+    min_required_samples = max(2, (sample_points + 1) // 2)
+    if valid_samples < min_required_samples:
+        return False
+
+    return residual_hits / valid_samples >= 0.5
 
 
 def detection_thread_worker(  # pragma: no cover
@@ -104,10 +348,17 @@ def detection_thread_worker(  # pragma: no cover
     twilight_type="nautical",
     twilight_sensitivity="low",
     twilight_min_speed=200.0,
+    twilight_max_speed=0.0,
     bird_filter_enabled=False,
     bird_min_brightness=80.0,
     twilight_bird_filter_enabled=True,
     twilight_bird_min_brightness=80.0,
+    contrail_check_enabled=False,
+    contrail_afterglow_window=2.0,
+    contrail_residual_brightness_ratio=0.5,
+    twilight_rate_window_sec=300.0,
+    twilight_rate_max_events=0,
+    twilight_rate_suppress_enabled=False,
 ):
     """検出処理を行うワーカースレッド"""
 
@@ -209,6 +460,79 @@ def detection_thread_worker(  # pragma: no cover
     state.current_twilight_detection_mode = twilight_detection_mode
     state.current_twilight_type = twilight_type
 
+    # 方式4（薄明期間バーストレート抑制）。観測はcached_twilight中の確定
+    # イベントごとに行う。EventMergerの秒オーダーのバースト抑制とは独立させる
+    # （分オーダーの現象を対象とするため、EventMerger内部のギャップクラスタリング
+    # には一切手を入れない）。
+    if twilight_rate_suppress_enabled and twilight_rate_max_events <= 0:
+        print(
+            "[WARN] twilight_rate_suppress_enabled=true ですが "
+            "twilight_rate_max_events<=0 のため抑制は発動しません"
+            "（観測専用モードのまま）。抑制を有効にするには "
+            "TWILIGHT_RATE_MAX_EVENTS を正の値に設定してください",
+            flush=True,
+        )
+    twilight_rate_limiter = TwilightRateLimiter(
+        window_sec=twilight_rate_window_sec,
+        max_events=twilight_rate_max_events if twilight_rate_suppress_enabled else 0,
+    )
+
+    def _save_if_allowed(ev):
+        """方式2（残光チェック）を通過したイベントのみsave_meteor_event()に回す。
+
+        4箇所ある確定イベントの保存経路（通常フロー・タイムアウト排出・
+        finalize_all・シャットダウン残処理）を一本化し、方式2の適用漏れを防ぐ。
+        棄却時はdetection_countを増やさず、mitigation_rejected_countsのみ加算する。
+        """
+        if contrail_check_enabled:
+            try:
+                is_contrail = check_contrail_afterglow(
+                    ring_buffer,
+                    ev,
+                    params,
+                    window=contrail_afterglow_window,
+                    residual_brightness_ratio=contrail_residual_brightness_ratio,
+                )
+            except Exception as e:
+                print(f"[WARN] 残光チェックでエラー、フィルタを適用せず通します: {e}", flush=True)
+                is_contrail = False
+            if is_contrail:
+                state.current_mitigation_rejected_counts["contrail_afterglow"] += 1
+                print(
+                    f"[INFO] rejected_by=contrail_afterglow start={ev.start_time:.3f} end={ev.end_time:.3f}",
+                    flush=True,
+                )
+                return None
+
+        if cached_twilight:
+            # 観測モード（twilight_rate_suppress_enabled=False）でもレートは
+            # 記録する。抑制発動閾値(twilight_rate_max_events)を決めるための
+            # 実データ収集が観測モードの目的であり、記録自体を抑制フラグで
+            # ゲートすると常にレート0のままになってしまう。
+            twilight_rate_limiter.record_event(ev.end_time)
+            # mitigation_rejected_countsのキー名は他3方式が「棄却数」なのに対し
+            # ここは「直近ウィンドウ内の薄明期間確定イベント数」（現在のレート、
+            # 累積ではない）。方式4は抑制せず記録するだけの状態もあるため
+            # 棄却数ではないが、既存のstate.current_mitigation_rejected_counts
+            # 辞書（/stats露出、設計書指定のキー構成）に一本化するためここに置く。
+            state.current_mitigation_rejected_counts["twilight_rate"] = twilight_rate_limiter.current_rate(
+                ev.end_time
+            )
+
+        state.detection_count += 1
+        print(f"\n[{ev.timestamp.strftime('%H:%M:%S')}] 流星検出 #{state.detection_count}")
+        print(f"  長さ: {ev.length:.1f}px, 時間: {ev.duration:.2f}秒")
+        return save_meteor_event(
+            ev,
+            ring_buffer,
+            output_path,
+            fps=fps,
+            extract_clips=extract_clips,
+            clip_margin_before=state.current_clip_margin_before,
+            clip_margin_after=state.current_clip_margin_after,
+            composite_after=state.current_clip_margin_after,
+        )
+
     while not stop_flag.is_set():
         ret, timestamp, frame = reader.read()
         if not ret:
@@ -255,9 +579,15 @@ def detection_thread_worker(  # pragma: no cover
         now_mono = time.time()
         if is_twilight_active is not None and now_mono - last_twilight_check >= 60.0:
             try:
-                cached_twilight = is_twilight_active(latitude, longitude, timezone, twilight_type)
+                new_cached_twilight = is_twilight_active(latitude, longitude, timezone, twilight_type)
             except Exception:
-                cached_twilight = False
+                new_cached_twilight = False
+            if cached_twilight and not new_cached_twilight:
+                # 薄明期間が終了したら方式4のレート表示を陳腐化させない
+                # （/statsがmitigation_rejected_counts.twilight_rateとして
+                # 前回薄明期間の値をいつまでも返し続けるのを防ぐ）。
+                state.current_mitigation_rejected_counts["twilight_rate"] = 0
+            cached_twilight = new_cached_twilight
             state.current_twilight_active = cached_twilight
             last_twilight_check = now_mono
 
@@ -276,7 +606,20 @@ def detection_thread_worker(  # pragma: no cover
                         state.current_detection_status = "TWILIGHT_SKIP"
                     else:
                         # reduce モード: 感度プリセットと min_speed を上書きした params で検出
-                        twilight_params = build_twilight_params(twilight_sensitivity, twilight_min_speed, params)
+                        effective_twilight_sensitivity = twilight_sensitivity
+                        if twilight_rate_suppress_enabled and twilight_rate_limiter.should_suppress(timestamp):
+                            # 方式4: レート超過時は感度プリセットを一段階下げて
+                            # （low側へ）検出継続する。すでにlowの場合はこれ以上
+                            # 下げられないためそのまま維持する。
+                            effective_twilight_sensitivity = _TWILIGHT_SENSITIVITY_STEP_DOWN.get(
+                                twilight_sensitivity, twilight_sensitivity
+                            )
+                        twilight_params = build_twilight_params(
+                            effective_twilight_sensitivity,
+                            twilight_min_speed,
+                            params,
+                            twilight_max_speed=twilight_max_speed,
+                        )
                         # detector の params を一時差し替えて検出し、元に戻す
                         orig_params = detector.params
                         detector.params = twilight_params
@@ -312,6 +655,17 @@ def detection_thread_worker(  # pragma: no cover
 
         events = detector.track_objects(objects, timestamp)
 
+        # 方式1a・方式3の棄却カウンタをstateへ反映（detectorはdetection_stateに
+        # 依存させない方針のため、この境界でのみ合算する）。track_objects()は
+        # トラック確定時（gap>max_gap_time）のみ_finalize_track()を呼ぶため、
+        # 棄却のみが起きてeventsが空のフレームもあり得る。detector側は単調増加の
+        # 累計値を持つのでそのまま上書きコピーする（トラック確定頻度＝低頻度の
+        # ためコスト無視できる）。
+        state.current_mitigation_rejected_counts["heading_variance"] = detector.rejected_counts.get(
+            "heading_variance", 0
+        )
+        state.current_mitigation_rejected_counts["max_speed"] = detector.rejected_counts.get("max_speed", 0)
+
         for event in events:
             if stop_flag.is_set():
                 break
@@ -324,37 +678,13 @@ def detection_thread_worker(  # pragma: no cover
                 # 保存のたびに停止要求を確認する。
                 if stop_flag.is_set():
                     break
-                state.detection_count += 1
-                print(f"\n[{merged_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{state.detection_count}")
-                print(f"  長さ: {merged_event.length:.1f}px, 時間: {merged_event.duration:.2f}秒")
-                clip_path = save_meteor_event(
-                    merged_event,
-                    ring_buffer,
-                    output_path,
-                    fps=fps,
-                    extract_clips=extract_clips,
-                    clip_margin_before=state.current_clip_margin_before,
-                    clip_margin_after=state.current_clip_margin_after,
-                    composite_after=state.current_clip_margin_after,
-                )
+                clip_path = _save_if_allowed(merged_event)
 
         expired_events = merger.flush_expired(timestamp)
         for expired_event in expired_events:
             if stop_flag.is_set():
                 break
-            state.detection_count += 1
-            print(f"\n[{expired_event.timestamp.strftime('%H:%M:%S')}] 流星検出 #{state.detection_count}")
-            print(f"  長さ: {expired_event.length:.1f}px, 時間: {expired_event.duration:.2f}秒")
-            clip_path = save_meteor_event(
-                expired_event,
-                ring_buffer,
-                output_path,
-                fps=fps,
-                extract_clips=extract_clips,
-                clip_margin_before=state.current_clip_margin_before,
-                clip_margin_after=state.current_clip_margin_after,
-                composite_after=state.current_clip_margin_after,
-            )
+            clip_path = _save_if_allowed(expired_event)
 
         # プレビュー用フレーム生成
         display = frame.copy()
@@ -400,17 +730,7 @@ def detection_thread_worker(  # pragma: no cover
     for event in events:
         merged_events = merger.add_event(event)
         for merged_event in merged_events:
-            state.detection_count += 1
-            clip_path = save_meteor_event(
-                merged_event,
-                ring_buffer,
-                output_path,
-                fps=fps,
-                extract_clips=extract_clips,
-                clip_margin_before=state.current_clip_margin_before,
-                clip_margin_after=state.current_clip_margin_after,
-                composite_after=state.current_clip_margin_after,
-            )
+            clip_path = _save_if_allowed(merged_event)
 
     # 終了時に残ったイベントを保存する。ここは stop_flag で打ち切らない
     # （停止要求そのものが到達のきっかけなので、打ち切ると常に保存0件になる）。
@@ -426,17 +746,7 @@ def detection_thread_worker(  # pragma: no cover
                 flush=True,
             )
             break
-        state.detection_count += 1
-        clip_path = save_meteor_event(
-            event,
-            ring_buffer,
-            output_path,
-            fps=fps,
-            extract_clips=extract_clips,
-            clip_margin_before=state.current_clip_margin_before,
-            clip_margin_after=state.current_clip_margin_after,
-            composite_after=state.current_clip_margin_after,
-        )
+        clip_path = _save_if_allowed(event)
 
 
 def process_rtsp_stream(  # pragma: no cover
@@ -463,6 +773,12 @@ def process_rtsp_stream(  # pragma: no cover
     bird_min_brightness: float = 80.0,
     twilight_bird_filter_enabled: bool = True,
     twilight_bird_min_brightness: float = 80.0,
+    contrail_check_enabled: bool = False,
+    contrail_afterglow_window: float = 2.0,
+    contrail_residual_brightness_ratio: float = 0.5,
+    twilight_rate_window_sec: float = 300.0,
+    twilight_rate_max_events: int = 0,
+    twilight_rate_suppress_enabled: bool = False,
 ):
     params = params or DetectionParams()
     state.camera_name = _storage_camera_name(cam_name)
@@ -514,6 +830,44 @@ def process_rtsp_stream(  # pragma: no cover
     twilight_bird_min_brightness = float(
         runtime_overrides.get("twilight_bird_min_brightness", twilight_bird_min_brightness)
     )
+    contrail_check_enabled = _to_bool(
+        runtime_overrides.get("contrail_check_enabled", contrail_check_enabled),
+        default=contrail_check_enabled,
+    )
+    contrail_afterglow_window = float(
+        runtime_overrides.get("contrail_afterglow_window", contrail_afterglow_window)
+    )
+    contrail_residual_brightness_ratio = float(
+        runtime_overrides.get("contrail_residual_brightness_ratio", contrail_residual_brightness_ratio)
+    )
+    twilight_rate_window_sec = float(
+        runtime_overrides.get("twilight_rate_window_sec", twilight_rate_window_sec)
+    )
+    twilight_rate_max_events = int(
+        runtime_overrides.get("twilight_rate_max_events", twilight_rate_max_events)
+    )
+    twilight_rate_suppress_enabled = _to_bool(
+        runtime_overrides.get("twilight_rate_suppress_enabled", twilight_rate_suppress_enabled),
+        default=twilight_rate_suppress_enabled,
+    )
+
+    # env/config.json(runtime_overrides)いずれの経路でも/apply_settingsの検証
+    # テーブル（http_handlers.pyのstartup_float_fields/startup_int_fields）と
+    # 同じレンジへクランプする。特にtwilight_rate_window_secの下限1.0は、
+    # 0や負値がTwilightRateLimiter._prune()のcutoff計算を破壊し記録を
+    # 即座に全消去する問題を防ぐために必須。
+    contrail_afterglow_window = _clamp_env_value_and_warn(
+        "contrail_afterglow_window", contrail_afterglow_window, 0.0, 10.0
+    )
+    contrail_residual_brightness_ratio = _clamp_env_value_and_warn(
+        "contrail_residual_brightness_ratio", contrail_residual_brightness_ratio, 0.0, 1.0
+    )
+    twilight_rate_window_sec = _clamp_env_value_and_warn(
+        "twilight_rate_window_sec", twilight_rate_window_sec, 1.0, 3600.0
+    )
+    twilight_rate_max_events = int(
+        _clamp_env_value_and_warn("twilight_rate_max_events", twilight_rate_max_events, 0, None)
+    )
 
     params.exclude_bottom_ratio = float(runtime_overrides.get("exclude_bottom_ratio", params.exclude_bottom_ratio))
     params.exclude_edge_ratio = float(runtime_overrides.get("exclude_edge_ratio", params.exclude_edge_ratio))
@@ -542,6 +896,10 @@ def process_rtsp_stream(  # pragma: no cover
         "min_track_points",
         "max_stationary_ratio",
         "small_area_threshold",
+        "max_speed",
+        "max_heading_variance",
+        "min_heading_variance_points",
+        "record_track_points",
     ):
         if field in runtime_overrides:
             pending_param_overrides[field] = runtime_overrides[field]
@@ -612,6 +970,16 @@ def process_rtsp_stream(  # pragma: no cover
         "min_track_points": params.min_track_points,
         "max_stationary_ratio": params.max_stationary_ratio,
         "small_area_threshold": params.small_area_threshold,
+        "max_speed": params.max_speed,
+        "max_heading_variance": params.max_heading_variance,
+        "min_heading_variance_points": params.min_heading_variance_points,
+        "record_track_points": params.record_track_points,
+        "contrail_check_enabled": contrail_check_enabled,
+        "contrail_afterglow_window": contrail_afterglow_window,
+        "contrail_residual_brightness_ratio": contrail_residual_brightness_ratio,
+        "twilight_rate_window_sec": twilight_rate_window_sec,
+        "twilight_rate_max_events": twilight_rate_max_events,
+        "twilight_rate_suppress_enabled": twilight_rate_suppress_enabled,
     })
 
     output_path = Path(output_dir)
@@ -677,6 +1045,13 @@ def process_rtsp_stream(  # pragma: no cover
         TWILIGHT_MIN_SPEED = float(os.environ.get("TWILIGHT_MIN_SPEED", "200"))
     except ValueError:
         TWILIGHT_MIN_SPEED = 200.0
+    # 方式3（薄明期間速度上限フィルタ）。既定0=無効。UIには公開しない
+    # env-only設定（twilight_min_speedと同様、/apply_settingsの対応表がなく
+    # UI経由では変更できないdead endを新規に再現しないため）。
+    try:
+        TWILIGHT_MAX_SPEED = float(os.environ.get("TWILIGHT_MAX_SPEED", "0"))
+    except ValueError:
+        TWILIGHT_MAX_SPEED = 0.0
 
     _valid_twilight_modes = {"reduce", "skip"}
     if TWILIGHT_DETECTION_MODE not in _valid_twilight_modes:
@@ -716,6 +1091,7 @@ def process_rtsp_stream(  # pragma: no cover
         "twilight_type": TWILIGHT_TYPE,
         "twilight_sensitivity": TWILIGHT_SENSITIVITY,
         "twilight_min_speed": TWILIGHT_MIN_SPEED,
+        "twilight_max_speed": TWILIGHT_MAX_SPEED,
     })
 
     # 検出処理を別スレッドで実行
@@ -740,10 +1116,17 @@ def process_rtsp_stream(  # pragma: no cover
             'twilight_type': TWILIGHT_TYPE,
             'twilight_sensitivity': TWILIGHT_SENSITIVITY,
             'twilight_min_speed': TWILIGHT_MIN_SPEED,
+            'twilight_max_speed': TWILIGHT_MAX_SPEED,
             'bird_filter_enabled': bird_filter_enabled,
             'bird_min_brightness': bird_min_brightness,
             'twilight_bird_filter_enabled': twilight_bird_filter_enabled,
             'twilight_bird_min_brightness': twilight_bird_min_brightness,
+            'contrail_check_enabled': contrail_check_enabled,
+            'contrail_afterglow_window': contrail_afterglow_window,
+            'contrail_residual_brightness_ratio': contrail_residual_brightness_ratio,
+            'twilight_rate_window_sec': twilight_rate_window_sec,
+            'twilight_rate_max_events': twilight_rate_max_events,
+            'twilight_rate_suppress_enabled': twilight_rate_suppress_enabled,
         },
         daemon=False,
     )
@@ -833,6 +1216,39 @@ def main():  # pragma: no cover
     except ValueError:
         twilight_bird_min_brightness = 80.0
 
+    # 方式1b（観測専用）。既定False=記録しない。データ構造が変わるため
+    # DetectionParams側のフィールドとしてここで確定させる（bird_filter_enabled
+    # と同様の起動時パターン）。
+    params.record_track_points = os.environ.get("RECORD_TRACK_POINTS", "false").lower() in ("1", "true", "yes")
+
+    # 方式2（飛行機雲の残光チェック）。既定False=無効。
+    # レンジ検証はprocess_rtsp_stream()側で行う（runtime_overrides経由の
+    # 上書きも同じ関数を通るため、env/config.json両経路を一箇所でカバーする）。
+    contrail_check_enabled = os.environ.get("CONTRAIL_CHECK_ENABLED", "false").lower() in ("1", "true", "yes")
+    try:
+        contrail_afterglow_window = float(os.environ.get("CONTRAIL_AFTERGLOW_WINDOW", "2.0"))
+    except ValueError:
+        contrail_afterglow_window = 2.0
+    try:
+        contrail_residual_brightness_ratio = float(
+            os.environ.get("CONTRAIL_RESIDUAL_BRIGHTNESS_RATIO", "0.5")
+        )
+    except ValueError:
+        contrail_residual_brightness_ratio = 0.5
+
+    # 方式4（薄明期間バーストレート抑制、観測モードから開始）。既定False=抑制なし。
+    try:
+        twilight_rate_window_sec = float(os.environ.get("TWILIGHT_RATE_WINDOW_SEC", "300"))
+    except ValueError:
+        twilight_rate_window_sec = 300.0
+    try:
+        twilight_rate_max_events = int(os.environ.get("TWILIGHT_RATE_MAX_EVENTS", "0"))
+    except ValueError:
+        twilight_rate_max_events = 0
+    twilight_rate_suppress_enabled = os.environ.get(
+        "TWILIGHT_RATE_SUPPRESS_ENABLED", "false"
+    ).lower() in ("1", "true", "yes")
+
     mask_image = args.mask_image.strip() if args.mask_image else None
     mask_image = mask_image if mask_image else None
     mask_from_day = args.mask_from_day.strip() if args.mask_from_day else None
@@ -868,6 +1284,12 @@ def main():  # pragma: no cover
         bird_min_brightness=bird_min_brightness,
         twilight_bird_filter_enabled=twilight_bird_filter_enabled,
         twilight_bird_min_brightness=twilight_bird_min_brightness,
+        contrail_check_enabled=contrail_check_enabled,
+        contrail_afterglow_window=contrail_afterglow_window,
+        contrail_residual_brightness_ratio=contrail_residual_brightness_ratio,
+        twilight_rate_window_sec=twilight_rate_window_sec,
+        twilight_rate_max_events=twilight_rate_max_events,
+        twilight_rate_suppress_enabled=twilight_rate_suppress_enabled,
     )
 
 

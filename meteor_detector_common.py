@@ -34,6 +34,38 @@ def calculate_linearity(xs: Sequence[float], ys: Sequence[float]) -> float:
     return eigenvalues[0] / (eigenvalues[0] + eigenvalues[1] + 1e-10)
 
 
+def calculate_heading_variance(xs: Sequence[float], ys: Sequence[float]) -> float:
+    """軌跡の進行方向角度の分散（蛇行度）を計算する。
+
+    連続する軌跡点間の進行方向角度（atan2(dy, dx)）を求め、隣接する角度差
+    （ラップアラウンドを[-pi, pi]に正規化）の標準偏差（ラジアン）を返す。
+    直線的な軌跡（流星）は角度差が小さく分散も小さい。羽ばたきで進行方向が
+    揺れる軌跡（鳥・コウモリ）は角度差の分散が大きくなる。
+
+    点数が3未満（角度差を1つも計算できない）の場合は判定不能として0.0を返す
+    （fail-open。呼び出し側はmin_heading_variance_pointsで別途、統計的に
+    不安定な少点数域を判定スキップする）。
+    """
+    if len(xs) < 3:
+        return 0.0
+
+    xs_arr = np.asarray(xs, dtype=np.float64)
+    ys_arr = np.asarray(ys, dtype=np.float64)
+
+    dx = np.diff(xs_arr)
+    dy = np.diff(ys_arr)
+    headings = np.arctan2(dy, dx)
+
+    heading_diffs = np.diff(headings)
+    # [-pi, pi] にラップアラウンド正規化
+    heading_diffs = np.arctan2(np.sin(heading_diffs), np.cos(heading_diffs))
+
+    if heading_diffs.size == 0:
+        return 0.0
+
+    return float(np.std(heading_diffs))
+
+
 def calculate_confidence(
     length: float,
     speed: float,
