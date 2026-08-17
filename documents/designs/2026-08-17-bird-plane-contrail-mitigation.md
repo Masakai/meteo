@@ -208,7 +208,7 @@
 
 ## ドキュメント更新が必要なファイル
 
-- `documents/DETECTOR_COMPONENTS.md`: 「検出アルゴリズムフロー」図・「判定条件」ノートに方式1a・方式3の棄却条件を追加。新規セクション「鳥・コウモリ・飛行機雲対策フィルタ（v3.19.0想定）」を追加し、4方式の仕組み・パラメータ表・棄却ログ形式を記載。`MeteorEvent`のフィールド説明に`track_xs`/`track_ys`（既定空リスト、`record_track_points`有効時のみ）を追記。
+- `documents/DETECTOR_COMPONENTS.md`: 「検出アルゴリズムフロー」図・「判定条件」ノートに方式1a・方式3の棄却条件を追加。新規セクション「鳥・コウモリ・飛行機雲対策フィルタ（v3.19.0）」を追加し、4方式の仕組み・パラメータ表・棄却ログ形式を記載。`MeteorEvent`のフィールド説明に`track_xs`/`track_ys`（既定空リスト、`record_track_points`有効時のみ）を追記。
 - `documents/CONFIGURATION_GUIDE.md`: 新規環境変数（`TWILIGHT_MAX_SPEED`, `RECORD_TRACK_POINTS`, `CONTRAIL_CHECK_ENABLED`, `CONTRAIL_AFTERGLOW_WINDOW`, `CONTRAIL_RESIDUAL_BRIGHTNESS_RATIO`, `TWILIGHT_RATE_WINDOW_SEC`, `TWILIGHT_RATE_MAX_EVENTS`, `TWILIGHT_RATE_SUPPRESS_ENABLED`）を既存の「薄明」「鳥シルエット除外」節の近くに追加。カメラ別に異なる設定を適用する運用手順（`/settings`画面の対象カメラドロップダウン使用）への参照を追記。
 - `documents/API_REFERENCE.md`: `/stats`レスポンス例に`mitigation_rejected_counts`を追加。`/apply_settings`の対象フィールド一覧に新規パラメータを追加。
 - `documents/ARCHITECTURE.md`: 検出フロー図に方式2（残光チェック、保存前のポストチェック）・方式4（レートリミッタ、薄明ループ内）の位置づけを追記。

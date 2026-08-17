@@ -27,6 +27,11 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
+### v3.19.0 - 鳥・コウモリ・飛行機雲対策4方式
+
+- **`GET /stats`**: レスポンスに `mitigation_rejected_counts`（`heading_variance` / `max_speed` / `contrail_afterglow` / `twilight_rate` の4フィールド）を追加。全新規パラメータが既定値（無効）の場合、値は0のまま推移する。
+- **`POST /apply_settings`**: リクエストフィールドに `max_speed`（方式3・即時反映）、`max_heading_variance` / `min_heading_variance_points`（方式1a・即時反映）、`record_track_points`（方式1b・自動再起動で反映）、`contrail_check_enabled` / `contrail_afterglow_window` / `contrail_residual_brightness_ratio`（方式2・自動再起動で反映）、`twilight_rate_suppress_enabled` / `twilight_rate_window_sec` / `twilight_rate_max_events`（方式4・自動再起動で反映）を追加。既定値は既存の検出挙動を変えない。
+
 ### v3.17.0 - カメラ単位のマスクリセット
 
 - **新規エンドポイント（カメラ層）**: `POST /reset_mask` — 指定カメラの除外マスクを無効化する。detector の `exclusion_mask` を `None` に戻し、出力ディレクトリ側（`/output/<camera>/masks/<camera>_mask.png`）とホスト `masks/`（`MASK_BUILD_DIR`）の保存済みマスク画像を削除し、pending 状態もクリアする。実行後は `/stats` の `mask_active` が `false` になる。`/update_mask`→`/confirm_mask_update` の対称操作。

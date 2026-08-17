@@ -201,7 +201,7 @@ RingBufferの実効長は`process_rtsp_stream()`内で`min(buffer_seconds, max_d
 - **方式4は抑制が自己減衰しうる**: 感度を下げると検出数が減り、レートが下がって`should_suppress()`が偽に戻る可能性がある。閾値決定前は抑制のON/OFFが短時間で切り替わる（フラッピングする）ケースがありうる。`twilight_rate_max_events`の妥当な初期値は方式1bと同様、観測モードでの実データ収集後に決定する必要がある（オープンクエスチョン3、未解決）。
 - **方式2の残光判定アルゴリズムの精度は未検証**（オープンクエスチョン2、設計書記載のまま）。背景差し引きによりfail-open原則の違反は解消したが、雲・月明かり等の背景変動との区別は実際の飛行機雲サンプルでのチューニングが必要。
 - **`record_track_points`有効時の`detections.jsonl`肥大化**（オープンクエスチョン5、設計書記載のまま）は未対応。長時間トラックでの記録点数上限（間引き）は今回のスコープ外。
-- ドキュメント上の「v3.19.0」表記は`dashboard_config.py`の`VERSION=3.18.0`からのMINORバージョン予測であり、番号確定はrelease-manager判断による。CLAUDE.mdの「新機能追加はMINORを上げる」ルールおよび設計書の「v3.19.0想定」表記と整合しているが、実際のリリース時に別番号になる可能性がある。
+- ドキュメント上の「v3.19.0」表記は、release-managerによるリリース作業でVERSION `3.19.0`として確定した（CLAUDE.mdの「新機能追加はMINORを上げる」ルールに基づく、現行`3.18.0`からのMINORバージョンアップ）。
 - **`_nearest_frame_entry()`は最終レビューでデッドコードと判定され削除済み**（第3回是正時点では残課題だったが、最終確認レビューで対応）: `check_contrail_afterglow()`を`RingBuffer.get_nearest_in_range()`に置き換えたことで最後の実呼び出し元を失っていた`_nearest_frame_entry()`本体と、これのみを参照していた`TestNearestFrameEntry`（2件）を削除した。他に参照が残っていないことを`grep`で確認済み。
 - **指摘E-1（M2）は等価変異のためテストで直接kill不能**（記録として明記）: baseline候補が全て`t < event.start_time < event.end_time`を満たす場合、targetを`event.start_time`から`event.end_time`に差し替える変異は数学的に等価（argminが必ず一致）であり、いかなるフィクスチャでも判定結果の差として検出できない。代替として「複数候補から`start_time`直前の候補が正しく選ばれること」を検証するテストを追加し、選択ロジック自体のバグは`RingBuffer.get_nearest_in_range()`側のユニットテストで確実にカバーしている。
 

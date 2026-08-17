@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.19.0] - 2026-08-17
+### Added
+- 鳥・コウモリ・飛行機雲の誤検出を抑制する4方式を追加した（`max_speed`/`max_heading_variance`/`min_heading_variance_points`/`record_track_points`/`contrail_check_enabled`/`contrail_afterglow_window`/`contrail_residual_brightness_ratio`/`twilight_rate_suppress_enabled`/`twilight_rate_window_sec`/`twilight_rate_max_events`）。全パラメータの既定値は無効（`0`または`false`）で、リリース直後は既存カメラの検出結果に一切影響しない。カメラ別フラグ切り替えに対応し、既存のカメラ個別設定機構（`/settings`画面）で観測データを蓄積しながら段階的に有効化できる。
+  - **方式1a（蛇行フィルタ）**: 軌跡の進行方向角度の分散（`calculate_heading_variance()`）が`max_heading_variance`を超える場合に棄却する。軌跡点数が`min_heading_variance_points`（既定5）未満の場合は判定不能としてfail-openで通す。本番`min_track_points=3`の現行運用では隣接角度差が高々1〜2個しか取れず、既定閾値のもとでは事実上fail-openとなり実質無効な状態で動作する（実装済み・観測フェーズ）。
+  - **方式1b（軌跡点列記録、観測専用）**: `MeteorEvent`に`track_xs`/`track_ys`を追加し、`record_track_points`有効時のみ`detections.jsonl`の`track_points`に出力する。方式1a・方式3の閾値を実データから決定するための観測用途。
+  - **方式2（飛行機雲残光チェック）**: 確定イベントの経路上5点で、終了直前フレームと終了`window`秒後フレームの輝度を比較し、残光が`residual_brightness_ratio`以上残っていれば飛行機雲疑いとして棄却する。
+  - **方式3（薄明期間速度上限フィルタ）**: 薄明期間中のみ`max_speed`を超える速い物体（速い鳥・飛行機雲）を棄却する。
+  - **方式4（薄明期間バーストレート抑制）**: 薄明期間中の確定イベントレートが`twilight_rate_max_events`を超えると感度プリセットを一段階下げる。`twilight_rate_max_events=0`（既定）は観測専用モードで抑制は発動しない。
+- `GET /stats`に`mitigation_rejected_counts`（4方式それぞれの棄却カウンタ）を追加。`POST /apply_settings`に上記10パラメータを追加（詳細は`documents/API_REFERENCE.md`）。
+
+方式2はレビュー3サイクルを要し、判定式のfail-open原則違反を2段階で是正した。第1回レビューで、経路パッチの絶対輝度をそのまま比較する当初の判定式が、背景（薄明の空・月明かり）が明るいだけで確定流星を誤って「残光あり」と棄却する欠陥（前後フレームが完全に同一の静止シーンでも常に真を返す）を指摘され、周辺リング領域の輝度を差し引いた超過輝度で比較する方式に是正した。第2回レビューで、この是正が経路パッチ**周囲**の輝度しか除去できず、パッチ**内部**に恒常的に存在する高輝度源（恒星・ホットピクセル）が超過輝度に混入して同種の誤棄却を起こすことが新たに判明し（推奨レンジ下限`r=0.3`・背景輝度100・静止輝点152で実測確認）、イベント開始前のベースラインフレームをさらに追加取得し、3フレーム比較で静止成分を相殺する方式に是正した。第3回レビューでこの是正を120条件（`residual_brightness_ratio` 5値×背景輝度4値×静止輝点輝度6値）で掃引し誤棄却0件を確認、承認に至った。
+
+方式2の3フレーム比較化に伴い、`RingBuffer.get_range()`を3回呼ぶ実装ではイベントごとに約946MB（1920x1080想定）のフレームコピーと約149msの検出スレッド停止が発生し、その間に`RTSPReader`のフレームキューが埋まりフレーム落ちが起きうる性能問題が第3回レビューで判明した。`RingBuffer`に対象時刻に最も近い1フレームのみを複製して返す`get_nearest_in_range()`を新設して3箇所を置き換え、実測（1280x720、50回平均）で複製量474.6MB→7.91MB（約60分の1）、所要時間35.59ms→0.21ms（約166倍高速化）を確認した。
+
+### Changed
+- `documents/DETECTOR_COMPONENTS.md` / `documents/CONFIGURATION_GUIDE.md` / `documents/API_REFERENCE.md` / `documents/ARCHITECTURE.md` — 4方式のパラメータ表・検出フロー図・既知の限界を追記。
+
 ## [3.18.0] - 2026-08-16
 ### Added
 - `meteor_detector_realtime.py` — 同時刻バースト抑制を追加。`DetectionParams` に `burst_window_time`（既定 `1.0` 秒、バースト判定の最大到着間隔）と `burst_max_events`（既定 `5`）を新設し、`EventMerger` が到着ログを到着間隔（ギャップ）でクラスタリングして、サイズが `burst_max_events` を超えた塊を破棄する。
