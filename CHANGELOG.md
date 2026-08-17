@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.19.1] - 2026-08-17
+### Changed
+- `dashboard_templates_settings.py` — `/settings`画面の鳥・コウモリ・飛行機雲対策パネルを方式1a/1b/2/3/4ごとに枠で区切り、チェックボックスと従属する数値パラメータの親子関係をインデントで明示するグルーピング表示に変更した。挙動変化なし（`id`属性は変更なし、JS側の送信ロジックへの影響なし）。
+
 ## [3.19.0] - 2026-08-17
 ### Added
 - 鳥・コウモリ・飛行機雲の誤検出を抑制する4方式を追加した（`max_speed`/`max_heading_variance`/`min_heading_variance_points`/`record_track_points`/`contrail_check_enabled`/`contrail_afterglow_window`/`contrail_residual_brightness_ratio`/`twilight_rate_suppress_enabled`/`twilight_rate_window_sec`/`twilight_rate_max_events`）。全パラメータの既定値は無効（`0`または`false`）で、リリース直後は既存カメラの検出結果に一切影響しない。カメラ別フラグ切り替えに対応し、既存のカメラ個別設定機構（`/settings`画面）で観測データを蓄積しながら段階的に有効化できる。
