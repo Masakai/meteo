@@ -13,10 +13,13 @@ from typing import List, Optional, Tuple, Dict
 from collections import deque
 from threading import Thread, Lock, Event
 from queue import Queue, Empty
+import contextlib
 import json
+import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from urllib.parse import urlparse
 
@@ -25,6 +28,35 @@ import numpy as np
 
 from meteor_detector_common import calculate_linearity, calculate_confidence, open_video_writer
 
+# FFmpegバックエンドのTCP読み書きタイムアウト（マイクロ秒）。TCP接続が生きたまま
+# ストリームが停止すると cap.read() が無期限にブロックしうるため、
+# RTSP_RW_TIMEOUT_US が明示的に設定された場合のみ有効化する（既定では未設定＝
+# 従来通りOpenCVの組み込みデフォルトのまま）。無条件にデフォルト値を設定しない
+# 理由: (1) OPENCV_FFMPEG_CAPTURE_OPTIONS は既存のオプションを上書きするため、
+# コンテナのOpenCVビルドが元々どのデフォルトを使っていたか未検証のまま置き換える
+# リスクがある。(2) rtsp:// 入力に対してFFmpegのRTSPデムクサーが解釈するのは
+# 主に timeout（旧stimeout）オプションであり、汎用AVIOオプションの rw_timeout は
+# RTSP経由では無視されることが多い。効果が未検証のため、既定で有効化せず
+# 明示的なopt-inとする。有効化する場合はコンテナのOpenCV/FFmpegビルドで
+# 実際に効くか確認すること。
+_rw_timeout_us = os.environ.get("RTSP_RW_TIMEOUT_US")
+if _rw_timeout_us:
+    os.environ.setdefault(
+        "OPENCV_FFMPEG_CAPTURE_OPTIONS",
+        f"rtsp_transport;tcp|rw_timeout;{_rw_timeout_us}",
+    )
+
+# 棄却理由の[DEBUG]ログは、ノイズ多発時（大量の輪郭・トラックが棄却される局面）に
+# ホットループ内のI/O負荷とログ肥大の一因になるため、既定では出力しない。
+# METEOR_DEBUG_LOG=1（またはtrue/yes/on）で有効化する。ホットループ内で毎回
+# os.getenvを呼ばないよう、モジュール読み込み時に一度だけ判定する。
+_DEBUG_LOG_ENABLED = os.environ.get("METEOR_DEBUG_LOG", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _debug_log(message: str) -> None:
+    if _DEBUG_LOG_ENABLED:
+        print(message, flush=True)
+
 
 def write_mp4_clip_ffmpeg(
     output_path: Path,
@@ -32,6 +64,7 @@ def write_mp4_clip_ffmpeg(
     *,
     fps: float,
     size: Tuple[int, int],
+    wait_timeout: float = 60.0,
 ) -> bool:
     """ffmpegで目的メタデータに近いMP4を直接出力する。"""
     width, height = size
@@ -50,7 +83,7 @@ def write_mp4_clip_ffmpeg(
         "-s",
         f"{width}x{height}",
         "-r",
-        f"{target_fps:.0f}",
+        f"{target_fps:.3f}",
         "-i",
         "pipe:0",
         "-an",
@@ -92,37 +125,52 @@ def write_mp4_clip_ffmpeg(
         "+faststart",
         str(output_path),
     ]
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except FileNotFoundError:
-        return False
-    except Exception:
-        return False
+    # stderrは一時ファイルへ逃がす（returncode!=0時の表示にのみ使うため、
+    # フレーム書き込み中にパイプバッファが溢れてffmpegがブロックし、
+    # proc.stdin.write()と相互待ちになるデッドロックを避ける）。
+    # stdoutは使わないためDEVNULLへ捨てる。
+    with tempfile.TemporaryFile() as stderr_file:
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=stderr_file,
+            )
+        except FileNotFoundError:
+            return False
+        except Exception:
+            return False
 
-    try:
-        assert proc.stdin is not None
-        for _, frame in frames:
-            proc.stdin.write(frame.tobytes())
-        proc.stdin.close()
-        stderr = b""
-        if proc.stderr is not None:
-            stderr = proc.stderr.read()
-        proc.wait()
-    except Exception:
-        proc.kill()
-        proc.wait()
-        return False
+        try:
+            assert proc.stdin is not None
+            for _, frame in frames:
+                proc.stdin.write(frame.tobytes())
+            proc.stdin.close()
+            proc.wait(timeout=wait_timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+            return False
+        except Exception:
+            proc.kill()
+            proc.wait()
+            return False
+        finally:
+            # kill()後にはstdinバッファ未送出のデータが残っている場合があり、
+            # 死んだプロセスへのパイプをcloseするとBrokenPipeErrorを送出しうる。
+            # ここで例外を伝播させるとフォールバック経路に到達できなくなるため抑制する。
+            if proc.stdin is not None and not proc.stdin.closed:
+                with contextlib.suppress(Exception):
+                    proc.stdin.close()
 
-    if proc.returncode != 0:
-        if stderr:
-            sys.stderr.write(stderr.decode("utf-8", errors="ignore"))
-        return False
-    return True
+        if proc.returncode != 0:
+            stderr_file.seek(0)
+            stderr = stderr_file.read()
+            if stderr:
+                sys.stderr.write(stderr.decode("utf-8", errors="ignore"))
+            return False
+        return True
 
 
 def write_clip_with_fallback(
@@ -131,9 +179,10 @@ def write_clip_with_fallback(
     *,
     fps: float,
     size: Tuple[int, int],
+    wait_timeout: float = 60.0,
 ) -> bool:
     """ffmpeg優先でMP4を書き出し、失敗時のみOpenCVへフォールバックする。"""
-    if write_mp4_clip_ffmpeg(output_path, frames, fps=fps, size=size):
+    if write_mp4_clip_ffmpeg(output_path, frames, fps=fps, size=size, wait_timeout=wait_timeout):
         return True
 
     writer = open_video_writer(output_path, fps, size)
@@ -194,6 +243,12 @@ def estimate_fps_from_frames(
 
     estimated_fps = sanitize_fps(1.0 / median_dt, default=sanitized_fallback)
     if estimated_fps > sanitized_fallback * max_ratio_to_fallback:
+        print(
+            f"[WARN] fps推定値をクランプ: 推定={estimated_fps:.1f} "
+            f"接続時={sanitized_fallback:.1f} 上限比率={max_ratio_to_fallback} "
+            "(CPU飽和等でフレーム受信間隔が乱れている可能性)",
+            flush=True,
+        )
         return sanitized_fallback
 
     return estimated_fps
@@ -325,13 +380,76 @@ class DetectionParams:
     def __post_init__(self):
         if self.min_brightness_tracking is None:
             self.min_brightness_tracking = self.min_brightness
+        self.validate()
+
+    def validate(self) -> None:
+        """レンジ外の値を安全な値へクランプし、[WARN]ログを出す。
+
+        exclude_bottom_ratio / exclude_edge_ratio が範囲外（特に1.0超）だと
+        detect_bright_objects() のマスク処理でthreshが無警告に全面ゼロ化され
+        検出が全滅する。無警告の機能停止を避けるため、クランプ発動時は必ず
+        警告を出す。
+
+        レンジは http_handlers.py の /apply_settings 入力検証テーブル
+        （int_fields / float_fields）の既存の正の値と一致させている。二層で
+        食い違うと運用者の正当な設定が別の値にクランプされるため。
+
+        注意: この検証は __post_init__ 経由の生成時のみ有効。
+        meteor_detector_rtsp_web.py の setattr ループ・
+        params.__dict__.update(preset.__dict__) は dataclass の再初期化を
+        経由しないため、ここでのクランプは通らない（http_handlers.py 側の
+        /apply_settings は別途レンジ検証済み。詳細は実装仕様書の残課題を参照）。
+        """
+        self.exclude_bottom_ratio = self._clamp_and_warn(
+            "exclude_bottom_ratio", self.exclude_bottom_ratio, 0.0, 1.0
+        )
+        self.exclude_edge_ratio = self._clamp_and_warn(
+            "exclude_edge_ratio", self.exclude_edge_ratio, 0.0, 0.5
+        )
+        self.burst_window_time = self._clamp_and_warn(
+            "burst_window_time", self.burst_window_time, 0.0, None
+        )
+        self.burst_max_events = int(
+            self._clamp_and_warn("burst_max_events", self.burst_max_events, 1, None)
+        )
+
+        # burst_max_events × burst_window_time が _prune_arrival_times() の
+        # 保持幅（10 × max(burst_window_time, merge_max_gap_time)）を超える
+        # 極端な設定では、クラスタ前端の到着記録が刈られてバースト検知漏れ
+        # （破棄されない方向＝安全側）が起こりうる。3変数の関係式でクランプ先が
+        # 一意に決まらないため、ここでは警告のみに留める。
+        cluster_span = self.burst_max_events * self.burst_window_time
+        retention = 10 * max(self.burst_window_time, self.merge_max_gap_time)
+        if cluster_span > retention:
+            print(
+                f"[WARN] バースト抑制の設定が保持幅を超えています: "
+                f"burst_max_events({self.burst_max_events}) × "
+                f"burst_window_time({self.burst_window_time}) = {cluster_span:.2f} > "
+                f"保持幅 {retention:.2f}。クラスタ前端の到着記録が刈られ、"
+                "バースト検知漏れが起こりうる",
+                flush=True,
+            )
+
+    @staticmethod
+    def _clamp_and_warn(name: str, value: float, min_v: Optional[float], max_v: Optional[float]) -> float:
+        clamped = value
+        if min_v is not None and clamped < min_v:
+            clamped = min_v
+        if max_v is not None and clamped > max_v:
+            clamped = max_v
+        if clamped != value:
+            print(
+                f"[WARN] DetectionParams.{name}={value} は許容範囲外のためクランプ: {clamped}",
+                flush=True,
+            )
+        return clamped
 
 
 class RingBuffer:
     """リングバッファ"""
 
     def __init__(self, max_seconds: float, fps: float = 30):
-        self.max_frames = int(max_seconds * fps)
+        self.max_frames = max(1, int(max_seconds * fps))
         self.buffer: deque = deque(maxlen=self.max_frames)
         self.lock = Lock()
 
@@ -390,7 +508,11 @@ class RTSPReader:
                 self.height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 self.fps = sanitize_fps(cap.get(cv2.CAP_PROP_FPS), default=30.0)
                 if self.start_time is None:
-                    self.start_time = time.time()
+                    # NTPステップ調整でジャンプしうる壁時計(time.time())ではなく
+                    # 単調増加するmonotonicクロックを基準にする。start_time/timestamp
+                    # はプロセス起動からの相対秒というセマンティクス（detections.jsonl の
+                    # start_time/end_time も同様）は変わらない。
+                    self.start_time = time.monotonic()
 
             print(f"接続成功: {self.width}x{self.height} @ {self.fps:.1f}fps", flush=True)
             attempt = 0
@@ -410,7 +532,7 @@ class RTSPReader:
                     continue
 
                 consecutive_failures = 0
-                timestamp = time.time() - self.start_time
+                timestamp = time.monotonic() - self.start_time
 
                 if self.queue.full():
                     try:
@@ -517,14 +639,20 @@ class RealtimeMeteorDetector:
             if cy >= max_y:
                 continue
 
-            mask_img = np.zeros(frame.shape, dtype=np.uint8)
-            cv2.drawContours(mask_img, [contour], -1, 255, -1)
-            brightness = cv2.mean(frame, mask=mask_img)[0]
+            # 輪郭の外接矩形(ROI)に限定してマスク確保・走査することで、
+            # フレーム全面 np.zeros + cv2.mean(全面走査) を輪郭サイズに縮小する
+            # （結果は従来の全面マスク方式と同一）。
+            rx, ry, rw, rh = cv2.boundingRect(contour)
+            roi_mask = np.zeros((rh, rw), dtype=np.uint8)
+            cv2.drawContours(roi_mask, [contour], -1, 255, -1, offset=(-rx, -ry))
+            roi_frame = frame[ry:ry + rh, rx:rx + rw]
+            brightness = cv2.mean(roi_frame, mask=roi_mask)[0]
             nuisance_overlap_ratio = 0.0
             if nuisance_mask is not None and area <= self.params.small_area_threshold:
-                nuisance_overlap_ratio = self._calculate_mask_overlap_ratio(mask_img, nuisance_mask)
+                roi_nuisance_mask = nuisance_mask[ry:ry + rh, rx:rx + rw]
+                nuisance_overlap_ratio = self._calculate_mask_overlap_ratio(roi_mask, roi_nuisance_mask)
                 if nuisance_overlap_ratio >= self.params.nuisance_overlap_threshold:
-                    print(
+                    _debug_log(
                         f"[DEBUG] rejected_by=nuisance_overlap area={area:.1f} "
                         f"ratio={nuisance_overlap_ratio:.2f}"
                     )
@@ -609,7 +737,7 @@ class RealtimeMeteorDetector:
 
         track_points = self.active_tracks.pop(track_id)
         if len(track_points) < self.params.min_track_points:
-            print(
+            _debug_log(
                 f"[DEBUG] rejected_by=min_track_points points={len(track_points)} "
                 f"required={self.params.min_track_points}"
             )
@@ -619,7 +747,7 @@ class RealtimeMeteorDetector:
         duration = max(times) - min(times)
 
         if not (self.params.min_duration <= duration <= self.params.max_duration):
-            print(f"[DEBUG] rejected_by=duration duration={duration:.3f}")
+            _debug_log(f"[DEBUG] rejected_by=duration duration={duration:.3f}")
             return None
 
         xs = [p[1] for p in track_points]
@@ -628,7 +756,7 @@ class RealtimeMeteorDetector:
 
         stationary_ratio = self._calculate_stationary_ratio(xs, ys)
         if stationary_ratio > self.params.max_stationary_ratio:
-            print(
+            _debug_log(
                 f"[DEBUG] rejected_by=stationary_ratio ratio={stationary_ratio:.2f} "
                 f"max={self.params.max_stationary_ratio:.2f}"
             )
@@ -648,7 +776,7 @@ class RealtimeMeteorDetector:
                 end_point,
             )
             if nuisance_path_overlap_ratio > self.params.nuisance_path_overlap_threshold:
-                print(
+                _debug_log(
                     f"[DEBUG] rejected_by=nuisance_path_overlap ratio={nuisance_path_overlap_ratio:.2f} "
                     f"max={self.params.nuisance_path_overlap_threshold:.2f}"
                 )
@@ -658,17 +786,17 @@ class RealtimeMeteorDetector:
                          (end_point[1] - start_point[1]) ** 2)
 
         if not (self.params.min_length <= length <= self.params.max_length):
-            print(f"[DEBUG] rejected_by=length length={length:.1f}")
+            _debug_log(f"[DEBUG] rejected_by=length length={length:.1f}")
             return None
 
         speed = length / max(0.001, duration)
         if speed < self.params.min_speed:
-            print(f"[DEBUG] rejected_by=speed speed={speed:.1f}")
+            _debug_log(f"[DEBUG] rejected_by=speed speed={speed:.1f}")
             return None
 
         linearity = calculate_linearity(xs, ys)
         if linearity < self.params.min_linearity:
-            print(f"[DEBUG] rejected_by=linearity linearity={linearity:.2f}")
+            _debug_log(f"[DEBUG] rejected_by=linearity linearity={linearity:.2f}")
             return None
 
         confidence = calculate_confidence(
@@ -871,8 +999,11 @@ class EventMerger:
         行う。flush_expired() が確定を複数バッチに分割しても、到着ログは
         add_event() のたびに蓄積されているため取りこぼさない。
         """
+        if not events:
+            return events
+
         burst_times = self._burst_start_times()
-        if not events or not burst_times:
+        if not burst_times:
             return events
 
         kept = [e for e in events if e.start_time not in burst_times]
@@ -964,6 +1095,11 @@ def save_meteor_event(
     frames = ring_buffer.get_range(start, end)
 
     if not frames:
+        print(
+            f"[WARN] イベント保存を中止: RingBufferに該当区間のフレームがありません "
+            f"(start={start:.3f}, end={end:.3f})。イベントは記録されず消失します",
+            flush=True,
+        )
         return None
 
     record = event.to_dict()
@@ -980,7 +1116,12 @@ def save_meteor_event(
         clip_path = output_dir / f"{base_name}.mp4"
         ok = write_clip_with_fallback(clip_path, frames, fps=clip_fps, size=(width, height))
         if not ok:
-            print("[WARN] 動画エンコーダの初期化に失敗しました")
+            print(
+                f"[WARN] 動画クリップの書き出しに失敗しました（ffmpeg実行エラー、"
+                f"またはOpenCVフォールバックのエンコーダ初期化失敗）。イベントは"
+                f"記録されず消失します: base_name={base_name}",
+                flush=True,
+            )
             return None
 
     composite_end = min(event.end_time + composite_after, end)
@@ -1007,8 +1148,18 @@ def save_meteor_event(
                 2,
             )
 
-        cv2.imwrite(str(output_dir / f"{base_name}_composite.jpg"), marked)
-        cv2.imwrite(str(output_dir / f"{base_name}_composite_original.jpg"), composite)
+        if not cv2.imwrite(str(output_dir / f"{base_name}_composite.jpg"), marked):
+            print(
+                f"[WARN] コンポジット画像の書き込みに失敗しました（ディスクフル等）: "
+                f"base_name={base_name}",
+                flush=True,
+            )
+        if not cv2.imwrite(str(output_dir / f"{base_name}_composite_original.jpg"), composite):
+            print(
+                f"[WARN] オリジナル合成画像の書き込みに失敗しました（ディスクフル等）: "
+                f"base_name={base_name}",
+                flush=True,
+            )
 
     record["id"] = detection_id
     record["base_name"] = base_name

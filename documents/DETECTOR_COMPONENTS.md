@@ -428,6 +428,14 @@ stateDiagram-v2
 無関係な値が偶然近接しうる。検証・分析では必ずプロセスセッション単位に分割してから
 比較すること（跨いだまま比較すると誤った近接を検出する）。
 
+!!! warning "731件検証の生存バイアス限界"
+    「動画ファイルが残存＝流星と判断」という基準は、**ユーザーが目視確認して削除しなかった
+    レコード**を代理指標にしている。これはユーザーの削除判断の質に依存する間接的な検証であり、
+    (1) ユーザーが見落として削除しなかった誤認識、(2) 逆に流星だが誤って削除してしまった
+    レコードは、いずれもこの集計には反映されない。0.00%という結果は「本抑制導入前の実運用で
+    生き残ったレコードには影響がなかった」ことを示すが、統計的に独立な正解ラベル（例えば
+    別人による再判定）による検証ではない点に留意する。
+
 **適用範囲**: `EventMerger` は Webプレビュー付き検出（`meteor_detector_rtsp_web.py`）だけでなく、
 RTSP CLI版（`meteor_detector_rtsp.py`）と動画ファイル解析（`meteor_detector.py`）でも
 生成されるため、本抑制はこれら3経路すべてに適用される。
@@ -557,19 +565,22 @@ class MeteorEvent:
     end_point: Tuple[int, int]   # 終了座標
     peak_brightness: float       # ピーク輝度
     confidence: float            # 信頼度 (0-1)
-    frames: List[Tuple[float, np.ndarray]]  # フレームリスト
+    frames: List[Tuple[float, np.ndarray]]  # フレームリスト（リアルタイム経路では常に空、後述）
 ```
+
+!!! note "frames は常に空リスト"
+    `_finalize_track()` / `EventMerger._merge()` はいずれも `frames=[]` で `MeteorEvent` を生成するため、リアルタイム検出経路では軌跡点列そのものは `MeteorEvent` に保存されない。保存用動画は `RingBuffer` から `event.start_time` 〜 `event.end_time`（マージン込み）の時刻範囲で切り出す設計であり、`frames` フィールドの中身に依存しない。
 
 #### プロパティ
 
 | プロパティ | 型 | 説明 |
 |-----------|-----|------|
 | `duration` | `float` | 継続時間（秒） |
-| `length` | `float` | 軌跡長（ピクセル） |
+| `length` | `float` | 始点・終点間の直線距離（ピクセル）。屈曲した軌跡や断片マージ後のイベントでは、実際の移動経路長より短く算出される |
 
 #### JSON出力形式（to_dict）
 
-`MeteorEvent.to_dict()` は**下記のフィールドのみ**を返します。`id` / `base_name` / `clip_path` / `image_path` / `composite_original_path` は `save_meteor_event()` 側で後付けされ、JSONL 行として書き出されます（実装: `meteor_detector_realtime.py:262-273` / `879-892`）。
+`MeteorEvent.to_dict()` は**下記のフィールドのみ**を返します。`id` / `base_name` / `clip_path` / `image_path` / `composite_original_path` は `save_meteor_event()` 側で後付けされ、JSONL 行として書き出されます（実装: `MeteorEvent.to_dict()` / `save_meteor_event()`、いずれも `meteor_detector_realtime.py`）。
 
 ```json
 {
@@ -1014,6 +1025,27 @@ cv2.line(composite, start_point, end_point, (0, 255, 255), 2)
 cv2.circle(composite, start_point, 6, (0, 255, 0), 2)  # 開始点（緑）
 cv2.circle(composite, end_point, 6, (0, 0, 255), 2)    # 終了点（赤）
 ```
+
+### クリップ書き出しfpsの推定とクランプ（`estimate_fps_from_frames`）
+
+`save_meteor_event()` は動画クリップの書き出しfpsを、RTSP接続時にネゴシエートされた
+fps（`fallback_fps`）で決め打ちせず、`RingBuffer` から取得したフレームの実際の時刻差
+から `estimate_fps_from_frames()` で推定する。CPU飽和等で `cap.read()` の呼び出し間隔が
+乱れると、フレームに付与される受信時刻が実際の撮影間隔より詰まり、推定fpsがカメラの
+実効fpsを大きく上回ることがある（2026-08-16の本番環境で、接続時20.0fpsのカメラに対し
+108fps・117fpsで書き出された事例）。
+
+- フレーム時刻差の**中央値**から実効fpsを算出し、`sanitize_fps()` で有効範囲
+  （1.0〜120.0fps）に正規化する。
+- 正規化後の推定値が `fallback_fps × max_ratio_to_fallback`（既定倍率 1.5）を
+  **超えた場合のみ** `fallback_fps` にクランプする。108fps・117fpsのような異常値は
+  `sanitize_fps()` の上限（120.0）の内側にあるため、上限だけでは弾けず、この比率判定が
+  必要になる。
+- 夜間IRモード等でカメラの実効fpsがネゴシエーション値より正常に低下するケース
+  （例: 20.0fps接続で実効10.0fps）はこの範囲に収まるため、そのまま推定値が採用される。
+- クランプが発動した場合は `[WARN] fps推定値をクランプ` をログに出力する（次回リリースで追加）。
+  無言クランプはCPU飽和という重要な兆候を隠してしまうため、必ずログで確認できるように
+  している。
 
 ---
 

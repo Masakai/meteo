@@ -1,10 +1,13 @@
 import numpy as np
 from datetime import datetime
 
+import cv2
+
 from meteor_detector_realtime import (
     DetectionParams,
     EventMerger,
     MeteorEvent,
+    RealtimeMeteorDetector,
     estimate_fps_from_frames,
     make_detection_base_name,
     make_detection_id,
@@ -192,8 +195,10 @@ def test_event_merger_does_not_burst_reject_merged_fragments():
         y += 5
 
     finalized = _run_merger(merger, fragments, advance_to=t + 100)
-    # マージされて件数は6件より少なくなるが、破棄されずに残ることが要点。
-    assert 0 < len(finalized) <= len(fragments)
+    # 実測: 5番目の断片(index 4)で speed_ratio が merge_max_speed_ratio(0.5)を
+    # 超えて分裂するため、6断片は2件のイベントにマージされる
+    # （前半4断片が1件、後半2断片が1件）。破棄されずに残ることが要点。
+    assert len(finalized) == 2
 
 
 def test_event_merger_burst_window_connects_trailing_isolated_event():
@@ -243,8 +248,11 @@ def test_event_merger_handles_non_monotonic_arrival_order():
         for i, st in enumerate(arrivals)
     ]
     # 例外を送出せず、_arrival_timesが単調増加を仮定した実装で壊れないことを確認する。
+    # 実測: 7件は到着間隔1.0秒以内の単一クラスタとなりburst_max_events(5)を超えるため
+    # 全件がバーストとして破棄される。
     finalized = _run_merger(merger, events, advance_to=200.0)
-    assert isinstance(finalized, list)
+    assert finalized == []
+    assert merger._burst_dropped == 7
 
 
 def test_probe_rtsp_endpoint_reports_tcp_ok(monkeypatch):
@@ -294,3 +302,111 @@ def test_make_detection_base_name_avoids_existing_collision(tmp_path):
     (tmp_path / f"{first}.mp4").write_bytes(b"x")
     second = make_detection_base_name(tmp_path, datetime(2026, 2, 7, 22, 0, 0), detection_id)
     assert second == "meteor_20260207_220000_12345678_02"
+
+
+def test_detection_params_default_values_are_not_clamped():
+    # 既定値はレンジ内であり、クランプが発動しないことを確認する。
+    params = DetectionParams()
+    assert params.exclude_bottom_ratio == 1 / 16
+    assert params.exclude_edge_ratio == 0.0
+    assert params.burst_window_time == 1.0
+    assert params.burst_max_events == 5
+
+
+def test_detection_params_clamps_out_of_range_values(capsys):
+    params = DetectionParams(
+        exclude_bottom_ratio=1.5,
+        exclude_edge_ratio=0.9,
+        burst_window_time=-1.0,
+        burst_max_events=0,
+    )
+    assert params.exclude_bottom_ratio == 1.0
+    assert params.exclude_edge_ratio == 0.5
+    assert params.burst_window_time == 0.0
+    assert params.burst_max_events == 1
+
+    captured = capsys.readouterr()
+    assert "[WARN]" in captured.out
+    assert "exclude_bottom_ratio" in captured.out
+    assert "exclude_edge_ratio" in captured.out
+    assert "burst_window_time" in captured.out
+    assert "burst_max_events" in captured.out
+
+
+def test_detection_params_warns_when_burst_span_exceeds_prune_retention(capsys):
+    # burst_max_events × burst_window_time が _prune_arrival_times() の
+    # 保持幅（10 × max(burst_window_time, merge_max_gap_time)）を超える場合、
+    # クランプはしないが警告を出す。
+    DetectionParams(burst_window_time=5.0, burst_max_events=100, merge_max_gap_time=1.5)
+    captured = capsys.readouterr()
+    assert "[WARN] バースト抑制の設定が保持幅を超えています" in captured.out
+
+
+def test_detect_bright_objects_roi_matches_full_frame_calculation():
+    # detect_bright_objects の brightness / nuisance_overlap_ratio 計算を
+    # 輪郭のROI(外接矩形)に限定した実装に変更したが、結果はフレーム全面で
+    # マスクを確保する旧方式と完全一致するはず（uint8の合計・カウントなので
+    # 誤差は生じない）。複数の候補輪郭・ノイズ帯マスクとの重なりを含めて検証する。
+    height, width = 120, 160
+    frame = np.full((height, width), 50, dtype=np.uint8)
+    prev_frame = np.full((height, width), 50, dtype=np.uint8)
+
+    # 3つの明るい矩形（面積・輝度が異なる）を候補として配置。
+    # 3つ目は非対称な外接矩形（rx != ry, rw != rh）とし、ノイズ帯が候補矩形を
+    # 部分的にのみ覆うようにする。これにより boundingRect の offset(-rx, -ry)
+    # の1pxずれや、ROIスライス座標の入れ替え（[rx:rx+rw, ry:ry+rh]）といった
+    # 実装ミスが混入した場合に overlap_ratio の値が変化し、テストが検出できる
+    # （対称形状・完全内包/完全非重複のみだとこれらの変異が数学的に無害化される）。
+    cv2.rectangle(frame, (10, 10), (25, 25), 220, -1)   # 通常の明るい物体（ノイズ帯対象外）
+    cv2.rectangle(frame, (60, 60), (68, 68), 210, -1)   # small_area閾値以下、ノイズ帯と完全重なり→除外される
+    cv2.rectangle(frame, (30, 70), (46, 76), 205, -1)   # small_area閾値以下、ノイズ帯と部分的に重なる（非対称）
+
+    nuisance_mask = np.zeros((height, width), dtype=np.uint8)
+    cv2.rectangle(nuisance_mask, (55, 55), (75, 75), 255, -1)  # 2つ目の矩形を完全に内包
+    cv2.rectangle(nuisance_mask, (30, 70), (38, 76), 255, -1)  # 3つ目の矩形を部分的に重なる
+
+    params = DetectionParams(
+        diff_threshold=30,
+        min_area=5,
+        max_area=10000,
+        min_brightness=100,
+        small_area_threshold=100,
+        nuisance_overlap_threshold=0.60,
+        exclude_bottom_ratio=0.0,
+        exclude_edge_ratio=0.0,
+    )
+    detector = RealtimeMeteorDetector(params, fps=20, nuisance_mask=nuisance_mask)
+
+    objects = detector.detect_bright_objects(frame, prev_frame)
+
+    # ノイズ帯と完全重なりの矩形(overlap_ratio=1.0 >= 0.60)は候補段階で除外される。
+    # 部分重なりの矩形(overlap_ratio≈0.53 < 0.60)は残る。
+    assert len(objects) == 2
+    by_brightness = {round(o["brightness"]): o for o in objects}
+    assert sorted(by_brightness) == [205, 220]
+    assert by_brightness[220]["nuisance_overlap_ratio"] == 0.0
+    assert round(by_brightness[205]["nuisance_overlap_ratio"], 4) == 0.5304
+
+    # 除外閾値を1.0超にして overlap_ratio 自体の計算値（ROIスライスでの正確さ）を検証する。
+    params_no_reject = DetectionParams(
+        diff_threshold=30,
+        min_area=5,
+        max_area=10000,
+        min_brightness=100,
+        small_area_threshold=100,
+        nuisance_overlap_threshold=1.5,
+        exclude_bottom_ratio=0.0,
+        exclude_edge_ratio=0.0,
+    )
+    detector_no_reject = RealtimeMeteorDetector(params_no_reject, fps=20, nuisance_mask=nuisance_mask)
+    objects_all = detector_no_reject.detect_bright_objects(frame, prev_frame)
+
+    assert len(objects_all) == 3
+    by_brightness = {round(o["brightness"]): o for o in objects_all}
+    assert by_brightness[220]["nuisance_overlap_ratio"] == 0.0
+    # 内包される矩形は輪郭全域がノイズ帯内なのでoverlap_ratioは1.0
+    assert by_brightness[210]["nuisance_overlap_ratio"] == 1.0
+    # 部分的に重なる非対称矩形は、offsetの1pxずれやROIスライス座標の
+    # 入れ替えといった実装ミスがあれば異なる値を返す（1pxずれなら0.5、
+    # 座標入れ替えなら形状不一致でValueError）。
+    assert round(by_brightness[205]["nuisance_overlap_ratio"], 4) == 0.5304
