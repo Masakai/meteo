@@ -200,6 +200,29 @@ def render_settings_html(cameras, version):
             grid-template-columns: repeat(2, minmax(200px, 1fr));
             gap: 10px 14px;
         }}
+        .param-group {{
+            border: 1px solid #d0dce8;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background: #fbfdff;
+        }}
+        .param-group:last-child {{
+            margin-bottom: 0;
+        }}
+        .param-group h3 {{
+            margin: 0 0 8px;
+            font-size: 0.88rem;
+            color: #1a6090;
+        }}
+        .param-children {{
+            margin-top: 8px;
+            padding-left: 16px;
+            border-left: 3px solid #d0dce8;
+        }}
+        .param-group .help-note {{
+            margin-bottom: 8px;
+        }}
         label {{
             display: block;
             font-size: 0.82rem;
@@ -495,30 +518,68 @@ def render_settings_html(cameras, version):
                         <tr><th>パラメータ</th><th>意味</th><th>調整の目安</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td>max_speed</td><td>方式3: 速度上限フィルタ</td><td>0で無効。超高速の鳥・飛行機雲を上限で棄却</td></tr>
                         <tr><td>max_heading_variance</td><td>方式1a: 蛇行フィルタの分散閾値</td><td>0で無効。羽ばたきによる進行方向のぶれが大きい軌跡を棄却</td></tr>
                         <tr><td>min_heading_variance_points</td><td>方式1a判定に必要な最小点数</td><td>これ未満は判定をスキップして通す（fail-open）</td></tr>
                         <tr><td>record_track_points</td><td>方式1b: 軌跡点列の記録（観測専用、再起動要）</td><td>閾値決定用データ収集。検出結果には影響しない</td></tr>
                         <tr><td>contrail_check_enabled</td><td>方式2: 飛行機雲の残光チェック（再起動要）</td><td>経路上の輝度残存を見て飛行機雲を棄却</td></tr>
                         <tr><td>contrail_afterglow_window</td><td>方式2の観測窓（秒、再起動要）</td><td>既定2.0秒。長すぎるとRingBuffer取得コストが増える</td></tr>
                         <tr><td>contrail_residual_brightness_ratio</td><td>方式2の残光判定比率（再起動要）</td><td>終了直前比でこの比率以上残っていれば残光ありと判定</td></tr>
+                        <tr><td>max_speed</td><td>方式3: 速度上限フィルタ</td><td>0で無効。超高速の鳥・飛行機雲を上限で棄却</td></tr>
                         <tr><td>twilight_rate_suppress_enabled</td><td>方式4: 薄明期間バーストレート抑制の発動（再起動要）</td><td>既定false（観測モード）。有効化すると感度を一時的に下げる</td></tr>
                         <tr><td>twilight_rate_window_sec</td><td>方式4のレート監視窓（秒、再起動要）</td><td>既定300秒（5分）</td></tr>
                         <tr><td>twilight_rate_max_events</td><td>方式4の抑制発動閾値（再起動要）</td><td>0は観測専用モード（抑制なし）</td></tr>
                     </tbody>
                 </table>
             </details>
-            <div class="grid">
-                <div><label>速度上限 px/秒（max_speed）</label><input id="max_speed" type="number" step="1" min="0"></div>
-                <div><label>蛇行角度分散閾値（max_heading_variance）</label><input id="max_heading_variance" type="number" step="0.01" min="0"></div>
-                <div><label>蛇行判定の最小点数（min_heading_variance_points）</label><input id="min_heading_variance_points" type="number" step="1" min="3"></div>
-                <div><label><input id="record_track_points" type="checkbox"> 軌跡点列を記録する（観測専用、record_track_points）</label></div>
-                <div><label><input id="contrail_check_enabled" type="checkbox"> 飛行機雲の残光チェックを有効にする（contrail_check_enabled）</label></div>
-                <div><label>残光観測窓 秒（contrail_afterglow_window）</label><input id="contrail_afterglow_window" type="number" step="0.1" min="0" max="10"></div>
-                <div><label>残光判定比率（contrail_residual_brightness_ratio）</label><input id="contrail_residual_brightness_ratio" type="number" step="0.01" min="0" max="1"></div>
-                <div><label><input id="twilight_rate_suppress_enabled" type="checkbox"> 薄明レート抑制を発動する（twilight_rate_suppress_enabled）</label></div>
-                <div><label>薄明レート監視窓 秒（twilight_rate_window_sec）</label><input id="twilight_rate_window_sec" type="number" step="1" min="1"></div>
-                <div><label>薄明レート抑制閾値（twilight_rate_max_events）</label><input id="twilight_rate_max_events" type="number" step="1" min="0"></div>
+            <div class="param-group">
+                <h3>方式1a: 軌跡蛇行フィルタ</h3>
+                <p class="help-note">チェックボックスはありません。max_heading_varianceが0のとき無効です。</p>
+                <div class="grid">
+                    <div><label>蛇行角度分散閾値（max_heading_variance）</label><input id="max_heading_variance" type="number" step="0.01" min="0"></div>
+                    <div><label>蛇行判定の最小点数（min_heading_variance_points）</label><input id="min_heading_variance_points" type="number" step="1" min="3"></div>
+                </div>
+            </div>
+
+            <div class="param-group">
+                <h3>方式1b: 軌跡点列記録（観測専用）</h3>
+                <p class="help-note">対応する数値パラメータはありません。検出結果には影響しません。</p>
+                <div class="grid">
+                    <div><label><input id="record_track_points" type="checkbox"> 軌跡点列を記録する（観測専用、record_track_points）</label></div>
+                </div>
+            </div>
+
+            <div class="param-group">
+                <h3>方式2: 飛行機雲の残光チェック</h3>
+                <div class="grid">
+                    <div><label><input id="contrail_check_enabled" type="checkbox"> 飛行機雲の残光チェックを有効にする（contrail_check_enabled）</label></div>
+                </div>
+                <div class="param-children">
+                    <div class="grid">
+                        <div><label>残光観測窓 秒（contrail_afterglow_window）</label><input id="contrail_afterglow_window" type="number" step="0.1" min="0" max="10"></div>
+                        <div><label>残光判定比率（contrail_residual_brightness_ratio）</label><input id="contrail_residual_brightness_ratio" type="number" step="0.01" min="0" max="1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="param-group">
+                <h3>方式3: 薄明速度上限フィルタ</h3>
+                <p class="help-note">チェックボックスはありません。max_speedが0のとき無効です。</p>
+                <div class="grid">
+                    <div><label>速度上限 px/秒（max_speed）</label><input id="max_speed" type="number" step="1" min="0"></div>
+                </div>
+            </div>
+
+            <div class="param-group">
+                <h3>方式4: 薄明バーストレート抑制</h3>
+                <div class="grid">
+                    <div><label><input id="twilight_rate_suppress_enabled" type="checkbox"> 薄明レート抑制を発動する（twilight_rate_suppress_enabled）</label></div>
+                </div>
+                <div class="param-children">
+                    <div class="grid">
+                        <div><label>薄明レート監視窓 秒（twilight_rate_window_sec）</label><input id="twilight_rate_window_sec" type="number" step="1" min="1"></div>
+                        <div><label>薄明レート抑制閾値（twilight_rate_max_events）</label><input id="twilight_rate_max_events" type="number" step="1" min="0"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
