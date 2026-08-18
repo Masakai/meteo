@@ -206,6 +206,95 @@ class TestSoftDelete:
         rows = detection_store.query_detections(db, deleted=True)
         assert any(r["id"] == "a1" for r in rows)
 
+    def test_records_deletion_history(self, db, tmp_path):
+        """削除時に deleted_detections へ履歴が残る。"""
+        cam_dir = tmp_path / "cam1"
+        cam_dir.mkdir()
+        jsonl = cam_dir / "detections.jsonl"
+        with open(jsonl, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"id": "a1", "timestamp": "2024-01-01T00:00:00"}) + "\n")
+        detection_store.sync_camera_from_jsonl("cam1", cam_dir, db, _make_normalize_fn())
+
+        detection_store.soft_delete(db, "a1")
+
+        conn = sqlite3.connect(db)
+        row = conn.execute(
+            "SELECT id, camera FROM deleted_detections WHERE id = 'a1'"
+        ).fetchone()
+        conn.close()
+        assert row is not None
+        assert row[1] == "cam1"
+
+
+class TestDeletionSurvivesResync:
+    """削除済みレコードが JSONL 再同期で復活しないことを検証する。
+
+    JSONL は検出コアが追記する一次記録で、削除しても行は残る。
+    そのため再同期時に deleted を 0 固定で INSERT すると削除が取り消され、
+    ファイルだけ消えた「サムネイルなしの記録」が一覧に並ぶ不具合になる。
+    """
+
+    def _setup_and_delete(self, db, tmp_path):
+        cam_dir = tmp_path / "cam1"
+        cam_dir.mkdir()
+        jsonl = cam_dir / "detections.jsonl"
+        with open(jsonl, "w", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "id": "a1",
+                "timestamp": "2024-01-01T00:00:00",
+                "image_path": "cam1/a1_composite.jpg",
+            }) + "\n")
+        detection_store.sync_camera_from_jsonl("cam1", cam_dir, db, _make_normalize_fn())
+        detection_store.soft_delete(db, "a1")
+        return cam_dir
+
+    def test_deleted_record_stays_deleted_after_reset_sync_state(self, db, tmp_path):
+        cam_dir = self._setup_and_delete(db, tmp_path)
+
+        # カメラ名変更や一括削除の後に走る全行再同期を再現する
+        detection_store.reset_sync_state(db, "cam1")
+        detection_store.sync_camera_from_jsonl("cam1", cam_dir, db, _make_normalize_fn())
+
+        rows = detection_store.query_detections(db)
+        assert all(r["id"] != "a1" for r in rows), "再同期で削除済みレコードが復活した"
+
+    def test_deleted_record_stays_deleted_after_db_rebuild(self, db, tmp_path):
+        """DB を作り直しても削除履歴が残っていれば復活しない。"""
+        cam_dir = self._setup_and_delete(db, tmp_path)
+
+        # detections テーブルだけ失われ、削除履歴は残っている状況を再現する
+        conn = sqlite3.connect(db)
+        conn.execute("DELETE FROM detections")
+        conn.commit()
+        conn.close()
+        detection_store._local.conn.close()
+        del detection_store._local.conn
+        del detection_store._local.db_path
+
+        detection_store.reset_sync_state(db, "cam1")
+        detection_store.sync_camera_from_jsonl("cam1", cam_dir, db, _make_normalize_fn())
+
+        rows = detection_store.query_detections(db)
+        assert all(r["id"] != "a1" for r in rows), "DB再構築で削除済みレコードが復活した"
+
+    def test_undeleted_record_survives_resync(self, db, tmp_path):
+        """削除していないレコードは再同期後も通常どおり残る。"""
+        cam_dir = tmp_path / "cam1"
+        cam_dir.mkdir()
+        jsonl = cam_dir / "detections.jsonl"
+        with open(jsonl, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"id": "keep1", "timestamp": "2024-01-01T00:00:00"}) + "\n")
+            f.write(json.dumps({"id": "del1", "timestamp": "2024-01-01T00:01:00"}) + "\n")
+        detection_store.sync_camera_from_jsonl("cam1", cam_dir, db, _make_normalize_fn())
+        detection_store.soft_delete(db, "del1")
+
+        detection_store.reset_sync_state(db, "cam1")
+        detection_store.sync_camera_from_jsonl("cam1", cam_dir, db, _make_normalize_fn())
+
+        ids = {r["id"] for r in detection_store.query_detections(db)}
+        assert "keep1" in ids
+        assert "del1" not in ids
+
 
 class TestCountAssetReferences:
     def _insert(self, db, detection_id, clip_path="", image_path="", composite_original_path="", alternate=None):

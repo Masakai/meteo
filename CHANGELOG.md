@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.19.2] - 2026-08-18
+### Fixed
+- `detection_store.py` — UI で削除した検出が JSONL 再同期で復活する不具合を修正した。`detections.jsonl` は検出コアが追記し続ける一次記録であり削除時に行を消さない（`soft_delete()` は SQLite のみを更新する）が、`_insert_detection()` が同期時に `deleted` を `0` 固定で INSERT していたため、カメラ名変更（`migrate_camera_dirs.py`）などで `reset_sync_state()` による全行再同期が走ると、削除済みレコードが `deleted=0` で復活していた。復活したレコードは実ファイルが既に削除済みのため `image_path` が空文字列になり、ダッシュボードに「サムネイルが付かない検出」として並ぶ。本番環境では 2026-04-12〜2026-05-11 の期間で 4,875 件が影響を受けた。
+
+### Added
+- `detection_store.py` — 削除済み検出 ID を永続記録する `deleted_detections` テーブル（`id` / `camera` / `deleted_at`）を新設した。`soft_delete()` が削除履歴を登録し、`_insert_detection()` が `COALESCE((SELECT 1 FROM deleted_detections WHERE id = ?), 0)` で削除状態を復元するため、再同期や DB 再構築を経ても削除が取り消されない。テーブルは `CREATE TABLE IF NOT EXISTS` で既存 DB にも自動作成されるため、アップグレード時の手動マイグレーションは不要。
+- `scripts/repair_lost_deletions.py` — 過去に失われた削除フラグを復旧するスクリプトを追加した。JSONL に画像パスが記録されているのに実ファイルが存在しないレコードを削除済みとみなして `deleted=1` に戻し、`deleted_detections` へ履歴を登録する。既定はドライランで、`--apply` を付けるまで DB を変更しない。
+- `tests/test_detection_store.py` — 回帰テスト 4 件を追加した（削除履歴の記録、再同期後および DB 再構築後に復活しないこと、未削除レコードが残ること）。
+
+### Changed
+- `documents/DETECTION_STORE.md` / `documents/SCRIPTS_REFERENCE.md` — `deleted_detections` テーブルの仕様・背景と `repair_lost_deletions.py` の使い方を追記した。
+
 ## [3.19.1] - 2026-08-17
 ### Changed
 - `dashboard_templates_settings.py` — `/settings`画面の鳥・コウモリ・飛行機雲対策パネルを方式1a/1b/2/3/4ごとに枠で区切り、チェックボックスと従属する数値パラメータの親子関係をインデントで明示するグルーピング表示に変更した。挙動変化なし（`id`属性は変更なし、JS側の送信ロジックへの影響なし）。
