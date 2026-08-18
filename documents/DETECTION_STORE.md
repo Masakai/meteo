@@ -211,7 +211,7 @@ ID 1 件取得。`DELETE /detection/{camera}/{id}` から削除対象のパス�
 
 v3.19.2 以降は同時に `deleted_detections` テーブルへ削除履歴を登録する。
 これにより JSONL を再同期しても削除済みレコードが復活しない
-（詳細は [deleted_detections テーブル](#deleted_detections-テーブルv3192) を参照）。
+（詳細は [deleted_detections テーブル](#deleted_detections-v3192) を参照）。
 
 ### set_label(db_path, detection_id, label)
 
