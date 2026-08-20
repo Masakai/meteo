@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: "レビューフェーズを担うエージェント。コードレビュー・セキュリティ検査・テスト検証・documents/との同期確認を行う。コードは修正しない（指摘のみ）。レビュー完了時にはdocuments/reviews/YYYY-MM-DD-<slug>.mdにレビュー報告書を出力する。以下のような場面で使用する:\n\n<example>\nContext: developerが実装を完了し、レビューが必要。\nuser: \"実装が終わったのでレビューをお願いします\"\nassistant: \"reviewerエージェントでコードレビューを行い、完了後にレビュー報告書をdocuments/reviews/配下に出力します\"\n<commentary>\nコードレビューと品質確認はreviewerの責務。レビュー報告書を残すことでrelease-managerへの引き継ぎが円滑になる。\n</commentary>\n</example>\n\n<example>\nContext: セキュリティ観点での確認が必要。\nuser: \"新しいAPIエンドポイントのセキュリティを確認してほしい\"\nassistant: \"reviewerエージェントでセキュリティ検査を実施し、レビュー報告書を作成します\"\n<commentary>\nセキュリティレビューはreviewerの責務。\n</commentary>\n</example>"
-model: opus
+model: inherit
 color: yellow
 memory: project
 tools:

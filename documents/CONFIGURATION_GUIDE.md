@@ -127,16 +127,6 @@ docker-compose.ymlで設定される環境変数:
 | `BIRD_FILTER_ENABLED` | `false` | 通常時の黒点フィルタ（opt-in） | `true` / `false` |
 | `BIRD_MIN_BRIGHTNESS` | `80` | 通常時の除外輝度閾値 | `40` ~ `120` |
 | `STREAM_TIMEOUT` | `30.0` | ストリーム監視ウォッチドッグのタイムアウト秒数（v3.17.3+）。`last_frame_time` がこの秒数更新されないとストール（ストリーム断）とみなし検出プロセスを再起動する | `20` ~ `60` |
-| `RTSP_RW_TIMEOUT_US` | 未設定（無効） | FFmpegバックエンドのTCP読み書きタイムアウト（マイクロ秒単位、次回リリースで追加）。設定するとTCP接続が生きたままストリームが停止した際の `cap.read()` 無期限ブロックを緩和しうるが、RTSPデムクサーが本オプションを解釈するかは未検証（`timeout`/`stimeout` オプションの方が効く可能性がある）。明示的に指定した場合のみ有効化される。**有効化するとRTSPトランスポートがTCPに固定される**（`rtsp_transport;tcp` が同時に設定されるため、OpenCVビルドの既定トランスポートがUDPの場合は挙動が変わる）。**プロセス起動時（モジュール読み込み時）に一度だけ評価されるため、`/apply_settings` 等の実行時変更は反映されない**（コンテナ再起動が必要）。`STREAM_TIMEOUT` より短くすると、そちらの誤検知抑制と競合するため注意 | `30000000` ~ `120000000`（設定する場合） |
-| `METEOR_DEBUG_LOG` | `false` | 検出棄却理由（`[DEBUG] rejected_by=...`）のログ出力を有効化する（次回リリースで追加）。既定は無効。ノイズ多発時のホットループI/O負荷とログ肥大を避けるため既定でオフになっている | `true` / `false` |
-| `TWILIGHT_MAX_SPEED` | `0` | 方式3（v3.19.0）: 薄明期間中のみ有効化する速度上限フィルタ px/秒。0は無効。`TWILIGHT_MIN_SPEED`と組み合わせて速度帯を絞り込む。**env-only設定**（`/settings`画面のUIには公開していない。`TWILIGHT_MIN_SPEED`と同様に`/apply_settings`の対応テーブルがなくUI経由では変更できない構造のため、意図的にUI非公開としている） | `300` ~ `1000` |
-| `RECORD_TRACK_POINTS` | `false` | 方式1b（v3.19.0）: 軌跡点列を`detections.jsonl`に記録する（観測専用、判定には使わない）。データ構造が変わるため設定変更時はコンテナ再起動が必要 | `true` / `false` |
-| `CONTRAIL_CHECK_ENABLED` | `false` | 方式2（v3.19.0）: 飛行機雲の残光チェックを有効化する。設定変更時はコンテナ再起動が必要 | `true` / `false` |
-| `CONTRAIL_AFTERGLOW_WINDOW` | `2.0` | 方式2（v3.19.0）: 残光チェックの観測窓（秒）。長くするほど`RingBuffer.get_range()`の追加コピー量が増えるため2.0秒を超える設定は非推奨 | `1.0` ~ `2.0` |
-| `CONTRAIL_RESIDUAL_BRIGHTNESS_RATIO` | `0.5` | 方式2（v3.19.0）: 残光判定の輝度残存比率。経路パッチと周辺リング領域（背景）の差分＝背景を差し引いた超過輝度から、さらにイベント開始前のベースラインフレームの超過輝度を差し引いた「流星自身の輝度寄与分」を終了直前・終了直後で比較し、直前比でこの比率以上が残っていれば飛行機雲の残光と判定する（背景輝度・恒星やホットピクセル等の静止した高輝度源はいずれも比較に含まない）。低い側の値でも静止した高輝度源の混入によって消滅した流星を誤棄却することはない | `0.3` ~ `0.7` |
-| `TWILIGHT_RATE_WINDOW_SEC` | `300` | 方式4（v3.19.0）: 薄明期間バーストレート抑制のレート監視窓（秒） | `120` ~ `600` |
-| `TWILIGHT_RATE_MAX_EVENTS` | `0` | 方式4（v3.19.0）: レート監視窓内で許容する薄明期間確定イベント数。0は観測専用モード（抑制を発動しない） | `5` ~ `20` |
-| `TWILIGHT_RATE_SUPPRESS_ENABLED` | `false` | 方式4（v3.19.0）: レート超過時に感度を一時的に下げる抑制を発動するか。既定は観測モードのみ（抑制なし） | `true` / `false` |
 
 !!! warning "高閾値のリスク"
     `BIRD_MIN_BRIGHTNESS` および `TWILIGHT_BIRD_MIN_BRIGHTNESS` を 120 以上に設定すると暗い流星を誤除外するリスクがある。`faint` プリセット使用時は特に注意。
@@ -258,7 +248,6 @@ environment:
 
 **即時反映（再起動不要）:**
   - **検出パラメータ**: `diff_threshold`, `min_brightness`, `min_linearity`, `min_length`, `min_speed`, `min_duration`, `max_duration`, `min_area`, `max_area`
-  - **イベント結合・バースト抑制パラメータ（v3.18.0+）**: `merge_max_gap_time`, `merge_max_distance`, `merge_max_speed_ratio`, `burst_window_time`（バースト判定の最大到着間隔、既定1.0秒）, `burst_max_events`（1バーストで許容するイベント数、既定5件。超えた塊は破棄）
   - **ノイズ除外パラメータ**: `nuisance_overlap_threshold`, `nuisance_path_overlap_threshold`, `min_track_points`, `max_stationary_ratio`, `small_area_threshold`
   - **録画マージン設定（v1.14.0+）**: `clip_margin_before`, `clip_margin_after`
   - **マスク設定**: `mask_dilate`, `nuisance_dilate`, `mask_*`, `nuisance_*` の画像パス
@@ -567,18 +556,6 @@ params.diff_threshold = 25  # より敏感に
 
 ---
 
-#### max_speed（方式3: 速度上限フィルタ）v3.19.0+
-
-**説明**: 検出する最大移動速度（ピクセル/秒）。`min_speed`と対称の上限判定
-
-**既定値**: `0.0`（無効）
-
-**用途**: 薄明期間の速い鳥・コウモリ・飛行機雲（実測513〜1518px/s）を棄却する。通常の`min_speed`（下限のみ）では捕捉できない高速な誤検出対策
-
-**注意**: 通常時の`max_speed`をグローバルに設定すると火球・速い流星まで棄却しうるため、実運用では`TWILIGHT_MAX_SPEED`環境変数経由で薄明期間のみに適用する運用を推奨（`/apply_settings`経由の即時反映も可能）
-
----
-
 #### min_linearity（最小直線性）
 
 **説明**: 軌跡の直線度合い（0.0-1.0）。1.0が完全な直線
@@ -590,19 +567,6 @@ params.diff_threshold = 25  # より敏感に
 **推奨値**: 0.7
 
 **計算方法**: 主成分分析（PCA）による固有値比
-
----
-
-#### max_heading_variance / min_heading_variance_points（方式1a: 蛇行フィルタ）v3.19.0+
-
-**説明**: `max_heading_variance`は軌跡の進行方向角度の分散閾値（ラジアン、`calculate_heading_variance()`が算出）。`min_heading_variance_points`はこの判定に必要な最小軌跡点数（未満は判定をスキップして通す、fail-open）
-
-**既定値**: `max_heading_variance=0.0`（無効）、`min_heading_variance_points=5`
-
-**用途**: 羽ばたきで進行方向が揺れる鳥・コウモリの軌跡を、直線的な流星と区別して棄却する
-
-!!! warning "本番のmin_track_points=3では事実上機能しない"
-    本番`min_track_points`は2026-08-13にfps低下対策として5から3へ再変更済み（プロジェクトメモリ参照）。`min_track_points=3`では隣接角度差が高々1〜2個しか取れず、既定の`min_heading_variance_points=5`のもとでは統計的に不安定として判定をスキップする（fail-open）ため、方式1aは現状ほぼ無効化された状態で動作する。有効化するには、方式1b（`RECORD_TRACK_POINTS=true`）で観測データを蓄積し、閾値と`min_heading_variance_points`の妥当な組み合わせを実データから決定する必要がある。
 
 ---
 

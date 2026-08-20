@@ -35,7 +35,6 @@ Licensed under the MIT License
 | [merge_detection_directories.py](#merge_detection_directoriespy) | `scripts/` | 2 つの検出ディレクトリを統合 | ○ | `--apply` 時のみ移動 + JSONL 更新 | デフォルト dry-run |
 | [transfer_detections.py](#transfer_detectionspy) | `scripts/` | ZIP エクスポート/インポート（TUI） | ○ | import 側は `--apply` 指定時のみ副作用 | export は読み取りのみ / import はデフォルト dry-run |
 | [dump_detections_db.py](#dump_detections_dbpy) | `scripts/` | SQLite 内容を table / JSON / CSV でダンプ | ○（読み取り専用） | なし | - |
-| [repair_lost_deletions.py](#repair_lost_deletionspy) | `scripts/` | v3.19.2 再同期で失われた削除フラグの復旧 | ○ | `--apply` 時のみ SQLite 更新（JSONL 非破壊） | デフォルト dry-run |
 
 ---
 
@@ -350,38 +349,6 @@ python scripts/dump_detections_db.py --table sync
 # CSV 出力してスプレッドシートへ
 python scripts/dump_detections_db.py --format csv > detections.csv
 ```
-
----
-
-## repair_lost_deletions.py
-
-**配置**: `scripts/repair_lost_deletions.py`
-
-**目的**: v3.19.1 以前の不具合で失われた削除フラグを復旧する。JSONL 再同期時に `deleted` が `0` 固定で INSERT されていたため、UI で削除したはずのレコードが `deleted=0` で復活していた（詳細は [DETECTION_STORE.md](DETECTION_STORE.md) の `deleted_detections` テーブルを参照）。
-
-**判定条件**: JSONL に画像・動画パスが記録されているのに実ファイルが存在しないレコードを、削除済みとみなす。検出時に画像生成へ失敗した場合は JSONL 側にもパスが入らないため、この条件で「ユーザーが削除したもの」だけを選別できる。
-
-**主な引数**:
-
-| 引数 | デフォルト | 説明 |
-|---|---|---|
-| `--detections-dir PATH` | **必須** | `detections` ディレクトリ（`detections.db` を含む） |
-| `--apply` | オフ（dry-run） | 実際に DB を更新する |
-| `--include-migrated` | オフ | 移行前の旧カメラディレクトリ（`*.migrated_*`）も対象にする |
-
-**副作用**: `--apply` 時のみ `detections` テーブルの `deleted` を `1` に更新し、`deleted_detections` へ履歴を登録する。JSONL は変更しない。再実行しても `ON CONFLICT(id) DO NOTHING` により副作用は増えない。
-
-**実行例**:
-
-```bash
-# ドライラン（対象件数と月別内訳を表示するだけ）
-python scripts/repair_lost_deletions.py --detections-dir ~/meteo/detections
-
-# 本実行
-python scripts/repair_lost_deletions.py --detections-dir ~/meteo/detections --apply
-```
-
-**注意**: SQLite への書き込みを伴うため、実行前に `./meteor-docker.sh stop` でコンテナを停止すること。
 
 ---
 

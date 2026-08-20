@@ -318,10 +318,7 @@ stateDiagram-v2
         - 0.1秒 ≤ duration ≤ 10秒
         - 20px ≤ length ≤ 5000px
         - speed ≥ 50 px/s
-        - speed ≤ max_speed（0=無効、v3.19.0方式3）
         - linearity ≥ 0.7
-        - heading_variance ≤ max_heading_variance
-          （0=無効、v3.19.0方式1a、fail-open）
         - track_points ≥ min_track_points
         - stationary_ratio ≤ max_stationary_ratio
         - nuisance_path_overlap ≤ nuisance_path_overlap_threshold
@@ -357,203 +354,6 @@ stateDiagram-v2
 | `clip_margin_before` | 1.0 秒 | 録画開始マージン（イベント前） | v1.14.0 |
 | `clip_margin_after` | 1.0 秒 | 録画終了マージン（イベント後） | v1.14.0 |
 | `exclude_edge_ratio` | 0.0 | 画面端除外率（0.0-0.5、0=無効） | v1.16.0 |
-| `burst_window_time` | 1.0 秒 | バースト判定の最大到着間隔 | v3.18.0 |
-| `burst_max_events` | 5 | 1バーストで許容するイベント数（超過で塊を全破棄） | v3.18.0 |
-| `max_speed` | 0.0 (無効) | 方式3: 速度上限フィルタ px/s（薄明期間の速い鳥・飛行機雲対策） | v3.19.0 |
-| `max_heading_variance` | 0.0 (無効) | 方式1a: 蛇行フィルタの進行方向角度分散閾値 | v3.19.0 |
-| `min_heading_variance_points` | 5 | 方式1a判定に必要な最小軌跡点数（未満はfail-openで通す） | v3.19.0 |
-| `record_track_points` | False | 方式1b: 軌跡点列の記録（観測専用、再起動要） | v3.19.0 |
-
-#### 鳥・コウモリ・飛行機雲対策フィルタ（v3.19.0）
-
-既存の薄明対策（`TWILIGHT_MIN_SPEED`下限フィルタ、`filter_dark_objects`暗色除外）は
-「遅く暗い」誤検出には有効だが、実データで「速く明るい」鳥・コウモリ・飛行機雲には
-効かないことが確認された（速度の実測値513〜1518px/s）。軌跡の形状・時間発展という
-別の特徴軸を使う4方式を追加し、カメラごとに異なる組み合わせで有効化して実運用データで
-効果を比較できるようにした。**いずれも既定値は無効（0またはfalse）で、既存の検出結果には
-一切影響しない。**
-
-| 方式 | 名称 | 判定材料 | 実装位置 | 反映方式 |
-|------|------|---------|---------|---------|
-| 1a | 蛇行フィルタ | `calculate_heading_variance(xs, ys)` の進行方向角度分散 | `meteor_detector_realtime.py` `_finalize_track()` | 即時反映 |
-| 1b | 軌跡点列の記録（観測専用） | `MeteorEvent.track_xs`/`track_ys` | `meteor_detector_realtime.py` `MeteorEvent`/`_finalize_track()` | 起動時反映（再起動要） |
-| 2 | 飛行機雲の残光チェック | 経路上の背景差し引き後の輝度超過分の残存（終了直前 vs 直後） | `meteor_detector_rtsp_web.py` `check_contrail_afterglow()` | 起動時反映（再起動要） |
-| 3 | 薄明期間速度上限フィルタ | `speed > max_speed` | `meteor_detector_realtime.py` `_finalize_track()` | 即時反映 |
-| 4 | 薄明期間バーストレート抑制 | `TwilightRateLimiter`（分オーダーのレート監視） | `detection_filters.py` `TwilightRateLimiter` | 起動時反映（再起動要） |
-
-**方式1a（蛇行フィルタ）**: `calculate_heading_variance(xs, ys)`（`meteor_detector_common.py`）
-が連続する軌跡点間の進行方向角度（`atan2(dy, dx)`）を求め、隣接角度差（ラップアラウンド
-考慮済み）の標準偏差を返す。直線的な流星は分散が小さく、羽ばたきで進行方向が揺れる
-鳥・コウモリは分散が大きくなる。`min_heading_variance_points`（既定5）未満の軌跡点数では
-統計的に不安定なため判定をスキップして通す（fail-open）。本番の`min_track_points=3`では
-高々1〜2個の隣接角度差しか取れず、既定の`min_heading_variance_points=5`のもとでは
-事実上判定不能（fail-open）となる構成であり、有効な閾値の決定には方式1b（観測専用）の
-データ蓄積が必要（詳細は`CONFIGURATION_GUIDE.md`参照）。
-
-**方式1b（軌跡点列の記録、観測専用）**: `record_track_points`有効時のみ`_finalize_track()`が
-軌跡点列を`MeteorEvent.track_xs`/`track_ys`に格納し、`to_dict()`が`detections.jsonl`に
-`track_points`として出力する。棄却判定は行わず記録のみ。既定は無効（空リスト）で
-`detections.jsonl`のフォーマットに影響しない。データ構造の変更を伴うため起動時反映
-（コンテナ再起動要）。
-
-**方式2（飛行機雲の残光チェック）**: `check_contrail_afterglow()`
-（`meteor_detector_rtsp_web.py`）が、確定イベントの`start_point`〜`end_point`を結ぶ経路上の
-数点について、イベント終了直前フレームと終了直後フレーム（`contrail_afterglow_window`秒後、
-既定2.0秒）の**背景・静止成分を差し引いた輝度超過分**を比較する。各サンプル点で経路パッチ
-（半径3px）の平均輝度から、その外側のリング状領域（半径6〜10px、中央値）を背景推定値として
-差し引いた値を「超過輝度」とし、これを終了直前・終了直後・**イベント開始前（ベースライン）**
-の3時点で求める。終了直前・終了直後それぞれの超過輝度からベースラインの超過輝度を差し引いた
-値（`m_before`・`m_after`）を実際の比較対象とし、`m_after`が`m_before`に対して
-`contrail_residual_brightness_ratio`（既定0.5）以上残っていれば飛行機雲の残光とみなし、
-`save_meteor_event()`呼び出し前に棄却する（`EventMerger`の確定イベントに対する
-ポストチェック）。
-
-背景輝度そのもの（薄明の空・月明かり・光害等）はリング差し引きにより比較対象に含まれない
-ため、薄明期間のような明るい背景でも、流星が実際に消滅していれば正しく通過する。加えて、
-経路パッチ**内部**に恒常的に存在する高輝度源（恒星・ホットピクセル・固定光源）がある場合、
-リング差し引きだけではこの成分を除去できず、静止成分が十分明るいと消滅した流星でも
-「残光あり」と誤判定してしまう（背景差し引きのみの実装で発生した既知の欠陥）。ベースライン
-フレーム（イベント開始前、流星が写り込む前）でも同じ超過輝度を求めて差し引くことで、
-before/after/baseの3フレームすべてに等しく存在する静止成分を相殺し、この誤判定を避ける。
-ベースラインフレームはイベント開始時刻（`event.start_time`）より前・かつ`RingBuffer`内に
-存在する必要があるため、`contrail_afterglow_window`とタイムスタンプの許容誤差
-（before/after判定と同じロジック）でも同様に評価する。
-
-ベースライン差し引き後の終了直前超過輝度（`m_before`）が`min_excess_brightness`（既定8.0）
-未満のサンプル点は判定不能としてスキップする（前後フレームが同一の静止シーンの場合、
-全サンプル点がこの条件でスキップされ残光ありと判定されない）。さらに、判定可能な
-サンプル点数が`sample_points`の過半数（既定`sample_points=5`なら3点）に満たない場合も
-評価不能として通す（単発ノイズによる1点だけの残光っぽい値で誤棄却しないためのガード）。
-評価不能（フレーム不足、経路がフレーム範囲外、ベースラインフレームが`RingBuffer`に
-残っていない等）の場合はフィルタを適用せず通す（fail-open）。座標系はフル解像度のまま処理し、
-既存の`_calculate_line_overlap_ratio`にある可能性のあるスケール不整合は新規コードに
-持ち込まない。
-
-既知の限界: 痕の幅が概ね9px以上になると背景推定用リング（半径6〜10px）が痕自身で汚染され、
-背景推定値が持ち上がって本物の残光を見逃す方向に働く（fail-open原則には反しない、感度上の
-制約）。また`RingBuffer`の実効長は`min(buffer_seconds, max_duration + 2.0)`（既定値では
-約12秒）に制限されるため、イベント継続時間が`max_duration`に近づくほどベースライン取得の
-余裕が減り、極端に長いイベントではベースラインが取得できず評価不能（fail-open）になりうる。
-
-**方式3（薄明期間速度上限フィルタ）**: `_finalize_track()`内の既存`min_speed`判定の直下に、
-対称の上限判定を追加。`max_speed > 0`かつ`speed > max_speed`の場合に棄却する。薄明期間には
-`build_twilight_params()`の`twilight_max_speed`引数（環境変数`TWILIGHT_MAX_SPEED`、既定0=無効）
-経由で薄明時のみ`max_speed`を上書きできる。
-
-**方式4（薄明期間バーストレート抑制）**: `TwilightRateLimiter`（`detection_filters.py`）が
-薄明期間中に確定したイベントの到着時刻を保持し、直近`twilight_rate_window_sec`秒
-（既定300秒=5分）以内のイベント数が`twilight_rate_max_events`を超えた場合に
-`should_suppress()`が真を返す。`record_event()`（レート記録）は`twilight_rate_suppress_enabled`
-の値に関わらず薄明期間中は常に呼ばれる（観測モードでも実データ収集のため記録は止めない）。
-`should_suppress()`は`twilight_rate_suppress_enabled=true`の場合のみ薄明reduceモードの
-検出ループ内（フレーム単位、確定イベント単位ではない）で評価され、真の場合は感度プリセットを
-`_TWILIGHT_SENSITIVITY_STEP_DOWN`（`faint→high→medium→low`、`low`は据え置き）に従って
-一段階下げる。方式4は既存イベントの棄却は行わない（感度を下げることで結果的に検出数を
-抑制する）ため`[INFO] rejected_by=twilight_rate`ログは出力しない。
-`twilight_rate_max_events<=0`（既定）は観測専用モードで、`TwilightRateLimiter`の
-コンストラクタが`max_events=0`に固定されるため`should_suppress()`は常に偽を返す。
-既存の`EventMerger`同時刻バースト抑制（秒オーダー、空間的散発を検出）とは時間スケール・
-実装ともに独立しており、`EventMerger`の到着ログ・ギャップクラスタリングには一切関与しない。
-
-!!! note "抑制は自己減衰する（フラッピングの可能性）"
-    感度を下げると検出数が減り、それに伴いレートも下がって`should_suppress()`が偽に戻る
-    可能性がある。閾値決定前（方式1b観測モードでのデータ蓄積前）は、抑制のON/OFFが
-    短時間で切り替わる（フラッピングする）ケースがありうる。
-
-**棄却ログ・カウンタ**: 方式1a・方式3・方式2の棄却は`[INFO] rejected_by=<方式名>`形式で
-既定ONのログを出力する（`heading_variance`/`max_speed`/`contrail_afterglow`）。
-`detection_state.py`の`current_mitigation_rejected_counts`辞書に方式別カウンタを持ち、
-`/stats`のJSONレスポンスに`mitigation_rejected_counts`として露出する。`twilight_rate`キーのみ
-棄却数ではなく直近ウィンドウ内の薄明期間確定イベント数（現在のレート、累積ではない）を保持する
-（詳細は`API_REFERENCE.md`参照）。
-
-#### 同時刻バースト抑制（v3.18.0）
-
-雷のフラッシュや雲の明滅で画面全体の輝度が急変すると、空間的に散在する多数の点が
-同一フレーム群の中で同時に「軌跡」として成立し、1秒未満の間に数十〜百数十件の
-イベントが確定することがある。個々のイベントは `merge_max_distance` の距離条件を
-満たさないため `EventMerger` では結合できず、全件がMP4書き出し（`libx264` 再エンコード）
-に回るためCPU飽和を増幅する。
-
-判定は `EventMerger._burst_start_times()` が、受理したイベントの到着時刻ログを
-**到着間隔（ギャップ）でクラスタリング**して行う。連続する到着の間隔が
-`burst_window_time` 秒以内である塊をひとつのクラスタとみなし、そのサイズが
-`burst_max_events` 件を超えたクラスタだけをバーストと判定して破棄する。
-
-**設計の経緯**: 当初は「窓内の累積到着数」で判定する方式（スライディングウィンドウ）
-で実装したが、レビューでバーストの両端に境界バグがあることが判明した。
-
-- 確定バッチ単位の判定（初版）: `flush_expired()` は `end_time` が閾値を過ぎたものだけを
-  少数ずつ排出するため、同一バーストが複数回のバッチに分割されると各バッチが
-  「少数」にしか見えず判定が働かない。実データで `end_time` が20fpsで1フレームぶんずつ
-  ばらつく158件バーストを再現したところ、158件全件が保存されてしまい抑制が完全に
-  無効化されるケースを確認した。
-- 到着時カウント方式（第二版）: 累積到着数の窓判定に変更したが、バースト検知後に
-  カウントをクリアしなければバースト末尾の到着記録が残り続け、直後に来た無関係な
-  孤立イベント1件だけで再び閾値超過と誤判定した（バースト終息後 `burst_window_time` 秒
-  以内の正常イベントが理由なく巻き込まれる）。逆にクリアすると継続中のバーストの
-  末尾を取りこぼした。
-
-現在の**ギャップクラスタリング方式**はこの矛盾を構造的に解消する。継続中のバーストは
-到着間隔が短いため全体がひとつのクラスタのままとなり末尾の取りこぼしがない。
-
-**注意**: バースト終息直後、`burst_window_time` 秒以内に到着した次のイベントは、
-単連結クラスタリングの定義上「同じクラスタの続き」として連結される（誤判定ではなく
-方式の定義通りの挙動）。実データでの安全マージンは以下の通り大きい。
-
-実データの裏付け: 158件バーストの到着間隔は約0.095秒。目視で流星と確認された記録
-同士の最小間隔は297秒。既定の `burst_window_time`（1.0秒）はこの間にあり両側に
-桁違いのマージンがある。
-
-**マージ経路との相互作用（重要）**: `add_event()` はバースト判定用の到着ログに
-「新規に成立したイベント」の到着だけを積み、`_is_mergeable()` によって既存の
-`pending` 末尾とマージされた場合は到着として数えない。トラッキングの瞬断等で
-1つの流星が複数の断片に分かれ、時間・距離・速度差の条件でマージされるのは正常系
-であり、断片の数だけ到着として数えると `burst_max_events` を超えて正常な単一の
-流星が誤って全破棄される（開発中に6断片の単一流星が誤破棄される事例を実測で
-発見し修正した）。
-
-本番greeng4の全検出データ16,149件で影響を検証した。本システムの運用では「誤認識を
-削除し、残ったものが流星」という判断が行われているため、検出動画ファイルが現在も
-残っているレコードを「ユーザーが流星と認めたもの」とみなして集計した。検証は
-`EventMerger` の実クラスをそのままインポートし、実データの `start_time` をプロセス
-セッション単位（`start_time` が逆行する箇所をプロセス再起動の境界とみなして分割）で
-`add_event()` に順に流して再生する方式で行った。
-
-| 区分 | 件数 | バースト抑制で破棄される数 |
-|---|---|---|
-| 動画ファイルが残存（＝流星と判断） | 731 | **0（0.00%）** |
-| 動画ファイルが削除済み（＝誤認識と判断） | 15,418 | 6,178（40.07%） |
-
-ユーザーが残した731件は1件も破棄されず、破棄対象はすべて既に誤認識として削除済みの
-レコードだった。逆にいえば、削除済みレコードの40.07%は本機能があれば最初から記録されず、
-削除の手間も発生しなかったことになる。あわせて、本抑制導入の契機となった2件の実バースト
-（2026-08-15 01:55:00 camera2の158件、2026-08-13 22:12 camera1の187件）が実クラスの
-再生でどちらも100%破棄されることを確認済み。
-
-なお `detections.jsonl` および `detections.db` にはユーザーが削除した検出のレコードも
-残り続ける（削除されるのは動画・画像ファイルのみ）。影響検証の際にDBのレコード有無を
-基準にすると削除済みを生存扱いしてしまうため、`base_name + ".mp4"` の実在で判定すること。
-また `start_time` はRTSP接続時（プロセス起動時）からの相対秒であり、プロセスを跨ぐと
-無関係な値が偶然近接しうる。検証・分析では必ずプロセスセッション単位に分割してから
-比較すること（跨いだまま比較すると誤った近接を検出する）。
-
-!!! warning "731件検証の生存バイアス限界"
-    「動画ファイルが残存＝流星と判断」という基準は、**ユーザーが目視確認して削除しなかった
-    レコード**を代理指標にしている。これはユーザーの削除判断の質に依存する間接的な検証であり、
-    (1) ユーザーが見落として削除しなかった誤認識、(2) 逆に流星だが誤って削除してしまった
-    レコードは、いずれもこの集計には反映されない。0.00%という結果は「本抑制導入前の実運用で
-    生き残ったレコードには影響がなかった」ことを示すが、統計的に独立な正解ラベル（例えば
-    別人による再判定）による検証ではない点に留意する。
-
-**適用範囲**: `EventMerger` は Webプレビュー付き検出（`meteor_detector_rtsp_web.py`）だけでなく、
-RTSP CLI版（`meteor_detector_rtsp.py`）と動画ファイル解析（`meteor_detector.py`）でも
-生成されるため、本抑制はこれら3経路すべてに適用される。
-
-**運用上の注意**: 本機能は検出イベントを記録せずに破棄する。破棄時は
-`[WARN] 同時刻バーストを検出: N件のイベントを破棄` をログに出力するので、
-想定外の破棄が起きていないかはログで確認できる。パラメータはダッシュボードの
-設定画面（検出パラメータ）から調整可能。
 
 #### 除外マスク（固定カメラ向け）
 
@@ -654,7 +454,6 @@ def calculate_confidence(length, speed, linearity, brightness, duration) -> floa
 RTSP/MP4検出で共通利用する補助関数群です。
 
 - `calculate_linearity(xs, ys)`: 直線性の評価
-- `calculate_heading_variance(xs, ys)`: 進行方向角度の分散（蛇行度）を評価（v3.19.0、方式1a用）。連続する軌跡点間の進行方向角度（`atan2(dy, dx)`）の隣接差（ラップアラウンド考慮）の標準偏差を返す。点数不足（3点未満）は判定不能として`0.0`を返す
 - `calculate_confidence(...)`: 信頼度スコアの算出
 - `open_video_writer(...)`: 利用可能なコーデックでVideoWriterを初期化
 
@@ -676,27 +475,19 @@ class MeteorEvent:
     end_point: Tuple[int, int]   # 終了座標
     peak_brightness: float       # ピーク輝度
     confidence: float            # 信頼度 (0-1)
-    frames: List[Tuple[float, np.ndarray]]  # フレームリスト（リアルタイム経路では常に空、後述）
-    track_xs: List[int] = field(default_factory=list)  # 軌跡点列x座標（v3.19.0、方式1b）
-    track_ys: List[int] = field(default_factory=list)  # 軌跡点列y座標（v3.19.0、方式1b）
+    frames: List[Tuple[float, np.ndarray]]  # フレームリスト
 ```
-
-!!! note "frames は常に空リスト"
-    `_finalize_track()` / `EventMerger._merge()` はいずれも `frames=[]` で `MeteorEvent` を生成するため、リアルタイム検出経路では動画フレームそのものは `MeteorEvent` に保存されない。保存用動画は `RingBuffer` から `event.start_time` 〜 `event.end_time`（マージン込み）の時刻範囲で切り出す設計であり、`frames` フィールドの中身に依存しない。
-
-!!! note "track_xs / track_ys は record_track_points 有効時のみ（v3.19.0）"
-    既定は空リストで、`DetectionParams.record_track_points`（既定False）が真の場合のみ `_finalize_track()` が軌跡点列を格納する。`EventMerger._merge()` は断片マージ時に両者の点列を連結する。既定では既存の `detections.jsonl` フォーマットに一切影響しない（後述の `to_dict()` 参照）。
 
 #### プロパティ
 
 | プロパティ | 型 | 説明 |
 |-----------|-----|------|
 | `duration` | `float` | 継続時間（秒） |
-| `length` | `float` | 始点・終点間の直線距離（ピクセル）。屈曲した軌跡や断片マージ後のイベントでは、実際の移動経路長より短く算出される |
+| `length` | `float` | 軌跡長（ピクセル） |
 
 #### JSON出力形式（to_dict）
 
-`MeteorEvent.to_dict()` は**下記のフィールドのみ**を返します。`id` / `base_name` / `clip_path` / `image_path` / `composite_original_path` は `save_meteor_event()` 側で後付けされ、JSONL 行として書き出されます（実装: `MeteorEvent.to_dict()` / `save_meteor_event()`、いずれも `meteor_detector_realtime.py`）。
+`MeteorEvent.to_dict()` は**下記のフィールドのみ**を返します。`id` / `base_name` / `clip_path` / `image_path` / `composite_original_path` は `save_meteor_event()` 側で後付けされ、JSONL 行として書き出されます（実装: `meteor_detector_realtime.py:262-273` / `879-892`）。
 
 ```json
 {
@@ -711,9 +502,6 @@ class MeteorEvent:
   "confidence": 0.87
 }
 ```
-
-!!! note "track_points はrecord_track_points有効時のみ出力（v3.19.0）"
-    `record_track_points`（既定False）が有効なカメラでは、`track_xs`/`track_ys`が非空である場合に限り `"track_points": [[x1, y1], [x2, y2], ...]` フィールドが追加される（データ駆動での判定、`to_dict()`の引数追加ではない）。既定では出力されず、既存パーサとの後方互換を維持する。
 
 ---
 
@@ -746,9 +534,6 @@ graph TD
     Track["track_objects()"]
 
     CheckEvent{"MeteorEvent<br/>発生?"}
-    CheckContrail{"contrail_check<br/>_enabled?<br/>(v3.19.0方式2)"}
-    ContrailCheck["check_contrail_afterglow()<br/>残光チェック"]
-    RejectContrail["棄却<br/>mitigation_rejected_counts<br/>[contrail_afterglow]++"]
     SaveEvent["save_meteor_event()<br/>- 動画(オプション)<br/>- コンポジット画像<br/>- JSONL追記"]
 
     UpdatePreview["プレビューフレーム生成<br/>current_frame更新"]
@@ -783,13 +568,8 @@ graph TD
 
     SkipObjects --> Track
     Track --> CheckEvent
-    CheckEvent -->|"Yes"| CheckContrail
+    CheckEvent -->|"Yes"| SaveEvent
     CheckEvent -->|"No"| UpdatePreview
-    CheckContrail -->|"Yes"| ContrailCheck
-    CheckContrail -->|"No"| SaveEvent
-    ContrailCheck -->|"残光あり"| RejectContrail
-    ContrailCheck -->|"残光なし/評価不能<br/>(fail-open)"| SaveEvent
-    RejectContrail --> UpdatePreview
     SaveEvent --> UpdatePreview
 
     UpdatePreview --> CheckStop
@@ -801,13 +581,8 @@ graph TD
     style SaveEvent fill:#dce6ff
     style CheckTime fill:#ffe3c4
     style CheckTwilightMode fill:#ffe3c4
-    style CheckContrail fill:#ffe3c4
-    style RejectContrail fill:#f8d7da
     style End fill:#e2eafc
 ```
-
-!!! note "方式4（薄明期間バーストレート抑制）はフロー図に現れない"
-    `TwilightRateLimiter.record_event()`は薄明期間中に確定イベントが保存される（棄却されない）たびにレートを積み上げる観測コンポーネント。`should_suppress()`の評価とそれに伴う感度プリセットの一段階引き下げ（`twilight_rate_suppress_enabled=true`時のみ）は、このフロー図が表す「1確定イベントの保存可否」とは別軸の、薄明reduceモードのフレーム単位検出ループ内で行われる副作用的な調整であり、個々のイベント単位の分岐を持たないためフロー図には明示しない（詳細は「鳥・コウモリ・飛行機雲対策フィルタ」節参照）。
 
 #### グローバル変数（Webサーバー連携用）
 
@@ -922,12 +697,6 @@ sequenceDiagram
     "remaining_sec": 0,
     "output_path": "",
     "error": ""
-  },
-  "mitigation_rejected_counts": {
-    "heading_variance": 0,
-    "max_speed": 0,
-    "contrail_afterglow": 0,
-    "twilight_rate": 0
   }
 }
 ```
@@ -983,9 +752,9 @@ with state.current_frame_lock:
 
 検出ループから呼び出される純粋関数群で、設定値の変換と候補フィルタリングを担当します。
 
-#### build_twilight_params(sensitivity, min_speed, base_params, twilight_max_speed=0.0)
+#### build_twilight_params(sensitivity, min_speed, base_params)
 
-薄明期間中に差し替えるための `DetectionParams` を返す。`sensitivity`（`low` / `medium` / `high` / `faint`）と `min_speed` (px/s) を受け取り、base_params をコピーしてプリセット・最小速度のみ上書きします。`twilight_max_speed`（v3.19.0、既定0.0=無効）を0.0超で渡すと、薄明時のみ方式3（速度上限フィルタ）の `max_speed` を上書きします。0.0以下の場合は `base_params.max_speed` をそのまま維持します。
+薄明期間中に差し替えるための `DetectionParams` を返す。`sensitivity`（`low` / `medium` / `high` / `faint`）と `min_speed` (px/s) を受け取り、base_params をコピーしてプリセット・最小速度のみ上書きします。
 
 #### filter_dark_objects(objects, min_brightness)
 
@@ -1001,20 +770,6 @@ with state.current_frame_lock:
 #### _to_bool(value, default)
 
 環境変数の truthy 文字列（`1` / `true` / `yes` / `on` など）を bool に変換する内部ユーティリティ。空文字列や `None` は `default` に倒れます。
-
-#### TwilightRateLimiter（v3.19.0、方式4）
-
-薄明期間の確定イベントレートを監視するクラス。状態（イベント到着時刻のdeque）はインスタンスにローカル保持し、永続化しない。
-
-```python
-class TwilightRateLimiter:
-    def __init__(self, window_sec: float = 300.0, max_events: int = 0)
-    def record_event(self, now: float) -> None
-    def current_rate(self, now: float) -> int
-    def should_suppress(self, now: float) -> bool
-```
-
-`max_events <= 0`（既定）は観測専用モードで、`should_suppress()`は常に`False`を返す。既存の`EventMerger`同時刻バースト抑制（秒オーダー）とは独立しており、`EventMerger`の到着ログには一切関与しない。
 
 ---
 
@@ -1177,27 +932,6 @@ cv2.line(composite, start_point, end_point, (0, 255, 255), 2)
 cv2.circle(composite, start_point, 6, (0, 255, 0), 2)  # 開始点（緑）
 cv2.circle(composite, end_point, 6, (0, 0, 255), 2)    # 終了点（赤）
 ```
-
-### クリップ書き出しfpsの推定とクランプ（`estimate_fps_from_frames`）
-
-`save_meteor_event()` は動画クリップの書き出しfpsを、RTSP接続時にネゴシエートされた
-fps（`fallback_fps`）で決め打ちせず、`RingBuffer` から取得したフレームの実際の時刻差
-から `estimate_fps_from_frames()` で推定する。CPU飽和等で `cap.read()` の呼び出し間隔が
-乱れると、フレームに付与される受信時刻が実際の撮影間隔より詰まり、推定fpsがカメラの
-実効fpsを大きく上回ることがある（2026-08-16の本番環境で、接続時20.0fpsのカメラに対し
-108fps・117fpsで書き出された事例）。
-
-- フレーム時刻差の**中央値**から実効fpsを算出し、`sanitize_fps()` で有効範囲
-  （1.0〜120.0fps）に正規化する。
-- 正規化後の推定値が `fallback_fps × max_ratio_to_fallback`（既定倍率 1.5）を
-  **超えた場合のみ** `fallback_fps` にクランプする。108fps・117fpsのような異常値は
-  `sanitize_fps()` の上限（120.0）の内側にあるため、上限だけでは弾けず、この比率判定が
-  必要になる。
-- 夜間IRモード等でカメラの実効fpsがネゴシエーション値より正常に低下するケース
-  （例: 20.0fps接続で実効10.0fps）はこの範囲に収まるため、そのまま推定値が採用される。
-- クランプが発動した場合は `[WARN] fps推定値をクランプ` をログに出力する（次回リリースで追加）。
-  無言クランプはCPU飽和という重要な兆候を隠してしまうため、必ずログで確認できるように
-  している。
 
 ---
 

@@ -27,11 +27,6 @@ Licensed under the MIT License
 
 ## バージョン履歴
 
-### v3.19.0 - 鳥・コウモリ・飛行機雲対策4方式
-
-- **`GET /stats`**: レスポンスに `mitigation_rejected_counts`（`heading_variance` / `max_speed` / `contrail_afterglow` / `twilight_rate` の4フィールド）を追加。全新規パラメータが既定値（無効）の場合、値は0のまま推移する。
-- **`POST /apply_settings`**: リクエストフィールドに `max_speed`（方式3・即時反映）、`max_heading_variance` / `min_heading_variance_points`（方式1a・即時反映）、`record_track_points`（方式1b・自動再起動で反映）、`contrail_check_enabled` / `contrail_afterglow_window` / `contrail_residual_brightness_ratio`（方式2・自動再起動で反映）、`twilight_rate_suppress_enabled` / `twilight_rate_window_sec` / `twilight_rate_max_events`（方式4・自動再起動で反映）を追加。既定値は既存の検出挙動を変えない。
-
 ### v3.17.0 - カメラ単位のマスクリセット
 
 - **新規エンドポイント（カメラ層）**: `POST /reset_mask` — 指定カメラの除外マスクを無効化する。detector の `exclusion_mask` を `None` に戻し、出力ディレクトリ側（`/output/<camera>/masks/<camera>_mask.png`）とホスト `masks/`（`MASK_BUILD_DIR`）の保存済みマスク画像を削除し、pending 状態もクリアする。実行後は `/stats` の `mask_active` が `false` になる。`/update_mask`→`/confirm_mask_update` の対称操作。
@@ -1580,12 +1575,6 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
     "remaining_sec": 42,
     "output_path": "/output/manual_recordings/camera1/manual_camera1_20260319_213000_90s.mp4",
     "error": ""
-  },
-  "mitigation_rejected_counts": {
-    "heading_variance": 0,
-    "max_speed": 3,
-    "contrail_afterglow": 1,
-    "twilight_rate": 0
   }
 }
 ```
@@ -1639,11 +1628,6 @@ ffmpeg -i http://localhost:8081/stream -t 60 output.mp4
 | `recording.remaining_sec` | integer | 残り秒数 |
 | `recording.output_path` | string | 保存先MP4パス |
 | `recording.error` | string | 失敗・停止理由 |
-| `mitigation_rejected_counts` | object | 鳥・コウモリ・飛行機雲対策4方式（v3.19.0）の棄却カウンタ。プロセス起動からの累計 |
-| `mitigation_rejected_counts.heading_variance` | integer | 方式1a（蛇行フィルタ）による棄却数 |
-| `mitigation_rejected_counts.max_speed` | integer | 方式3（速度上限フィルタ）による棄却数 |
-| `mitigation_rejected_counts.contrail_afterglow` | integer | 方式2（飛行機雲の残光チェック）による棄却数 |
-| `mitigation_rejected_counts.twilight_rate` | integer | 方式4（薄明期間バーストレート抑制）の直近`twilight_rate_window_sec`秒ウィンドウ内における薄明期間確定イベント数（累積カウントではなく現在のレート）。`twilight_rate_suppress_enabled`の値に関わらず薄明期間中は常に記録される（観測モードでも実データ収集のため記録は行う）。直近の薄明期間終了時に0へリセットされる |
 
 **使用例**:
 ```bash
@@ -1842,34 +1826,9 @@ curl -X POST http://localhost:8081/reset_mask | jq
   "nuisance_dilate": 3,
   "exclude_edge_ratio": 0.0,
   "clip_margin_before": 0.5,
-  "clip_margin_after": 0.5,
-  "max_speed": 0.0,
-  "max_heading_variance": 0.0,
-  "min_heading_variance_points": 5,
-  "record_track_points": false,
-  "contrail_check_enabled": false,
-  "contrail_afterglow_window": 2.0,
-  "contrail_residual_brightness_ratio": 0.5,
-  "twilight_rate_suppress_enabled": false,
-  "twilight_rate_window_sec": 300,
-  "twilight_rate_max_events": 0
+  "clip_margin_after": 0.5
 }
 ```
-
-**鳥・コウモリ・飛行機雲対策4方式のフィールド（v3.19.0）**:
-
-| フィールド | 反映方式 | 説明 |
-|-----------|---------|------|
-| `max_speed` | 即時反映 | 方式3: 速度上限フィルタ px/s。0で無効 |
-| `max_heading_variance` | 即時反映 | 方式1a: 蛇行フィルタの分散閾値。0で無効 |
-| `min_heading_variance_points` | 即時反映 | 方式1a判定に必要な最小軌跡点数（レンジ: 3以上） |
-| `record_track_points` | 自動再起動で反映 | 方式1b: 軌跡点列の記録（観測専用） |
-| `contrail_check_enabled` | 自動再起動で反映 | 方式2: 飛行機雲の残光チェック |
-| `contrail_afterglow_window` | 自動再起動で反映 | 方式2の観測窓秒数（レンジ: 0.0〜10.0） |
-| `contrail_residual_brightness_ratio` | 自動再起動で反映 | 方式2の残光判定比率（レンジ: 0.0〜1.0） |
-| `twilight_rate_suppress_enabled` | 自動再起動で反映 | 方式4: 薄明期間バーストレート抑制の発動 |
-| `twilight_rate_window_sec` | 自動再起動で反映 | 方式4のレート監視窓秒数（レンジ: 1.0〜3600.0） |
-| `twilight_rate_max_events` | 自動再起動で反映 | 方式4の抑制発動閾値（0=観測専用モード） |
 
 **レスポンスボディ（例）**:
 ```json

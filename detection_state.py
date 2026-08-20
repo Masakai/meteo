@@ -81,16 +81,6 @@ class DetectionState:
     current_twilight_detection_mode: str = "reduce"
     current_twilight_type: str = "nautical"
 
-    # 鳥・コウモリ・飛行機雲対策4方式の棄却カウンタ。キー:
-    # heading_variance(方式1a) / max_speed(方式3) / contrail_afterglow(方式2) /
-    # twilight_rate(方式4)。/stats の mitigation_rejected_counts に露出する。
-    current_mitigation_rejected_counts: dict = field(default_factory=lambda: {
-        "heading_variance": 0,
-        "max_speed": 0,
-        "contrail_afterglow": 0,
-        "twilight_rate": 0,
-    })
-
     # 設定情報（ダッシュボード表示用）
     current_settings: dict = field(default_factory=lambda: {
         "sensitivity": "medium",

@@ -39,15 +39,6 @@ CREATE TABLE IF NOT EXISTS jsonl_sync_state (
     offset  INTEGER NOT NULL DEFAULT 0,
     mtime   REAL    NOT NULL DEFAULT 0.0
 );
--- 削除済み検出IDの永続記録。
--- detections.jsonl は検出コアが追記し続ける一次記録であり、削除時に行を消さない。
--- そのため JSONL を再同期すると削除済みレコードが復活してしまう（v3.14.0 以前の不具合）。
--- 削除の事実をこのテーブルに残し、同期時に参照して deleted を復元する。
-CREATE TABLE IF NOT EXISTS deleted_detections (
-    id         TEXT PRIMARY KEY,
-    camera     TEXT NOT NULL DEFAULT '',
-    deleted_at TEXT NOT NULL DEFAULT ''
-);
 """
 
 
@@ -81,16 +72,7 @@ def _insert_detection(conn: sqlite3.Connection, camera: str, normalized: dict, r
             (id, camera, timestamp, confidence, base_name,
              clip_path, image_path, composite_original_path,
              alternate_clip_paths, label, deleted, raw_json)
-        VALUES (
-            ?,?,?,?,?,?,?,?,?,?,
-            -- 過去に削除済みなら deleted=1 を引き継ぐ。
-            -- JSONL には削除済みレコードも残るため、0 固定にすると再同期で復活してしまう。
-            COALESCE(
-                (SELECT 1 FROM deleted_detections WHERE id = ?),
-                0
-            ),
-            ?
-        )
+        VALUES (?,?,?,?,?,?,?,?,?,?,0,?)
         """,
         (
             normalized["id"],
@@ -103,7 +85,6 @@ def _insert_detection(conn: sqlite3.Connection, camera: str, normalized: dict, r
             normalized.get("composite_original_path", ""),
             alternate_str,
             normalized.get("label", ""),
-            normalized["id"],
             raw_json,
         ),
     )
@@ -223,25 +204,9 @@ def query_detections(
 
 
 def soft_delete(db_path: str, detection_id: str) -> None:
-    """検出を削除済みにする（JSONL は変更しない）。
-
-    JSONL を書き換えない代わりに deleted_detections へ削除の事実を残す。
-    これにより JSONL を再同期しても削除済みレコードが復活しない。
-    """
+    """Mark a detection as deleted (does not modify JSONL)."""
     conn = _get_conn(db_path)
-    row = conn.execute(
-        "SELECT camera FROM detections WHERE id = ?", (detection_id,)
-    ).fetchone()
-    camera = row["camera"] if row else ""
     conn.execute("UPDATE detections SET deleted = 1 WHERE id = ?", (detection_id,))
-    conn.execute(
-        """
-        INSERT INTO deleted_detections (id, camera, deleted_at)
-        VALUES (?, ?, datetime('now'))
-        ON CONFLICT(id) DO NOTHING
-        """,
-        (detection_id, camera),
-    )
     conn.commit()
 
 

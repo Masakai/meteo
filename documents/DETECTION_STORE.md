@@ -94,40 +94,6 @@ CREATE TABLE IF NOT EXISTS jsonl_sync_state (
 | `offset` | 最後まで読んだバイトオフセット |
 | `mtime` | 最後に参照した JSONL の `mtime`（POSIX 秒） |
 
-### deleted_detections テーブル（v3.19.2+）
-
-削除済み検出 ID を永続的に記録するテーブル。
-
-```sql
-CREATE TABLE IF NOT EXISTS deleted_detections (
-    id         TEXT PRIMARY KEY,
-    camera     TEXT NOT NULL DEFAULT '',
-    deleted_at TEXT NOT NULL DEFAULT ''
-);
-```
-
-| カラム | 説明 |
-|---|---|
-| `id` | 削除された検出 ID |
-| `camera` | 削除時点のカメラ内部名 |
-| `deleted_at` | 削除日時（UTC、`datetime('now')`） |
-
-**このテーブルが必要な理由:**
-
-`detections.jsonl` は検出コアが追記し続ける一次記録であり、削除時に行を消さない（`soft_delete` は SQLite のみを更新する）。
-そのため JSONL を先頭から再同期すると、削除済みレコードが `detections` テーブルへ再挿入されてしまう。
-
-v3.19.1 以前は `_insert_detection` が `deleted` を `0` 固定で INSERT していたため、
-カメラ名変更（`migrate_camera_dirs.py`）などで `reset_sync_state()` が呼ばれて全行再同期が走ると、
-UI で削除したはずのレコードが復活していた。復活したレコードは実ファイルが既に削除済みのため
-`image_path` が空文字列になり、ダッシュボードに「サムネイルが付かない検出」として並ぶ。
-
-v3.19.2 以降は `soft_delete()` が本テーブルへ履歴を残し、`_insert_detection` が
-`COALESCE((SELECT 1 FROM deleted_detections WHERE id = ?), 0)` で削除状態を復元するため、
-再同期や DB 再構築を経ても削除が取り消されない。
-
-過去に発生したデータの復旧には `scripts/repair_lost_deletions.py` を使用する。
-
 ---
 
 ## JSONL → SQLite 同期アルゴリズム
@@ -208,10 +174,6 @@ ID 1 件取得。`DELETE /detection/{camera}/{id}` から削除対象のパス�
 ### soft_delete(db_path, detection_id)
 
 論理削除（`UPDATE detections SET deleted = 1 WHERE id = ?`）。JSONL は変更しない。
-
-v3.19.2 以降は同時に `deleted_detections` テーブルへ削除履歴を登録する。
-これにより JSONL を再同期しても削除済みレコードが復活しない
-（詳細は [deleted_detections テーブル](#deleted_detections-v3192) を参照）。
 
 ### set_label(db_path, detection_id, label)
 
