@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.3-rollback] - 2026-08-20
+### Changed
+- v3.17.3以降にリリースされたv3.18.0（同時刻バースト抑制・fps推定クランプ・終了処理の孤児化修正）、v3.19.0（鳥・コウモリ・飛行機雲対策4方式）、v3.19.1（対策パネルのグルーピング表示）、v3.19.2（UI削除した検出がJSONL再同期で復活する不具合の修正）の変更を全てロールバックし、追跡ファイルの内容をv3.17.3タグ時点とツリーハッシュレベルで完全一致させた。ユーザー指示による本番機greeng4の巻き戻し対応。
+
+### Removed
+- 上記4バージョンに伴う設計書・レビュー報告書・リリース記録・`scripts/repair_lost_deletions.py` を削除（v3.17.3時点の状態に復元）。
+
+### Known Issues
+- v3.19.2で修正された「UI削除した検出がJSONL再同期で復活する」不具合が本ロールバックにより再発する可能性がある（ユーザー承認済み）。
+
 ## [3.17.3] - 2026-08-15
 ### Changed
 - `detection_state.py` — `stream_timeout` のデフォルト値を `10.0` 秒 → `30.0` 秒に変更。
