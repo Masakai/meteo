@@ -161,10 +161,24 @@ def sanitize_fps(value: Optional[float], default: float = 30.0) -> float:
 def estimate_fps_from_frames(
     frames: List[Tuple[float, np.ndarray]],
     fallback_fps: float = 30.0,
+    max_ratio_to_fallback: float = 1.5,
 ) -> float:
-    """フレーム時刻差の中央値から実効FPSを推定"""
+    """フレーム時刻差の中央値から実効FPSを推定
+
+    fallback_fpsはRTSP接続時にネゴシエートされたカメラ本来のfpsを想定する。
+    CPU飽和等でcap.read()の呼び出し間隔が乱れると、フレームに付与される
+    受信時刻が実際の撮影間隔より詰まり、推定fpsがカメラの実効fpsを大きく
+    上回ることがある（2026-08-16の本番greeng4で、接続時20.0fpsのカメラに対し
+    108fps・117fpsで書き出された事例。2026-08-23には210fps・226fpsも観測）。
+    これらはsanitize_fps()の上限120.0の内側にあるため上限だけでは弾けない。
+    カメラのネゴシエーション値を基準にmax_ratio_to_fallback倍を超える推定値を
+    退けることで、実効fpsの正常な変動（夜間IRモードでの低下など）は保ちつつ
+    非物理的な値のみ除外する。
+    """
+    sanitized_fallback = sanitize_fps(fallback_fps, default=30.0)
+
     if len(frames) < 2:
-        return sanitize_fps(fallback_fps, default=30.0)
+        return sanitized_fallback
 
     deltas: List[float] = []
     for idx in range(1, len(frames)):
@@ -173,13 +187,17 @@ def estimate_fps_from_frames(
             deltas.append(dt)
 
     if not deltas:
-        return sanitize_fps(fallback_fps, default=30.0)
+        return sanitized_fallback
 
     median_dt = float(np.median(np.array(deltas, dtype=np.float64)))
     if median_dt <= 0:
-        return sanitize_fps(fallback_fps, default=30.0)
+        return sanitized_fallback
 
-    return sanitize_fps(1.0 / median_dt, default=sanitize_fps(fallback_fps, default=30.0))
+    estimated_fps = sanitize_fps(1.0 / median_dt, default=sanitized_fallback)
+    if estimated_fps > sanitized_fallback * max_ratio_to_fallback:
+        return sanitized_fallback
+
+    return estimated_fps
 
 
 def probe_rtsp_endpoint(url: str, timeout: float = 3.0) -> str:

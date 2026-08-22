@@ -33,6 +33,44 @@ def test_estimate_fps_from_frames_15fps():
     assert abs(fps - 15.0) < 0.5
 
 
+def test_estimate_fps_from_frames_rejects_fps_far_above_negotiated():
+    # 2026-08-16に本番greeng4で観測された事象の再現。接続時fps=20.0のカメラで
+    # camera1/meteor_20260816_032802_79d9e49b.mp4 が108fpsで書き出されていた。
+    # 約9.3ms間隔はsanitize_fps()の有効帯(1.0〜120.0)の内側のため既存の上限では
+    # 弾けず、fallback_fps(20.0)との比率でのみ検出できる。
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    frames = [(i / 108.0, frame) for i in range(20)]
+    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
+    assert fps == 20.0
+
+
+def test_estimate_fps_from_frames_rejects_fps_within_sanitize_range():
+    # 同上、camera2/meteor_20260816_030601_7f6b0f81.mp4 の117fpsケース。
+    # 120.0未満のためsanitize_fps()を素通りする値であることが本テストの要点。
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    frames = [(i / 117.0, frame) for i in range(20)]
+    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
+    assert fps == 20.0
+
+
+def test_estimate_fps_from_frames_allows_normal_variation_within_ratio():
+    # Tapo C120は夜間IRモードで実効fpsが接続時ネゴシエーション値(20.0)より
+    # 下がることがある。10fps程度への低下は異常値ではないため推定値をそのまま使う。
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    frames = [(0.00, frame), (0.10, frame), (0.20, frame), (0.30, frame)]
+    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
+    assert abs(fps - 10.0) < 0.5
+
+
+def test_estimate_fps_from_frames_allows_fps_just_below_ratio_limit():
+    # 許容倍率1.5の境界。fallback_fps=20.0に対し29.0fpsは閾値30.0未満のため
+    # 推定値をそのまま採用する（境界判定は > のため30.0ちょうどはクランプされる）。
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    frames = [(i / 29.0, frame) for i in range(20)]
+    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
+    assert abs(fps - 29.0) < 0.5
+
+
 def test_probe_rtsp_endpoint_reports_tcp_ok(monkeypatch):
     class _DummySocket:
         def __enter__(self):
