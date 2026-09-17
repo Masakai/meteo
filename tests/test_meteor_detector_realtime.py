@@ -2,10 +2,10 @@ import numpy as np
 from datetime import datetime
 
 from meteor_detector_realtime import (
-    estimate_fps_from_frames,
     make_detection_base_name,
     make_detection_id,
     probe_rtsp_endpoint,
+    resample_frames_to_cfr,
     sanitize_fps,
 )
 
@@ -17,58 +17,150 @@ def test_sanitize_fps_returns_default_for_invalid_values():
     assert sanitize_fps(None, default=25.0) == 25.0
 
 
-def test_estimate_fps_from_frames_20fps():
-    frame = np.zeros((10, 10, 3), dtype=np.uint8)
-    # 0.05s間隔 -> 20fps
-    frames = [(0.00, frame), (0.05, frame), (0.10, frame), (0.15, frame), (0.20, frame)]
-    fps = estimate_fps_from_frames(frames, fallback_fps=30.0)
-    assert abs(fps - 20.0) < 0.5
+def _frames(timestamps):
+    """時刻列から (時刻, 識別可能な画像) のリストを作る"""
+    return [
+        (t, np.full((2, 2, 3), idx % 256, dtype=np.uint8))
+        for idx, t in enumerate(timestamps)
+    ]
 
 
-def test_estimate_fps_from_frames_15fps():
-    frame = np.zeros((10, 10, 3), dtype=np.uint8)
-    # 0.0667s間隔 -> 約15fps
-    frames = [(0.00, frame), (0.0667, frame), (0.1334, frame), (0.2001, frame)]
-    fps = estimate_fps_from_frames(frames, fallback_fps=30.0)
-    assert abs(fps - 15.0) < 0.5
+def _run(timestamps, out_fps):
+    frames = _frames(timestamps)
+    stats = []
+    out = list(resample_frames_to_cfr(frames, out_fps, stats=stats))
+    return out, stats[-1]
 
 
-def test_estimate_fps_from_frames_rejects_fps_far_above_negotiated():
-    # 2026-08-16に本番greeng4で観測された事象の再現。接続時fps=20.0のカメラで
-    # camera1/meteor_20260816_032802_79d9e49b.mp4 が108fpsで書き出されていた。
-    # 約9.3ms間隔はsanitize_fps()の有効帯(1.0〜120.0)の内側のため既存の上限では
-    # 弾けず、fallback_fps(20.0)との比率でのみ検出できる。
-    frame = np.zeros((10, 10, 3), dtype=np.uint8)
-    frames = [(i / 108.0, frame) for i in range(20)]
-    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
-    assert fps == 20.0
+def _ids(frames_out):
+    """出力フレーム列を、元フレームの識別値の列に変換する"""
+    return [int(f[0, 0, 0]) for f in frames_out]
 
 
-def test_estimate_fps_from_frames_rejects_fps_within_sanitize_range():
-    # 同上、camera2/meteor_20260816_030601_7f6b0f81.mp4 の117fpsケース。
-    # 120.0未満のためsanitize_fps()を素通りする値であることが本テストの要点。
-    frame = np.zeros((10, 10, 3), dtype=np.uint8)
-    frames = [(i / 117.0, frame) for i in range(20)]
-    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
-    assert fps == 20.0
+def _run_lengths(ids):
+    """同一フレームの連続回数の列を返す"""
+    runs = []
+    for value in ids:
+        if runs and runs[-1][0] == value:
+            runs[-1][1] += 1
+        else:
+            runs.append([value, 1])
+    return [count for _, count in runs]
 
 
-def test_estimate_fps_from_frames_allows_normal_variation_within_ratio():
-    # Tapo C120は夜間IRモードで実効fpsが接続時ネゴシエーション値(20.0)より
-    # 下がることがある。10fps程度への低下は異常値ではないため推定値をそのまま使う。
-    frame = np.zeros((10, 10, 3), dtype=np.uint8)
-    frames = [(0.00, frame), (0.10, frame), (0.20, frame), (0.30, frame)]
-    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
-    assert abs(fps - 10.0) < 0.5
+def test_resample_10fps_input_to_20fps_grid_duplicates_each_frame():
+    """夜間の実効10fpsを20fps格子へ: 各フレームが2回ずつ、脱落なし"""
+    timestamps = [i * 0.1 for i in range(11)]  # 10fps・1.0秒
+    out, stats = _run(timestamps, 20.0)
+
+    assert stats.n_out == 21  # 1.0秒 * 20fps + 1
+    assert stats.n_dropped == 0
+    assert stats.n_used == 11
+    assert stats.max_run == 2
+    assert _run_lengths(_ids(out))[:-1] == [2] * 10
 
 
-def test_estimate_fps_from_frames_allows_fps_just_below_ratio_limit():
-    # 許容倍率1.5の境界。fallback_fps=20.0に対し29.0fpsは閾値30.0未満のため
-    # 推定値をそのまま採用する（境界判定は > のため30.0ちょうどはクランプされる）。
-    frame = np.zeros((10, 10, 3), dtype=np.uint8)
-    frames = [(i / 29.0, frame) for i in range(20)]
-    fps = estimate_fps_from_frames(frames, fallback_fps=20.0)
-    assert abs(fps - 29.0) < 0.5
+def test_resample_20fps_input_to_20fps_grid_is_identity():
+    timestamps = [i * 0.05 for i in range(21)]
+    out, stats = _run(timestamps, 20.0)
+
+    assert stats.n_out == 21
+    assert stats.n_dropped == 0
+    assert stats.max_run == 1
+    assert _ids(out) == list(range(21))
+
+
+def test_resample_uneven_arrival_keeps_real_duration():
+    """0.05/0.05/0.2秒の偏り: 中央値推定は20fpsを返すが実効は10fps
+
+    現行の中央値方式が2倍速を生む入力パターン。再配置後の再生時間が
+    入力の実時間と一致し、入力フレームが脱落しないことを確認する。
+    """
+    timestamps = [0.0]
+    for _ in range(10):
+        timestamps += [timestamps[-1] + 0.05, timestamps[-1] + 0.10, timestamps[-1] + 0.30]
+
+    span = timestamps[-1] - timestamps[0]
+    out, stats = _run(timestamps, 20.0)
+
+    # 再生時間が実時間と一致する（n_outは両端を含むためn_out-1格子分）
+    assert abs((stats.n_out - 1) / 20.0 - span) <= 1.0 / 20.0
+    # 0.05秒間隔のフレームも20fps格子に収まるため脱落しない
+    assert stats.n_dropped == 0
+    assert stats.n_used == len(timestamps)
+    assert len(out) == stats.n_out
+
+
+def test_resample_simultaneous_arrivals_are_dropped_but_duration_holds():
+    """ほぼ同時到着が半数を超える入力（現行推定が200fps前後を返す）
+
+    格子より細かい間隔のフレームは出力に現れないが、再生時間は実時間を保つ。
+    脱落はn_droppedで検知できる。
+    """
+    timestamps = []
+    for i in range(10):
+        base = i * 0.1
+        timestamps += [base, base + 0.001, base + 0.002]
+
+    span = timestamps[-1] - timestamps[0]
+    out, stats = _run(timestamps, 20.0)
+
+    assert abs((stats.n_out - 1) / 20.0 - span) <= 1.0 / 20.0
+    assert stats.n_dropped > 0  # 同時到着分が脱落する
+    assert stats.n_used + stats.n_dropped == len(timestamps)
+    assert len(out) == stats.n_out
+
+
+def test_resample_fps_change_midway_is_tracked():
+    """途中で10fpsから20fpsへ変化: 複製連長が2から1へ変わる"""
+    timestamps = [i * 0.1 for i in range(6)]          # 10fps・0.5秒
+    timestamps += [timestamps[-1] + (i + 1) * 0.05 for i in range(10)]  # 20fps・0.5秒
+
+    span = timestamps[-1] - timestamps[0]
+    out, stats = _run(timestamps, 20.0)
+
+    assert abs((stats.n_out - 1) / 20.0 - span) <= 1.0 / 20.0
+    assert stats.n_dropped == 0
+
+    runs = _run_lengths(_ids(out))
+    assert runs[0] == 2    # 10fps区間は2回ずつ
+    assert runs[-2] == 1   # 20fps区間は1回ずつ
+
+
+def test_resample_gap_is_filled_with_previous_frame():
+    """2秒の欠落区間は直前フレームの複製で埋まる"""
+    timestamps = [0.0, 0.05, 0.10, 2.10, 2.15]
+    out, stats = _run(timestamps, 20.0)
+
+    assert stats.n_out == int(2.15 * 20) + 1
+    assert stats.n_dropped == 0
+    assert stats.max_run == 40  # 0.10秒のフレームが2.10秒直前まで40スロット継続
+    assert _ids(out)[3] == 2    # 欠落区間は直前フレーム(index 2)で埋まる
+
+
+def test_resample_handles_degenerate_inputs():
+    assert list(resample_frames_to_cfr([], 20.0)) == []
+
+    single, stats = _run([1.5], 20.0)
+    assert len(single) == 1
+    assert stats.n_out == 1
+    assert stats.n_dropped == 0
+
+    # 時刻の逆行・停滞は除外される（例外を出さない）
+    out, stats = _run([0.0, 0.05, 0.04, 0.05, 0.10], 20.0)
+    assert stats.n_dropped == 2
+    assert _ids(out) == [0, 1, 4]
+
+
+def test_resample_uses_sanitized_out_fps():
+    """不正なout_fpsはsanitize_fpsの既定値へ丸められる"""
+    timestamps = [i * (1.0 / 30.0) for i in range(31)]
+    out, stats = _run(timestamps, 0)  # 0 -> 既定30.0
+
+    assert stats.n_out == 31
+    assert len(out) == 31
+
+
 
 
 def test_probe_rtsp_endpoint_reports_tcp_ok(monkeypatch):

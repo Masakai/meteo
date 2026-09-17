@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 from pathlib import Path
-from typing import List, Optional, Tuple, Dict
+from typing import Iterator, List, NamedTuple, Optional, Tuple, Dict
 from collections import deque
 from threading import Thread, Lock, Event
 from queue import Queue, Empty
@@ -32,8 +32,13 @@ def write_mp4_clip_ffmpeg(
     *,
     fps: float,
     size: Tuple[int, int],
+    stats: Optional[List["ResampleStats"]] = None,
 ) -> bool:
-    """ffmpegで目的メタデータに近いMP4を直接出力する。"""
+    """ffmpegで目的メタデータに近いMP4を直接出力する。
+
+    fpsは出力CFRの格子間隔（RTSPネゴシエーション値）であり、入力フレームは
+    resample_frames_to_cfr()で自身の受信時刻の位置へ再配置される。
+    """
     width, height = size
     target_fps = sanitize_fps(fps, default=30.0)
     gop = int(target_fps * 2)
@@ -106,7 +111,7 @@ def write_mp4_clip_ffmpeg(
 
     try:
         assert proc.stdin is not None
-        for _, frame in frames:
+        for frame in resample_frames_to_cfr(frames, target_fps, stats=stats):
             proc.stdin.write(frame.tobytes())
         proc.stdin.close()
         stderr = b""
@@ -131,15 +136,18 @@ def write_clip_with_fallback(
     *,
     fps: float,
     size: Tuple[int, int],
+    stats: Optional[List["ResampleStats"]] = None,
 ) -> bool:
     """ffmpeg優先でMP4を書き出し、失敗時のみOpenCVへフォールバックする。"""
-    if write_mp4_clip_ffmpeg(output_path, frames, fps=fps, size=size):
+    target_fps = sanitize_fps(fps, default=30.0)
+
+    if write_mp4_clip_ffmpeg(output_path, frames, fps=target_fps, size=size, stats=stats):
         return True
 
-    writer = open_video_writer(output_path, fps, size)
+    writer = open_video_writer(output_path, target_fps, size)
     if writer is None:
         return False
-    for _, frame in frames:
+    for frame in resample_frames_to_cfr(frames, target_fps, stats=stats):
         writer.write(frame)
     writer.release()
     return True
@@ -158,46 +166,108 @@ def sanitize_fps(value: Optional[float], default: float = 30.0) -> float:
     return fps
 
 
-def estimate_fps_from_frames(
-    frames: List[Tuple[float, np.ndarray]],
-    fallback_fps: float = 30.0,
-    max_ratio_to_fallback: float = 1.5,
-) -> float:
-    """フレーム時刻差の中央値から実効FPSを推定
+# 再配置で脱落した入力フレームの割合がこれを超えたら警告する。
+# 受信間隔には常にジッタがあり、格子間隔より短い間隔で届いたフレームは
+# 同じスロットを奪い合って一方が脱落する。2026-09-17にgreeng4のcamera1で
+# 実測した受信間隔（公称0.05秒に対し0.031〜0.066秒）を再配置にかけると、
+# 正常時でも昼7〜11%・夜1.5%が脱落する。一方、同時到着バーストでは33%に
+# 達する。両者を分離する値として0.25を採る。
+RESAMPLE_DROP_WARN_RATIO = 0.25
 
-    fallback_fpsはRTSP接続時にネゴシエートされたカメラ本来のfpsを想定する。
-    CPU飽和等でcap.read()の呼び出し間隔が乱れると、フレームに付与される
-    受信時刻が実際の撮影間隔より詰まり、推定fpsがカメラの実効fpsを大きく
-    上回ることがある（2026-08-16の本番greeng4で、接続時20.0fpsのカメラに対し
-    108fps・117fpsで書き出された事例。2026-08-23には210fps・226fpsも観測）。
-    これらはsanitize_fps()の上限120.0の内側にあるため上限だけでは弾けない。
-    カメラのネゴシエーション値を基準にmax_ratio_to_fallback倍を超える推定値を
-    退けることで、実効fpsの正常な変動（夜間IRモードでの低下など）は保ちつつ
-    非物理的な値のみ除外する。
+
+class ResampleStats(NamedTuple):
+    """フレーム再配置の統計
+
+    n_dropped が 0 より大きい、または max_run が out_fps/実効fps から大きく
+    外れる場合、受信時刻が偏っていることを示す（再生時間は正しいまま
+    動きがカクつく）。実機での品質確認はこの2値で行う。
     """
-    sanitized_fallback = sanitize_fps(fallback_fps, default=30.0)
 
-    if len(frames) < 2:
-        return sanitized_fallback
+    n_out: int       # 出力フレーム数
+    n_used: int      # 出力に現れた入力フレーム数
+    n_dropped: int   # 出力に現れなかった入力フレーム数
+    max_run: int     # 同一フレームの最大連続回数
 
-    deltas: List[float] = []
-    for idx in range(1, len(frames)):
-        dt = frames[idx][0] - frames[idx - 1][0]
-        if dt > 0:
-            deltas.append(dt)
 
-    if not deltas:
-        return sanitized_fallback
+def resample_frames_to_cfr(
+    frames: List[Tuple[float, np.ndarray]],
+    out_fps: float,
+    stats: Optional[List[ResampleStats]] = None,
+) -> Iterator[np.ndarray]:
+    """フレームを受信時刻どおりに一定fpsの格子へ再配置する
 
-    median_dt = float(np.median(np.array(deltas, dtype=np.float64)))
-    if median_dt <= 0:
-        return sanitized_fallback
+    カメラの実効fpsは一定ではない（Tapo C120は夜間IRモードで20fpsから10fps
+    程度へ低下し、フレーム欠落も起きる）。クリップ全体を1個のfps値で表すと
+    必ずどこかで再生速度がずれるため、fpsの推定そのものを行わない。
 
-    estimated_fps = sanitize_fps(1.0 / median_dt, default=sanitized_fallback)
-    if estimated_fps > sanitized_fallback * max_ratio_to_fallback:
-        return sanitized_fallback
+    出力はout_fps固定のCFRとし、k番目の出力時刻 t0 + k/out_fps に対して
+    その時刻以前で最新の入力フレームを割り当てる。実効10fpsの区間では同じ
+    フレームが2回ずつ入り、欠落区間は直前のフレームで埋まる。これにより
+    再生時間は常に実時間と一致する（誤差は1/out_fps秒以内）。
 
-    return estimated_fps
+    なお本方式は受信時刻が撮影時刻におおむね比例することを前提とする。
+    RTSP再接続直後のバースト（バッファ済みフレームが同一時刻で一括到着）は
+    1〜2スロットに集約され、大半がn_droppedに計上される。再生時間は保たれるが
+    その区間の映像内容は失われる。これは想定内の挙動である。
+
+    画像はコピーせず参照を返す。統計はstatsリストに1件追加して返す
+    （ジェネレータを最後まで消費した時点で確定する）。
+    """
+    fps = sanitize_fps(out_fps, default=30.0)
+
+    # 時刻が逆行/停滞しているフレームを除外（単調増加列にする）
+    ordered: List[Tuple[float, np.ndarray]] = []
+    n_dropped = 0
+    for timestamp, frame in frames:
+        if ordered and timestamp <= ordered[-1][0]:
+            n_dropped += 1
+            continue
+        ordered.append((timestamp, frame))
+
+    if not ordered:
+        if stats is not None:
+            stats.append(ResampleStats(0, 0, n_dropped, 0))
+        return
+
+    t0 = ordered[0][0]
+    span = ordered[-1][0] - t0
+    n_out = int(span * fps + 1e-6) + 1
+
+    idx = 0
+    n_used = 0
+    max_run = 0
+    current_run = 0
+    last_idx = -1
+
+    # 格子間隔に対する許容誤差。浮動小数点の丸め（0.05*3 が 0.15 をわずかに
+    # 上回る等）で、格子上にあるべきフレームが次スロットへずれ込むのを防ぐ。
+    tolerance = (1.0 / fps) * 1e-6
+
+    for k in range(n_out):
+        target = t0 + k / fps + tolerance
+        # targetを超えない範囲で最も新しい入力フレームまで進める
+        while idx + 1 < len(ordered) and ordered[idx + 1][0] <= target:
+            idx += 1
+
+        if idx == last_idx:
+            current_run += 1
+        else:
+            # 出力に現れないまま飛ばされた入力フレームを数える
+            n_dropped += idx - last_idx - 1
+            n_used += 1
+            current_run = 1
+            last_idx = idx
+
+        if current_run > max_run:
+            max_run = current_run
+
+        yield ordered[idx][1]
+
+    # 末尾に残った未使用フレーム（通常は発生しない）
+    n_dropped += len(ordered) - 1 - last_idx
+
+    if stats is not None:
+        stats.append(ResampleStats(n_out, n_used, n_dropped, max_run))
 
 
 def probe_rtsp_endpoint(url: str, timeout: float = 3.0) -> str:
@@ -856,15 +926,32 @@ def save_meteor_event(
 
     height, width = frames[0][1].shape[:2]
 
-    clip_fps = estimate_fps_from_frames(frames, fallback_fps=fps)
+    # 出力fpsはRTSPネゴシエーション値に固定し、各フレームは自身の受信時刻の
+    # 位置へ再配置する（fps推定は行わない。設計書2026-09-17参照）
+    clip_fps = sanitize_fps(fps, default=30.0)
 
     clip_path = None
     if extract_clips:
         clip_path = output_dir / f"{base_name}.mp4"
-        ok = write_clip_with_fallback(clip_path, frames, fps=clip_fps, size=(width, height))
+        resample_stats: List[ResampleStats] = []
+        ok = write_clip_with_fallback(
+            clip_path, frames, fps=clip_fps, size=(width, height), stats=resample_stats
+        )
         if not ok:
             print("[WARN] 動画エンコーダの初期化に失敗しました")
             return None
+        if resample_stats:
+            st = resample_stats[-1]
+            total_in = st.n_used + st.n_dropped
+            drop_ratio = st.n_dropped / total_in if total_in else 0.0
+            if drop_ratio > RESAMPLE_DROP_WARN_RATIO:
+                print(
+                    f"[WARN] クリップ再配置: 入力フレームの{drop_ratio * 100:.0f}%"
+                    f"({st.n_dropped}/{total_in}枚)が出力に現れませんでした "
+                    f"(出力{st.n_out}枚, 最大連続{st.max_run}回) "
+                    f"受信時刻の偏りが疑われます: {base_name}",
+                    flush=True,
+                )
 
     composite_end = min(event.end_time + composite_after, end)
     event_frames = ring_buffer.get_range(event.start_time, composite_end)
