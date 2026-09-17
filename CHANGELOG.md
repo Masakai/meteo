@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.17.5] - 2026-09-17
 ### Fixed
 - `meteor_detector_realtime.py` — 検出クリップの再生速度異常を、fps推定の廃止によって根本対策した。設計書は `documents/designs/2026-09-17-clip-timestamp-faithful-export.md`。
 
